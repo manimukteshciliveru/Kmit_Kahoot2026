@@ -1,0 +1,426 @@
+const Response = require('../models/Response');
+const Quiz = require('../models/Quiz');
+const User = require('../models/User');
+
+// @desc    Submit answer for a question
+// @route   POST /api/responses/answer
+// @access  Private (Student)
+exports.submitAnswer = async (req, res) => {
+    try {
+        const { quizId, questionId, answer, timeTaken } = req.body;
+
+        // Validate input
+        if (!quizId || !questionId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Quiz ID and Question ID are required'
+            });
+        }
+
+        // Get quiz
+        const quiz = await Quiz.findById(quizId);
+        if (!quiz) {
+            return res.status(404).json({
+                success: false,
+                message: 'Quiz not found'
+            });
+        }
+
+        if (quiz.status !== 'active') {
+            return res.status(400).json({
+                success: false,
+                message: 'Quiz is not active'
+            });
+        }
+
+        // Get or create response
+        let response = await Response.findOne({ quizId, userId: req.user._id });
+
+        if (!response) {
+            return res.status(400).json({
+                success: false,
+                message: 'You have not joined this quiz'
+            });
+        }
+
+        if (response.status === 'terminated' || response.status === 'completed') {
+            return res.status(400).json({
+                success: false,
+                message: `Quiz already ${response.status}`
+            });
+        }
+
+        // Find the question in quiz
+        const question = quiz.questions.id(questionId);
+        if (!question) {
+            return res.status(404).json({
+                success: false,
+                message: 'Question not found'
+            });
+        }
+
+        // Check if answer is correct
+        const isCorrect = checkAnswer(question, answer);
+        const pointsEarned = isCorrect ? question.points : 0;
+
+        // Update answer in response
+        const answerIndex = response.answers.findIndex(
+            a => a.questionId.toString() === questionId.toString()
+        );
+
+        if (answerIndex !== -1) {
+            response.answers[answerIndex] = {
+                ...response.answers[answerIndex].toObject(),
+                answer,
+                isCorrect,
+                pointsEarned,
+                timeTaken: timeTaken || 0,
+                answeredAt: new Date()
+            };
+        }
+
+        response.lastActivityAt = new Date();
+        await response.save();
+
+        // Emit real-time update for faculty
+        const io = req.app.get('io');
+        if (io) {
+            // Update leaderboard
+            const leaderboard = await Response.getLeaderboard(quizId, 10);
+
+            io.to(`quiz:${quizId}`).emit('leaderboard:update', { leaderboard });
+
+            // Notify faculty of response
+            io.to(`quiz:${quizId}:faculty`).emit('response:received', {
+                participantId: req.user._id,
+                participantName: req.user.name,
+                questionId,
+                isCorrect,
+                pointsEarned,
+                timeTaken,
+                currentScore: response.totalScore + pointsEarned
+            });
+        }
+
+        // Prepare feedback
+        const feedback = quiz.settings.showInstantFeedback ? {
+            isCorrect,
+            pointsEarned,
+            correctAnswer: quiz.settings.showCorrectAnswer ? question.correctAnswer : undefined,
+            explanation: question.explanation
+        } : {};
+
+        res.status(200).json({
+            success: true,
+            message: 'Answer submitted',
+            data: {
+                feedback,
+                currentScore: response.totalScore,
+                answeredCount: response.answers.filter(a => a.answer).length
+            }
+        });
+    } catch (error) {
+        console.error('Submit answer error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to submit answer',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Get student's response for a quiz
+// @route   GET /api/responses/quiz/:quizId
+// @access  Private
+exports.getMyResponse = async (req, res) => {
+    try {
+        const response = await Response.findOne({
+            quizId: req.params.quizId,
+            userId: req.user._id
+        }).populate('quizId', 'title code questions settings');
+
+        if (!response) {
+            return res.status(404).json({
+                success: false,
+                message: 'Response not found'
+            });
+        }
+
+        let responseData = response.toObject();
+
+        // Sanitize if active and student
+        if (req.user.role === 'student' && responseData.quizId && responseData.quizId.status === 'active') {
+            responseData.quizId.questions = responseData.quizId.questions.map(q => ({
+                ...q,
+                correctAnswer: undefined,
+                explanation: undefined
+            }));
+        }
+
+        res.status(200).json({
+            success: true,
+            data: { response: responseData }
+        });
+    } catch (error) {
+        console.error('Get response error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch response',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Get all responses for a quiz (Faculty)
+// @route   GET /api/responses/quiz/:quizId/all
+// @access  Private (Faculty/Admin)
+exports.getQuizResponses = async (req, res) => {
+    try {
+        const quiz = await Quiz.findById(req.params.quizId);
+
+        if (!quiz) {
+            return res.status(404).json({
+                success: false,
+                message: 'Quiz not found'
+            });
+        }
+
+        // Check ownership
+        if (quiz.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Not authorized to view responses'
+            });
+        }
+
+        const responses = await Response.find({ quizId: req.params.quizId })
+            .populate('userId', 'name email avatar')
+            .sort({ rank: 1, totalScore: -1 });
+
+        res.status(200).json({
+            success: true,
+            data: { responses }
+        });
+    } catch (error) {
+        console.error('Get quiz responses error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch responses',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Report tab switch
+// @route   POST /api/responses/tab-switch
+// @access  Private (Student)
+exports.reportTabSwitch = async (req, res) => {
+    try {
+        const { quizId } = req.body;
+
+        const quiz = await Quiz.findById(quizId);
+        if (!quiz) {
+            return res.status(404).json({
+                success: false,
+                message: 'Quiz not found'
+            });
+        }
+
+        const response = await Response.findOne({ quizId, userId: req.user._id });
+        if (!response) {
+            return res.status(404).json({
+                success: false,
+                message: 'Response not found'
+            });
+        }
+
+        response.tabSwitchCount += 1;
+
+        // Check if should terminate
+        const maxSwitches = quiz.settings.maxTabSwitches || 0;
+        const shouldTerminate = !quiz.settings.allowTabSwitch ||
+            (maxSwitches > 0 && response.tabSwitchCount > maxSwitches);
+
+        if (shouldTerminate) {
+            response.status = 'terminated';
+            response.terminationReason = 'tab-switch';
+            response.completedAt = new Date();
+        }
+
+        await response.save();
+
+        // Notify faculty
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`quiz:${quizId}:faculty`).emit('participant:tabswitch', {
+                participantId: req.user._id,
+                participantName: req.user.name,
+                tabSwitchCount: response.tabSwitchCount,
+                terminated: shouldTerminate
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                tabSwitchCount: response.tabSwitchCount,
+                terminated: shouldTerminate,
+                message: shouldTerminate
+                    ? 'Quiz terminated due to tab switching'
+                    : `Warning: Tab switch detected (${response.tabSwitchCount}/${maxSwitches || 'unlimited'})`
+            }
+        });
+    } catch (error) {
+        console.error('Report tab switch error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to report tab switch',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Complete quiz submission
+// @route   POST /api/responses/complete
+// @access  Private (Student)
+exports.completeQuiz = async (req, res) => {
+    try {
+        const { quizId } = req.body;
+
+        const response = await Response.findOne({ quizId, userId: req.user._id });
+        if (!response) {
+            return res.status(404).json({
+                success: false,
+                message: 'Response not found'
+            });
+        }
+
+        if (response.status === 'completed' || response.status === 'terminated') {
+            return res.status(400).json({
+                success: false,
+                message: 'Quiz already finished'
+            });
+        }
+
+        response.status = 'completed';
+        response.completedAt = new Date();
+        await response.save();
+
+        // Update ranks
+        await Response.updateRanks(quizId);
+
+        // Get updated response with rank
+        const updatedResponse = await Response.findById(response._id);
+
+        // Update user stats
+        await User.findByIdAndUpdate(req.user._id, {
+            $inc: { 'stats.totalPoints': response.totalScore }
+        });
+
+        // Update average score
+        const user = await User.findById(req.user._id);
+        const allResponses = await Response.find({ userId: req.user._id, status: 'completed' });
+        const avgScore = allResponses.reduce((sum, r) => sum + r.percentage, 0) / allResponses.length;
+        await User.findByIdAndUpdate(req.user._id, {
+            $set: { 'stats.averageScore': Math.round(avgScore) }
+        });
+
+        // Emit leaderboard update
+        const io = req.app.get('io');
+        if (io) {
+            const leaderboard = await Response.getLeaderboard(quizId);
+            io.to(`quiz:${quizId}`).emit('leaderboard:update', { leaderboard });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Quiz completed successfully',
+            data: {
+                response: {
+                    totalScore: updatedResponse.totalScore,
+                    percentage: updatedResponse.percentage,
+                    correctCount: updatedResponse.correctCount,
+                    wrongCount: updatedResponse.wrongCount,
+                    rank: updatedResponse.rank,
+                    totalTimeTaken: updatedResponse.totalTimeTaken
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Complete quiz error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to complete quiz',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Get student's quiz history
+// @route   GET /api/responses/history
+// @access  Private (Student)
+exports.getQuizHistory = async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const responses = await Response.find({ userId: req.user._id })
+            .populate('quizId', 'title code mode createdAt')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const total = await Response.countDocuments({ userId: req.user._id });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                responses,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total,
+                    pages: Math.ceil(total / parseInt(limit))
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Get quiz history error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch history',
+            error: error.message
+        });
+    }
+};
+
+// Helper function to check answers
+function checkAnswer(question, answer) {
+    if (!answer) return false;
+
+    const normalize = (str) => str.toString().toLowerCase().trim();
+
+    switch (question.type) {
+        case 'mcq':
+            return normalize(answer) === normalize(question.correctAnswer);
+
+        case 'fill-blank':
+            // For fill in the blank, check exact match or similar
+            const correctAnswers = question.correctAnswer.split('|').map(a => normalize(a));
+            return correctAnswers.includes(normalize(answer));
+
+        case 'qa':
+            // For Q&A, might need more sophisticated checking
+            // For now, check if answer contains key terms
+            const userAnswer = normalize(answer);
+            const expected = normalize(question.correctAnswer);
+
+            // Simple word matching (could be enhanced with AI)
+            const expectedWords = expected.split(/\s+/).filter(w => w.length > 3);
+            const matchedWords = expectedWords.filter(w => userAnswer.includes(w));
+            return matchedWords.length >= expectedWords.length * 0.6;
+
+        default:
+            return false;
+    }
+}
