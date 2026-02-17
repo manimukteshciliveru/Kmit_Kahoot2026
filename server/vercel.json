@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "public": true,
+  "env": {
+    "MONGODB_URI": "@mongodb_uri",
+    "JWT_SECRET": "@jwt_secret",
+    "NODE_ENV": "production",
+    "PORT": "5000",
+    "CLIENT_URL": "@client_url",
+    "ALLOWED_ORIGINS": "@allowed_origins"
+  },
+  "functions": {
+    "server/server.js": {
+      "maxDuration": 30,
+      "memory": 1024,
+      "runtime": "nodejs20.x"
+    }
+  }
+}
