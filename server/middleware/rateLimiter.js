@@ -8,10 +8,9 @@ const rateLimit = require('express-rate-limit');
 const RateLimitRedis = require('rate-limit-redis');
 // Robustly handle different export formats (CJS/ESM/Default)
 const RedisStore = RateLimitRedis.RedisStore || RateLimitRedis.default || RateLimitRedis;
-const redis = require('../config/redis');
-
-// Get the centralized Redis client
-// const redis = initRedis(); <--- Removed, we import instance directly now
+// Redis DISABLED temporarily for stability
+const redis = null;
+// const redis = require('../config/redis'); <--- Commented out
 
 // Function to create store based on availability
 const createStore = () => {

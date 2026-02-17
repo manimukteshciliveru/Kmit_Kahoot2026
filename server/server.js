@@ -37,7 +37,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- 2. CORS Configuration (Fix for Vercel) ---
+// --- 2. CORS Configuration (Strict Production Setup) ---
 // Using strict origin reflection to guarantee match
 const corsOptions = {
     origin: ["https://kmit-kahoot.vercel.app", "http://localhost:5173"],
@@ -59,7 +59,7 @@ app.use(helmet({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Initialize Socket.io with CORS and Redis Adapter (if configured)
+// Initialize Socket.io (PURE WEBSOCKETS - NO REDIS)
 const ioConfig = {
     cors: corsOptions,
     pingTimeout: 60000,
@@ -68,34 +68,36 @@ const ioConfig = {
 
 const io = new Server(server, ioConfig);
 
-const { createAdapter } = require('@socket.io/redis-adapter');
-const redis = require('./config/redis');
+// REDIS COMPLETELY DISABLED
+console.log('ℹ️ Redis DISABLED. Running in Single-Node mode.');
+// const { createAdapter } = require('@socket.io/redis-adapter');
+// const redis = require('./config/redis');
 
 // Configure Redis Adapter for Multi-Node Scaling
-if (redis) {
-    try {
-        const pubClient = redis.duplicate();
-        const subClient = redis.duplicate();
+// if (redis) {
+//     try {
+//         const pubClient = redis.duplicate();
+//         const subClient = redis.duplicate();
 
-        // Prevent crashes on Pub/Sub clients
-        pubClient.on('error', (err) => console.error("❌ Redis Pub Error:", err.message));
-        subClient.on('error', (err) => console.error("❌ Redis Sub Error:", err.message));
+//         // Prevent crashes on Pub/Sub clients
+//         pubClient.on('error', (err) => console.error("❌ Redis Pub Error:", err.message));
+//         subClient.on('error', (err) => console.error("❌ Redis Sub Error:", err.message));
 
-        Promise.all([pubClient.connect(), subClient.connect()])
-            .then(() => {
-                io.adapter(createAdapter(pubClient, subClient));
-                console.log('✅ Socket.io Redis Adapter configured for horizontal scaling.');
-            })
-            .catch((err) => {
-                console.warn("⚠️ Redis Adapter failed to connect. Running in Single-Node mode.", err.message);
-            });
+//         Promise.all([pubClient.connect(), subClient.connect()])
+//             .then(() => {
+//                 io.adapter(createAdapter(pubClient, subClient));
+//                 console.log('✅ Socket.io Redis Adapter configured for horizontal scaling.');
+//             })
+//             .catch((err) => {
+//                 console.warn("⚠️ Redis Adapter failed to connect. Running in Single-Node mode.", err.message);
+//             });
 
-    } catch (e) {
-        console.warn("⚠️ Redis Adapter Setup Failed:", e.message);
-    }
-} else {
-    console.log('ℹ️ Running in Single-Node mode (Redis disabled).');
-}
+//     } catch (e) {
+//         console.warn("⚠️ Redis Adapter Setup Failed:", e.message);
+//     }
+// } else {
+//     console.log('ℹ️ Running in Single-Node mode (Redis disabled).');
+// }
 
 // Make io accessible to routes
 app.set('io', io);
@@ -108,7 +110,7 @@ const { limiter: defaultLimiter, authLimiter } = require('./middleware/rateLimit
 
 // Use the distributed rate limiter
 app.use('/api/', defaultLimiter);
-app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/login', authLimiter);  // This will now use MemoryStore
 
 // Static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
