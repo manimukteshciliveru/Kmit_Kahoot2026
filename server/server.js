@@ -31,24 +31,9 @@ requiredEnv.forEach((key) => {
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.io with CORS and Redis Adapter (if configured)
-const { createAdapter } = require('@socket.io/redis-adapter');
-const redis = require('./config/redis');
-
 // --- 2. CORS Configuration (Strict Production Setup) ---
 const corsOptions = {
-    origin: function (origin, callback) {
-        const allowedOrigins = [
-            "https://kmit-kahoot.vercel.app",
-            "http://localhost:5173"
-        ];
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.warn(`Blocked CORS request from: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: ["https://kmit-kahoot.vercel.app", "http://localhost:5173"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"]
@@ -56,9 +41,18 @@ const corsOptions = {
 
 // Apply CORS to Express
 app.use(cors(corsOptions));
-// Handle Preflight Requests explicitly
-app.options('*', cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle Preflight
 
+// Security middleware
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+
+// Body parsing (MUST BE BEFORE ROUTES)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Initialize Socket.io with CORS and Redis Adapter (if configured)
 const ioConfig = {
     cors: corsOptions,
     pingTimeout: 60000,
@@ -66,6 +60,9 @@ const ioConfig = {
 };
 
 const io = new Server(server, ioConfig);
+
+const { createAdapter } = require('@socket.io/redis-adapter');
+const redis = require('./config/redis');
 
 // Configure Redis Adapter for Multi-Node Scaling
 if (redis) {
@@ -99,21 +96,12 @@ app.set('io', io);
 // Connect to MongoDB
 connectDB();
 
-// Security middleware
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }
-}));
-
 // Rate limiting
 const { limiter: defaultLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 // Use the distributed rate limiter
 app.use('/api/', defaultLimiter);
 app.use('/api/auth/login', authLimiter);
-
-// Body parsing
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
