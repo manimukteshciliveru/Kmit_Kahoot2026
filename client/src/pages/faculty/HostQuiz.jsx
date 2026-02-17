@@ -11,7 +11,7 @@ const HostQuiz = () => {
     const { quizId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { socket, nextQuestion } = useSocket();
+    const { socket } = useSocket();
 
     const [quiz, setQuiz] = useState(null);
     const [participants, setParticipants] = useState([]);
@@ -19,12 +19,13 @@ const HostQuiz = () => {
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answeredCount, setAnsweredCount] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
-    const [showLeaderboard, setShowLeaderboard] = useState(false);
+    const [activeTab, setActiveTab] = useState('stats'); // stats, leaderboard, attendance
     const [answeredParticipants, setAnsweredParticipants] = useState([]);
+    const [cheatingAlerts, setCheatingAlerts] = useState([]);
+    const [timeLeft, setTimeLeft] = useState(0);
 
     useEffect(() => {
         if (user && user.role === 'student') {
-            console.log("Student detected on host page, redirecting to play page.");
             navigate(`/quiz/${quizId}/play`);
             return;
         }
@@ -35,19 +36,24 @@ const HostQuiz = () => {
                 const data = response.data.data.quiz;
                 setQuiz(data);
                 setParticipants(Array.isArray(data.participants) ? data.participants : []);
-                setStatus(data.status === 'active' ? 'active' : 'ready');
+                setStatus(data.status === 'active' ? 'active' : (data.status === 'completed' || data.status === 'finished') ? 'completed' : 'ready');
                 if (data.currentQuestionIndex >= 0) {
                     setCurrentQuestionIndex(data.currentQuestionIndex);
                 }
+
+                if (data.status === 'active' && data.expiresAt) {
+                    const expires = new Date(data.expiresAt).getTime();
+                    const now = Date.now();
+                    setTimeLeft(Math.max(0, Math.floor((expires - now) / 1000)));
+                } else if (data.status === 'active' && data.settings?.quizTimer > 0 && data.startedAt) {
+                    const start = new Date(data.startedAt).getTime();
+                    const elapsed = Math.floor((Date.now() - start) / 1000);
+                    setTimeLeft(Math.max(0, data.settings.quizTimer - elapsed));
+                }
             } catch (error) {
                 console.error("Fetch error:", error);
-                if (error.response?.status === 403) {
-                    toast.error('You are not authorized to host this quiz');
-                    navigate('/dashboard');
-                } else {
-                    toast.error('Failed to load quiz');
-                    navigate('/dashboard');
-                }
+                toast.error('Failed to load quiz');
+                navigate('/dashboard');
             }
         };
         fetchQuiz();
@@ -60,53 +66,65 @@ const HostQuiz = () => {
         socket.emit('quiz:join', { quizId });
 
         const handleQuizJoined = (data) => {
-            console.log("Quiz joined event received with participants:", data.participants);
-            // Set initial participants from students who have already joined
-            const joinedParticipants = data.participants || [];
-            setParticipants(joinedParticipants);
+            setParticipants(data.participants || []);
         };
 
         const handleParticipantJoined = (data) => {
-            console.log("Participant joined event received:", data);
             setParticipants(prev => {
-                // Safely compare IDs as strings to handle potential ObjectId/String mismatches
-                const participantId = data.participant?.id;
-                if (prev.find(p => String(p._id || p.id) === String(participantId))) {
-                    console.log("Participant already in list:", data.participant?.name);
-                    return prev;
-                }
-                console.log("Adding new participant:", data.participant?.name);
-                return [...prev, {
-                    _id: participantId,
-                    id: participantId,
-                    name: data.participant?.name || 'Student',
-                    avatar: data.participant?.avatar
-                }];
+                const participant = data.participant;
+                if (prev.find(p => String(p.id || p._id) === String(participant.id))) return prev;
+                return [...prev, participant];
             });
-            toast.success(`${data.participant?.name || 'A student'} joined!`, { icon: '👋' });
+            toast.success(`${data.participant?.name} joined!`);
         };
 
-        const handleQuizStarted = () => {
+        const handleQuizStarted = (data) => {
             setStatus('active');
             setCurrentQuestionIndex(0);
-            setShowLeaderboard(false);
+            setActiveTab('stats');
+            if (data.expiresAt) {
+                const expires = new Date(data.expiresAt).getTime();
+                setTimeLeft(Math.max(0, Math.floor((expires - Date.now()) / 1000)));
+            } else if (data.settings?.quizTimer) {
+                setTimeLeft(data.settings.quizTimer);
+            }
         };
 
         const handleResponseReceived = (data) => {
-            console.log("Response received from:", data.participantName);
             setAnsweredCount(prev => prev + 1);
             setAnsweredParticipants(prev => [...new Set([...prev, data.participantId])]);
-            toast.success(`${data.participantName} answered!`, { id: data.participantId, duration: 2000 });
         };
 
         const handleLeaderboardUpdate = (data) => {
             setLeaderboard(data.leaderboard || []);
         };
 
+        const handleTabSwitch = (data) => {
+            toast.error(`${data.participantName} switched tabs!`, { icon: '⚠️' });
+            setCheatingAlerts(prev => [{ ...data, time: new Date() }, ...prev].slice(0, 5));
+        };
+
         const handleQuizEnded = (data) => {
             setStatus('completed');
             setLeaderboard(data.leaderboard || []);
-            setShowLeaderboard(true);
+            setActiveTab('leaderboard');
+        };
+
+        const handleParticipantFlagged = (data) => {
+            toast.error(`Security Alert: ${data.participantName || 'Student'} flagged`, { icon: '🛡️' });
+            setCheatingAlerts(prev => [{
+                participantName: data.participantName,
+                reason: data.reason,
+                time: new Date()
+            }, ...prev].slice(0, 10));
+
+            // Update participant trust score locally
+            setParticipants(prev => prev.map(p => {
+                if (String(p.id || p._id) === String(data.participantId)) {
+                    return { ...p, trustScore: data.score };
+                }
+                return p;
+            }));
         };
 
         socket.on('quiz:joined', handleQuizJoined);
@@ -114,6 +132,8 @@ const HostQuiz = () => {
         socket.on('quiz:started', handleQuizStarted);
         socket.on('response:received', handleResponseReceived);
         socket.on('leaderboard:update', handleLeaderboardUpdate);
+        socket.on('participant:tabswitch', handleTabSwitch);
+        socket.on('participant:flagged', handleParticipantFlagged);
         socket.on('quiz:ended', handleQuizEnded);
 
         return () => {
@@ -122,270 +142,331 @@ const HostQuiz = () => {
             socket.off('quiz:started', handleQuizStarted);
             socket.off('response:received', handleResponseReceived);
             socket.off('leaderboard:update', handleLeaderboardUpdate);
+            socket.off('participant:tabswitch', handleTabSwitch);
+            socket.off('participant:flagged', handleParticipantFlagged);
             socket.off('quiz:ended', handleQuizEnded);
         };
     }, [socket, quizId]);
 
+    // Timer logic
+    useEffect(() => {
+        if (status !== 'active' || timeLeft <= 0) return;
+
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [status, timeLeft > 0]);
+
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     const handleStartQuiz = async () => {
         if (participants.length === 0) {
-            if (!window.confirm("No students have joined yet. Are you sure you want to start the quiz?")) {
-                return;
-            }
+            if (!window.confirm("No students joined. Start anyway?")) return;
         }
         try {
             await quizAPI.start(quizId);
             setStatus('active');
-            setCurrentQuestionIndex(0);
-            toast.success('Quiz Started!', { icon: '🚀' });
+            toast.success('Quiz Started!');
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to start quiz');
+            toast.error('Failed to start quiz');
         }
-    };
-
-    const handleNextQuestion = useCallback(() => {
-        if (currentQuestionIndex < (quiz?.questions?.length || 0) - 1) {
-            nextQuestion(quizId);
-            setCurrentQuestionIndex(prev => prev + 1);
-            setAnsweredCount(0);
-            setAnsweredParticipants([]);
-            setShowLeaderboard(false);
-        } else {
-            setShowLeaderboard(true);
-        }
-    }, [currentQuestionIndex, quiz, quizId, nextQuestion]);
-
-    const handleShowLeaderboard = () => {
-        setShowLeaderboard(true);
     };
 
     const handleEndQuiz = async () => {
+        if (window.confirm("End quiz now?")) {
+            try {
+                await quizAPI.end(quizId);
+                setStatus('completed');
+                toast.success('Quiz Ended');
+            } catch (error) {
+                toast.error('Failed to end quiz');
+            }
+        }
+    };
+
+    const handleResetQuiz = async () => {
+        if (!window.confirm("Are you sure you want to host this quiz again? This will clear all previous session data.")) return;
         try {
-            await quizAPI.end(quizId);
-            setStatus('completed');
-            toast.success('Quiz Ended!');
+            await quizAPI.reset(quizId);
+            setStatus('ready');
+            setParticipants([]);
+            setLeaderboard([]);
+            setAnsweredParticipants([]);
+            setCheatingAlerts([]);
+            toast.success('Quiz reset! Ready to host.');
         } catch (error) {
-            toast.error('Failed to end quiz');
+            console.error(error);
+            toast.error('Failed to reset quiz');
         }
     };
 
-    const copyCode = () => {
-        if (quiz?.code) {
-            navigator.clipboard.writeText(quiz.code);
-            toast.success('PIN copied!');
-        }
+    const copyPIN = () => {
+        navigator.clipboard.writeText(quiz?.code);
+        toast.success('PIN copied!');
     };
 
-    if (!quiz) return (
-        <div className="host-quiz-page">
-            <div className="loading-container">
-                <div className="loading-spinner"></div>
-                <p>Loading Quiz Lobby...</p>
-            </div>
-        </div>
-    );
+    if (!quiz) return <div className="loading-container"><div className="loading-spinner"></div><p>Loading Quiz...</p></div>;
 
-    const currentQuestion = quiz.questions?.[currentQuestionIndex];
     const totalQuestions = quiz.questions?.length || 0;
 
-    // Completed/Leaderboard View
-    if (status === 'completed' || (showLeaderboard && leaderboard.length > 0)) {
+    // Lobby View
+    if (status === 'ready') {
         return (
             <div className="host-quiz-page">
-                <div className="host-completed">
-                    <div className="completed-header">
-                        <h1>🏆 Final Leaderboard</h1>
-                        <p>{quiz.title}</p>
+                <div className="host-lobby">
+                    <div className="lobby-header">
+                        <h1>{quiz.title}</h1>
+                        <p>Join with Game PIN</p>
                     </div>
-
-                    <div className="leaderboard-podium">
-                        {leaderboard.slice(0, 3).map((entry, index) => (
-                            <div key={entry.studentId} className={`podium-item rank-${index + 1}`}>
-                                <div className="podium-medal">
-                                    {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                                </div>
-                                <div className="podium-name">{entry.studentName}</div>
-                                <div className="podium-score">{entry.score} pts</div>
+                    <div className="pin-container" onClick={copyPIN}>
+                        <div className="pin-box">
+                            <span className="pin-title">PIN:</span>
+                            <span className="pin-code">{quiz.code}</span>
+                        </div>
+                    </div>
+                    <div className="lobby-content">
+                        <div className="lobby-status-bar">
+                            <div className="player-count"><FiUsers /> <span>{participants.length} Players</span></div>
+                            <div className="status-indicator waiting">Waiting...</div>
+                        </div>
+                        <div className="participants-area">
+                            <div className="participants-list">
+                                {participants.map((p, idx) => (
+                                    <div key={idx} className="participant-card">
+                                        <div className="participant-avatar">{p.name?.charAt(0)}</div>
+                                        <span className="participant-name">{p.name}</span>
+                                    </div>
+                                ))}
+                                {participants.length === 0 && <p>No one here yet...</p>}
                             </div>
-                        ))}
+                        </div>
                     </div>
-
-                    <div className="leaderboard-full">
-                        {leaderboard.slice(3).map((entry, index) => (
-                            <div key={entry.studentId} className="leaderboard-row">
-                                <span className="lb-rank">#{index + 4}</span>
-                                <span className="lb-name">{entry.studentName}</span>
-                                <span className="lb-score">{entry.score} pts</span>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="completed-actions">
-                        <button className="btn btn-secondary btn-lg" onClick={() => navigate(`/quiz/${quiz._id}/results`)}>
-                            <FiBarChart2 /> View Detailed Results
-                        </button>
-                        <button className="btn btn-primary btn-lg" onClick={() => navigate('/dashboard')}>
-                            Back to Dashboard
-                        </button>
+                    <div className="lobby-actions">
+                        <button className="btn btn-primary btn-xl" onClick={handleStartQuiz}>Start Quiz</button>
                     </div>
                 </div>
             </div>
         );
     }
 
-    // Active Quiz View
-    if (status === 'active') {
-        return (
-            <div className="host-quiz-page">
-                <div className="host-active">
-                    {/* Header */}
-                    <div className="active-header">
-                        <div className="quiz-progress">
-                            <span>Question {currentQuestionIndex + 1} of {totalQuestions}</span>
-                            <div className="progress-bar">
-                                <div
-                                    className="progress-fill"
-                                    style={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
-                                />
-                            </div>
-                        </div>
-                        <div className="live-badge">
-                            <span className="live-dot"></span> LIVE
-                        </div>
-                        <div className="participants-count">
-                            <FiUsers /> {participants.length}
-                        </div>
+    return (
+        <div className="host-quiz-page">
+            <div className="host-active">
+                <div className="active-header">
+                    <div className="host-nav-tabs">
+                        <button className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>Live Stats</button>
+                        <button className={`tab-btn ${activeTab === 'leaderboard' ? 'active' : ''}`} onClick={() => setActiveTab('leaderboard')}>Leaderboard</button>
+                        <button className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>Attendance</button>
+                        <button className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security 🛡️</button>
                     </div>
-
-                    {/* Current Question Display */}
-                    <div className="question-display">
-                        <div className="question-card-host">
-                            <div className="question-meta">
-                                <span className={`difficulty ${currentQuestion?.difficulty || 'medium'}`}>
-                                    {currentQuestion?.difficulty || 'Medium'}
-                                </span>
-                                <span className="points">{currentQuestion?.points || 10} pts</span>
-                                <span className="q-type">{currentQuestion?.type?.toUpperCase() || 'MCQ'}</span>
+                    <div className="quiz-info-pill">
+                        <span>{quiz.title}</span>
+                        {status === 'active' && timeLeft > 0 && (
+                            <div className={`host-timer ${timeLeft < 60 ? 'critical' : ''}`}>
+                                <FiClock /> {formatTime(timeLeft)}
                             </div>
-                            <h2 className="question-text-host">{currentQuestion?.text || 'Loading question...'}</h2>
+                        )}
+                        <div className="live-badge"><span className="live-dot"></span> {status.toUpperCase()}</div>
+                    </div>
+                    <div className="host-actions">
+                        {status === 'active' && <button className="btn btn-danger btn-sm" onClick={handleEndQuiz}>End</button>}
+                        {status === 'completed' && (
+                            <div className="action-group">
+                                <button className="btn btn-secondary btn-sm" onClick={handleResetQuiz}>Re-Host</button>
+                                <button className="btn btn-primary btn-sm" onClick={() => navigate(`/quiz/${quizId}/results`)}>Report</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
 
-                            {currentQuestion?.type === 'mcq' && currentQuestion?.options && (
-                                <div className="options-display">
-                                    {currentQuestion.options.map((option, idx) => (
-                                        <div key={idx} className={`option-display opt-${idx}`}>
-                                            <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
-                                            <span className="option-text">{option}</span>
+                <div className="tab-content-area">
+                    {activeTab === 'stats' && (
+                        <div className="stats-view animate-fadeIn">
+                            <div className="stats-grid">
+                                <div className="stat-card large">
+                                    <div className="stat-icon"><FiClock /></div>
+                                    <div className="stat-info">
+                                        <h3>Progress</h3>
+                                        <p>Global Session Status: {status.toUpperCase()}</p>
+                                        <div className="progress-bar-container">
+                                            <div className="progress-bar-fill" style={{ width: status === 'completed' ? '100%' : '50%' }}></div>
                                         </div>
-                                    ))}
+                                    </div>
+                                </div>
+
+                                <div className="stats-row-group">
+                                    <div className="stat-card">
+                                        <h3>{participants.length}</h3>
+                                        <p>Students Joined</p>
+                                    </div>
+                                    <div className="stat-card highlight">
+                                        <h3>{answeredParticipants.length}</h3>
+                                        <p>Students Answered</p>
+                                    </div>
+                                    <div className="stat-card success">
+                                        <h3>{Math.round((answeredParticipants.length / (participants.length || 1)) * 100)}%</h3>
+                                        <p>Participation Rate</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {status === 'active' && (
+                                <div className="next-action" style={{ textAlign: 'center', marginTop: '3rem', padding: '2rem', background: 'rgba(255,127,17,0.05)', borderRadius: '20px', border: '1px dashed var(--primary)' }}>
+                                    <h2 style={{ color: 'var(--primary)', marginBottom: '1rem' }}>Independent Progression Active</h2>
+                                    <p style={{ color: 'var(--text-secondary)' }}>Students are currently navigating through the quiz questions at their own pace.</p>
                                 </div>
                             )}
                         </div>
-                    </div>
+                    )}
 
-                    {/* Response Stats */}
-                    <div className="response-stats">
-                        <div className="stat-card">
-                            <FiCheck className="stat-icon" />
-                            <div className="stat-value">{answeredCount}</div>
-                            <div className="stat-label">Answered</div>
+                    {activeTab === 'leaderboard' && (
+                        <div className="leaderboard-view animate-fadeIn">
+                            <h2 className="section-title">🏆 Quiz Leaderboard</h2>
+                            <div className="attendance-table-container leaderboard-table-scroll">
+                                <table className="attendance-table leaderboard-styled-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>Roll Number</th>
+                                            <th>Name</th>
+                                            <th>Branch</th>
+                                            <th>Section</th>
+                                            <th>Marks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(() => {
+                                            let lastScore = -1;
+                                            let currentRank = 0;
+                                            return leaderboard.map((entry, i) => {
+                                                const score = entry.totalScore || entry.score || 0;
+                                                if (score !== lastScore) {
+                                                    currentRank = i + 1;
+                                                }
+                                                lastScore = score;
+                                                const rank = currentRank;
+
+                                                return (
+                                                    <tr key={i} className={rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : rank === 3 ? 'rank-bronze' : ''}>
+                                                        <td>
+                                                            <div className="rank-display">
+                                                                {rank === 1 ? <span className="medal">🥇</span> :
+                                                                    rank === 2 ? <span className="medal">🥈</span> :
+                                                                        rank === 3 ? <span className="medal">🥉</span> :
+                                                                            <span className="rank-number">#{rank}</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="roll-number">{entry.userId?.rollNumber || '-'}</td>
+                                                        <td className="student-name-cell">{entry.userId?.name || entry.studentName}</td>
+                                                        <td>{entry.userId?.department || '-'}</td>
+                                                        <td>{entry.userId?.section || '-'}</td>
+                                                        <td className="score-cell-bold">{score} pts</td>
+                                                    </tr>
+                                                );
+                                            });
+                                        })()}
+                                        {leaderboard.length === 0 && (
+                                            <tr>
+                                                <td colSpan="6" className="empty-table-msg">
+                                                    No results available yet. Results appear as students complete the quiz.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div className="stat-card">
-                            <FiClock className="stat-icon" />
-                            <div className="stat-value">{participants.length - answeredCount}</div>
-                            <div className="stat-label">Waiting</div>
-                        </div>
-                    </div>
+                    )}
 
-                    {/* Action Buttons */}
-                    <div className="active-actions">
-                        {currentQuestionIndex < totalQuestions - 1 ? (
-                            <button className="btn btn-primary btn-lg" onClick={handleNextQuestion}>
-                                Next Question <FiChevronRight />
-                            </button>
-                        ) : (
-                            <button className="btn btn-success btn-lg" onClick={handleShowLeaderboard}>
-                                <FiAward /> Show Results
-                            </button>
-                        )}
-                        <button className="btn btn-danger" onClick={handleEndQuiz}>
-                            <FiStopCircle /> End Quiz
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Lobby/Waiting View
-    return (
-        <div className="host-quiz-page">
-            <div className="host-lobby">
-                {/* Quiz Title */}
-                <div className="lobby-header">
-                    <h1>{quiz.title}</h1>
-                    <p>{quiz.description || 'Get ready to play!'}</p>
-                </div>
-
-                {/* PIN Display */}
-                <div className="pin-container" onClick={copyCode}>
-                    <div className="pin-label">Join at: <strong>quizmaster.app</strong></div>
-                    <div className="pin-box">
-                        <span className="pin-title">Game PIN:</span>
-                        <span className="pin-code">{quiz.code}</span>
-                        <FiCopy className="copy-icon" />
-                    </div>
-                </div>
-
-                {/* Participants Grid */}
-                <div className="lobby-content">
-                    <div className="lobby-status-bar">
-                        <div className="player-count">
-                            <FiUsers />
-                            <span className="count-number">{participants.length}</span>
-                            <span>Player{participants.length !== 1 ? 's' : ''}</span>
-                        </div>
-                        <div className="status-indicator">
-                            <span className="status-dot waiting"></span>
-                            WAITING FOR PLAYERS
-                        </div>
-                    </div>
-
-                    <div className="participants-area">
-                        {participants.length > 0 ? (
-                            <div className="participants-list">
-                                {participants.map((p, idx) => (
-                                    <div
-                                        key={p.id || p._id || idx}
-                                        className={`participant-card ${answeredParticipants.includes(p.id || p._id) ? 'answered' : ''}`}
-                                        style={{ animationDelay: `${idx * 0.1}s` }}
-                                    >
-                                        <div className="participant-avatar">
-                                            {answeredParticipants.includes(p.id || p._id) ? <FiCheck /> : (p.name?.charAt(0)?.toUpperCase() || '?')}
-                                        </div>
-                                        <span className="participant-name">{p.name || 'Student'}</span>
-                                        {answeredParticipants.includes(p.id || p._id) && <span className="answered-badge">Ready</span>}
+                    {activeTab === 'security' && (
+                        <div className="security-view animate-fadeIn">
+                            <h2 className="section-title">🛡️ Anti-Cheat Monitor</h2>
+                            <div className="security-dashboard-grid">
+                                <div className="security-panel">
+                                    <h3>Trust Scores</h3>
+                                    <div className="trust-score-list">
+                                        {participants.sort((a, b) => (b.trustScore || 100) - (a.trustScore || 100)).map((p, i) => (
+                                            <div key={i} className={`trust-row ${(p.trustScore || 100) < 50 ? 'critical' : (p.trustScore || 100) < 80 ? 'warning' : 'good'}`}>
+                                                <div className="u-info">
+                                                    <span className="u-name">{p.name}</span>
+                                                    <span className="u-roll">{p.rollNumber}</span>
+                                                </div>
+                                                <div className="u-score">
+                                                    <div className="score-bar-bg">
+                                                        <div className="score-bar-fill" style={{ width: `${p.trustScore || 100}%` }}></div>
+                                                    </div>
+                                                    <span>{p.trustScore || 100}%</span>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+                                <div className="security-panel logs">
+                                    <h3>Recent Alerts</h3>
+                                    <div className="alert-feed">
+                                        {cheatingAlerts.length === 0 && <p className="no-alerts">No suspicious activity detected.</p>}
+                                        {cheatingAlerts.map((alert, idx) => (
+                                            <div key={idx} className="alert-card animate-slideIn">
+                                                <div className="alert-icon">⚠️</div>
+                                                <div className="alert-content">
+                                                    <strong>{alert.participantName || 'Unknown User'}</strong>
+                                                    <p>{alert.reason || 'Sispicious Activity'}</p>
+                                                    <span className="alert-time">{alert.time?.toLocaleTimeString()}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="empty-lobby">
-                                <div className="empty-icon">👥</div>
-                                <h3>Waiting for players...</h3>
-                                <p>Share the Game PIN with your students to get started</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                        </div>
+                    )}
 
-                {/* Start Button */}
-                <div className="lobby-actions">
-                    <button
-                        className="btn btn-primary btn-xl start-btn"
-                        onClick={handleStartQuiz}
-                    >
-                        <FiPlay /> Start Quiz
-                    </button>
-                    {participants.length === 0 && (
-                        <p className="start-hint">Wait for at least 1 player to join</p>
+                    {activeTab === 'attendance' && (
+                        <div className="attendance-view animate-fadeIn">
+                            <h2 className="section-title">👥 Attendance Tracker</h2>
+                            <div className="attendance-table-container">
+                                <table className="attendance-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Roll Number</th>
+                                            <th>Section</th>
+                                            <th>Trust Score</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {participants.map((p, i) => (
+                                            <tr key={i} className={answeredParticipants.includes(p.id || p._id) ? 'active-row' : ''}>
+                                                <td><div className="name-cell"><FiUsers /> {p.name}</div></td>
+                                                <td>{p.rollNumber || 'N/A'}</td>
+                                                <td>{p.department}-{p.section}</td>
+                                                <td>
+                                                    <span className={`trust-badge ${(p.trustScore || 100) > 80 ? 'high' : 'low'}`}>
+                                                        {p.trustScore || 100}%
+                                                    </span>
+                                                </td>
+                                                <td><span className={`status-pill ${answeredParticipants.includes(p.id || p._id) ? 'active' : 'waiting'}`}>
+                                                    {answeredParticipants.includes(p.id || p._id) ? 'Active' : 'Joined'}
+                                                </span></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

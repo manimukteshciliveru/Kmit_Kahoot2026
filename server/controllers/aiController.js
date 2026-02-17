@@ -30,13 +30,25 @@ const fileFilter = (req, file, cb) => {
         'audio/wav',
         'audio/mp3',
         'video/mp4',
-        'video/webm'
+        'video/webm',
+        'application/json',
+        'text/javascript',
+        'text/x-python',
+        'text/x-java-source',
+        'text/x-c',
+        'text/x-c++',
+        'text/html',
+        'text/css'
     ];
 
-    const allowedExtensions = ['.pdf', '.xlsx', '.xls', '.csv', '.txt', '.mp3', '.wav', '.mp4', '.webm'];
+    const allowedExtensions = [
+        '.pdf', '.xlsx', '.xls', '.csv', '.txt', '.mp3', '.wav', '.mp4', '.webm',
+        '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.c', '.cs', '.html', '.css', '.json', '.sql', '.go', '.rb', '.php'
+    ];
     const ext = path.extname(file.originalname).toLowerCase();
 
-    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
+    // Check if extension is allowed (more reliable than mime type for code files)
+    if (allowedExtensions.includes(ext) || allowedTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
         cb(new Error(`File type not supported. Allowed: ${allowedExtensions.join(', ')}`), false);
@@ -95,8 +107,24 @@ exports.generateFromFile = async (req, res) => {
                         break;
                     case '.txt':
                     case '.md':
+                    case '.js':
+                    case '.jsx':
+                    case '.ts':
+                    case '.tsx':
+                    case '.py':
+                    case '.java':
+                    case '.cpp':
+                    case '.c':
+                    case '.cs':
+                    case '.html':
+                    case '.css':
+                    case '.json':
+                    case '.sql':
+                    case '.go':
+                    case '.rb':
+                    case '.php':
                         const txtContent = fs.readFileSync(file.path, 'utf-8');
-                        combinedTextContent += `\n--- Content from ${file.originalname} (Text) ---\n${txtContent}\n`;
+                        combinedTextContent += `\n--- Content from ${file.originalname} (Code/Text) ---\n${txtContent}\n`;
                         break;
                     case '.mp3':
                     case '.wav':

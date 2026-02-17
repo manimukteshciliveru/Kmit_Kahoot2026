@@ -2,13 +2,22 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight, FiSun, FiMoon } from 'react-icons/fi';
+import { FiUser, FiLock, FiEye, FiEyeOff, FiArrowRight, FiSun, FiMoon } from 'react-icons/fi';
+import { HiAcademicCap, HiUserGroup, HiShieldCheck } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
 import KmitLogo from '../../components/common/KmitLogo';
 import './Auth.css';
 
+// Role definitions for login form
+const ROLES = [
+    { id: 'student', label: 'Student', icon: HiAcademicCap, placeholder: 'Enter Roll Number (e.g., 24BD1A058J)', fieldLabel: 'Roll Number' },
+    { id: 'faculty', label: 'Faculty', icon: HiUserGroup, placeholder: 'Enter Faculty ID', fieldLabel: 'Faculty ID' },
+    { id: 'admin', label: 'Admin', icon: HiShieldCheck, placeholder: 'Enter Admin ID', fieldLabel: 'Admin ID' },
+];
+
 const Login = () => {
-    const [email, setEmail] = useState('');
+    const [selectedRole, setSelectedRole] = useState('student');
+    const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -16,23 +25,31 @@ const Login = () => {
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
 
+    const currentRole = ROLES.find(r => r.id === selectedRole);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!email || !password) {
+        if (!userId || !password) {
             toast.error('Please fill in all fields');
             return;
         }
 
-        setLoading(true);
-        const result = await login(email, password);
-        setLoading(false);
+        if (loading) return; // Prevent double submission
 
-        if (result.success) {
-            toast.success('Welcome back!');
-            navigate('/dashboard');
-        } else {
-            toast.error(result.message);
+        setLoading(true);
+        try {
+            const result = await login(userId, password);
+            if (result.success) {
+                toast.success(`Welcome back!`);
+                navigate('/dashboard');
+            } else {
+                toast.error(result.message);
+            }
+        } catch (err) {
+            toast.error('Login failed, please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -82,18 +99,42 @@ const Login = () => {
                         <p>Sign in to continue your learning journey</p>
                     </div>
 
+                    {/* Role Selector */}
+                    <div className="role-selector">
+                        {ROLES.map(role => {
+                            const Icon = role.icon;
+                            return (
+                                <button
+                                    key={role.id}
+                                    type="button"
+                                    className={`role-btn ${selectedRole === role.id ? 'active' : ''}`}
+                                    onClick={() => {
+                                        setSelectedRole(role.id);
+                                        setUserId('');
+                                        setPassword('');
+                                    }}
+                                >
+                                    <Icon className="role-icon" />
+                                    <span>{role.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
                     <form onSubmit={handleSubmit} className="auth-form">
                         <div className="form-group">
-                            <label className="form-label">Email Address</label>
+                            <label className="form-label">
+                                {currentRole.fieldLabel}
+                            </label>
                             <div className="input-wrapper">
-                                <FiMail className="input-icon" />
+                                <FiUser className="input-icon" />
                                 <input
-                                    type="email"
+                                    type="text"
                                     className="form-input"
-                                    placeholder="Enter your email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    autoComplete="email"
+                                    placeholder={currentRole.placeholder}
+                                    value={userId}
+                                    onChange={(e) => setUserId(e.target.value)}
+                                    autoComplete="username"
                                 />
                             </div>
                         </div>
@@ -120,16 +161,6 @@ const Login = () => {
                             </div>
                         </div>
 
-                        <div className="form-options">
-                            <label className="checkbox-label">
-                                <input type="checkbox" />
-                                <span>Remember me</span>
-                            </label>
-                            <Link to="/forgot-password" className="forgot-link">
-                                Forgot password?
-                            </Link>
-                        </div>
-
                         <button
                             type="submit"
                             className="btn btn-primary btn-lg w-full"
@@ -145,37 +176,6 @@ const Login = () => {
                             )}
                         </button>
                     </form>
-
-                    <div className="auth-footer">
-                        <p>Don't have an account?</p>
-                        <Link to="/register" className="auth-link">
-                            Create Account
-                        </Link>
-                    </div>
-
-                    <div className="demo-accounts">
-                        <p className="demo-title">Demo Accounts</p>
-                        <div className="demo-grid">
-                            <button
-                                className="demo-btn"
-                                onClick={() => { setEmail('student@demo.com'); setPassword('demo123'); }}
-                            >
-                                Student
-                            </button>
-                            <button
-                                className="demo-btn"
-                                onClick={() => { setEmail('faculty@demo.com'); setPassword('demo123'); }}
-                            >
-                                Faculty
-                            </button>
-                            <button
-                                className="demo-btn"
-                                onClick={() => { setEmail('admin@demo.com'); setPassword('demo123'); }}
-                            >
-                                Admin
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

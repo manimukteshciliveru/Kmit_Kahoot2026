@@ -41,7 +41,10 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         try {
             const response = await authAPI.login({ email, password });
-            const { user: userData, token: authToken } = response.data.data;
+
+            // Handle if the response comes from a cached promise (Idempotency) or fresh request
+            const data = response.data?.data || response.data;
+            const { user: userData, token: authToken } = data;
 
             localStorage.setItem('token', authToken);
             localStorage.setItem('user', JSON.stringify(userData));
@@ -51,6 +54,7 @@ export const AuthProvider = ({ children }) => {
 
             return { success: true, user: userData };
         } catch (error) {
+            console.error('Login Error:', error);
             return {
                 success: false,
                 message: error.response?.data?.message || 'Login failed'

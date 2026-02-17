@@ -1,0 +1,1095 @@
+{
+  "total": 26,
+  "details": [
+    {
+      "_id": "699138fd43284ccac133b25e",
+      "name": "Ms. Deepa Ganu",
+      "email": "deepa.ganu@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC02",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "A",
+          "subject": "Data Structures",
+          "_id": "69913aab3fa93b4b2ef14d54"
+        },
+        {
+          "branch": "CSE",
+          "section": "B",
+          "subject": "Data Structures",
+          "_id": "69913aab3fa93b4b2ef14d55"
+        },
+        {
+          "branch": "CSE",
+          "section": "C",
+          "subject": "Data Structures",
+          "_id": "69913aab3fa93b4b2ef14d56"
+        },
+        {
+          "branch": "CSE",
+          "section": "D",
+          "subject": "Data Structures",
+          "_id": "69913aab3fa93b4b2ef14d57"
+        },
+        {
+          "branch": "CSM",
+          "section": "A",
+          "subject": "Data Structures",
+          "_id": "69913aab3fa93b4b2ef14d58"
+        },
+        {
+          "branch": "CSM",
+          "section": "B",
+          "subject": "Data Structures",
+          "_id": "69913aab3fa93b4b2ef14d59"
+        },
+        {
+          "branch": "CSM",
+          "section": "C",
+          "subject": "Data Structures",
+          "_id": "69913aab3fa93b4b2ef14d5a"
+        },
+        {
+          "branch": "CSM",
+          "section": "D",
+          "subject": "Data Structures",
+          "_id": "69913aab3fa93b4b2ef14d5b"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": "2026-02-15T07:48:58.621Z",
+      "createdAt": "2026-02-15T03:09:49.929Z",
+      "updatedAt": "2026-02-15T09:10:00.524Z",
+      "__v": 3
+    },
+    {
+      "_id": "699138fe43284ccac133b269",
+      "name": "Ms. K. Priyanka",
+      "email": "k.priyanka@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC03",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "A",
+          "subject": "Operating Systems",
+          "_id": "69913aab3fa93b4b2ef14d62"
+        },
+        {
+          "branch": "CSE",
+          "section": "I",
+          "subject": "Data Structures",
+          "_id": "69913aab3fa93b4b2ef14d63"
+        },
+        {
+          "branch": "CSM",
+          "section": "A",
+          "subject": "Operating Systems",
+          "_id": "69913aab3fa93b4b2ef14d64"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:09:50.347Z",
+      "updatedAt": "2026-02-15T09:10:00.637Z",
+      "__v": 3
+    },
+    {
+      "_id": "6991392e2f65d9fe235ae164",
+      "name": "Ms. Asha",
+      "email": "asha@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC04",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "A",
+          "subject": "Machine Learning",
+          "_id": "69913aab3fa93b4b2ef14d6c"
+        },
+        {
+          "branch": "CSE",
+          "section": "B",
+          "subject": "Machine Learning",
+          "_id": "69913aab3fa93b4b2ef14d6d"
+        },
+        {
+          "branch": "CSM",
+          "section": "A",
+          "subject": "Machine Learning",
+          "_id": "69913aab3fa93b4b2ef14d6e"
+        },
+        {
+          "branch": "CSM",
+          "section": "B",
+          "subject": "Machine Learning",
+          "_id": "69913aab3fa93b4b2ef14d6f"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:38.562Z",
+      "updatedAt": "2026-02-15T09:10:00.755Z",
+      "__v": 2
+    },
+    {
+      "_id": "6991392e2f65d9fe235ae16c",
+      "name": "Ms. B. Komala",
+      "email": "b.komala@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC05",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "A",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aab3fa93b4b2ef14d77"
+        },
+        {
+          "branch": "CSE",
+          "section": "D",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aab3fa93b4b2ef14d78"
+        },
+        {
+          "branch": "CSE",
+          "section": "G",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aab3fa93b4b2ef14d79"
+        },
+        {
+          "branch": "CSM",
+          "section": "A",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aab3fa93b4b2ef14d7a"
+        },
+        {
+          "branch": "CSM",
+          "section": "D",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aab3fa93b4b2ef14d7b"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:38.936Z",
+      "updatedAt": "2026-02-15T09:10:00.969Z",
+      "__v": 2
+    },
+    {
+      "_id": "6991392f2f65d9fe235ae175",
+      "name": "Mr. M. Kiran Kumar",
+      "email": "m.kiran.kumar@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC06",
+      "designation": "Mr.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "A",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aab3fa93b4b2ef14d83"
+        },
+        {
+          "branch": "CSE",
+          "section": "D",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aab3fa93b4b2ef14d84"
+        },
+        {
+          "branch": "CSE",
+          "section": "H",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aab3fa93b4b2ef14d85"
+        },
+        {
+          "branch": "CSM",
+          "section": "A",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aab3fa93b4b2ef14d86"
+        },
+        {
+          "branch": "CSM",
+          "section": "D",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aab3fa93b4b2ef14d87"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 1,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": "2026-02-15T08:22:07.563Z",
+      "createdAt": "2026-02-15T03:10:39.321Z",
+      "updatedAt": "2026-02-15T09:10:01.103Z",
+      "__v": 2
+    },
+    {
+      "_id": "6991392f2f65d9fe235ae17e",
+      "name": "Ms. Surekha",
+      "email": "surekha@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC07",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "A",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14d8e"
+        },
+        {
+          "branch": "CSE",
+          "section": "E",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14d8f"
+        },
+        {
+          "branch": "CSM",
+          "section": "A",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14d90"
+        },
+        {
+          "branch": "CSM",
+          "section": "E",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14d91"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:39.721Z",
+      "updatedAt": "2026-02-15T09:10:01.171Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139302f65d9fe235ae186",
+      "name": "Mr. R. Narender",
+      "email": "r.narender@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC08",
+      "designation": "Mr.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "B",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14d97"
+        },
+        {
+          "branch": "CSE",
+          "section": "H",
+          "subject": "Data Structures",
+          "_id": "69913aac3fa93b4b2ef14d98"
+        },
+        {
+          "branch": "CSM",
+          "section": "B",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14d99"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:40.177Z",
+      "updatedAt": "2026-02-15T09:10:01.239Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139302f65d9fe235ae18d",
+      "name": "Ms. V. Anusha",
+      "email": "v.anusha@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC09",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "B",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aac3fa93b4b2ef14da1"
+        },
+        {
+          "branch": "CSE",
+          "section": "E",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aac3fa93b4b2ef14da2"
+        },
+        {
+          "branch": "CSE",
+          "section": "H",
+          "subject": "Machine Learning",
+          "_id": "69913aac3fa93b4b2ef14da3"
+        },
+        {
+          "branch": "CSM",
+          "section": "B",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aac3fa93b4b2ef14da4"
+        },
+        {
+          "branch": "CSM",
+          "section": "E",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aac3fa93b4b2ef14da5"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:40.595Z",
+      "updatedAt": "2026-02-15T09:10:01.783Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139302f65d9fe235ae196",
+      "name": "Dr. K. Seshacharyulu",
+      "email": "k.seshacharyulu@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC10",
+      "designation": "Dr.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "B",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14dac"
+        },
+        {
+          "branch": "CSE",
+          "section": "F",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14dad"
+        },
+        {
+          "branch": "CSE",
+          "section": "I",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aac3fa93b4b2ef14dae"
+        },
+        {
+          "branch": "CSM",
+          "section": "B",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14daf"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:40.961Z",
+      "updatedAt": "2026-02-15T09:10:02.092Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139312f65d9fe235ae19e",
+      "name": "Ms. Lavanya",
+      "email": "lavanya@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC11",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "B",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14db8"
+        },
+        {
+          "branch": "CSE",
+          "section": "C",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14db9"
+        },
+        {
+          "branch": "CSE",
+          "section": "H",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14dba"
+        },
+        {
+          "branch": "CSE",
+          "section": "I",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14dbb"
+        },
+        {
+          "branch": "CSM",
+          "section": "B",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14dbc"
+        },
+        {
+          "branch": "CSM",
+          "section": "C",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14dbd"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:41.354Z",
+      "updatedAt": "2026-02-15T09:10:02.159Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139312f65d9fe235ae1a8",
+      "name": "Ms. K. Jamuna Rani",
+      "email": "k.jamuna.rani@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC12",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "C",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14dc3"
+        },
+        {
+          "branch": "CSE",
+          "section": "G",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14dc4"
+        },
+        {
+          "branch": "CSM",
+          "section": "C",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14dc5"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:41.731Z",
+      "updatedAt": "2026-02-15T09:10:02.257Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139322f65d9fe235ae1af",
+      "name": "Ms. Priyanka Saxena",
+      "email": "priyanka.saxena@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC13",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "C",
+          "subject": "Machine Learning",
+          "_id": "69913aac3fa93b4b2ef14dcc"
+        },
+        {
+          "branch": "CSE",
+          "section": "D",
+          "subject": "Machine Learning",
+          "_id": "69913aac3fa93b4b2ef14dcd"
+        },
+        {
+          "branch": "CSM",
+          "section": "C",
+          "subject": "Machine Learning",
+          "_id": "69913aac3fa93b4b2ef14dce"
+        },
+        {
+          "branch": "CSM",
+          "section": "D",
+          "subject": "Machine Learning",
+          "_id": "69913aac3fa93b4b2ef14dcf"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:42.088Z",
+      "updatedAt": "2026-02-15T09:10:02.431Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139322f65d9fe235ae1b7",
+      "name": "Ms. C. Rohini",
+      "email": "c.rohini@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC14",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "C",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aac3fa93b4b2ef14dd6"
+        },
+        {
+          "branch": "CSE",
+          "section": "F",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aac3fa93b4b2ef14dd7"
+        },
+        {
+          "branch": "CSE",
+          "section": "I",
+          "subject": "Machine Learning",
+          "_id": "69913aac3fa93b4b2ef14dd8"
+        },
+        {
+          "branch": "CSM",
+          "section": "C",
+          "subject": "Automata Theory and Compiler Design",
+          "_id": "69913aac3fa93b4b2ef14dd9"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:42.495Z",
+      "updatedAt": "2026-02-15T09:10:02.502Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139322f65d9fe235ae1bf",
+      "name": "Ms. Athar Fathima",
+      "email": "athar.fathima@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC15",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "C",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14de1"
+        },
+        {
+          "branch": "CSE",
+          "section": "E",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14de2"
+        },
+        {
+          "branch": "CSE",
+          "section": "G",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14de3"
+        },
+        {
+          "branch": "CSM",
+          "section": "C",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14de4"
+        },
+        {
+          "branch": "CSM",
+          "section": "E",
+          "subject": "Computer Organization and Architecture",
+          "_id": "69913aac3fa93b4b2ef14de5"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:42.883Z",
+      "updatedAt": "2026-02-15T09:10:02.702Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139332f65d9fe235ae1c8",
+      "name": "Ms. B. Arti",
+      "email": "b.arti@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC16",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "D",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14dea"
+        },
+        {
+          "branch": "CSM",
+          "section": "D",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14deb"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 1,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": "2026-02-15T07:49:54.279Z",
+      "createdAt": "2026-02-15T03:10:43.260Z",
+      "updatedAt": "2026-02-15T09:10:03.009Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139332f65d9fe235ae1ce",
+      "name": "Ms. M. V. Rama",
+      "email": "m.v.rama@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC17",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "D",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14df1"
+        },
+        {
+          "branch": "CSE",
+          "section": "G",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14df2"
+        },
+        {
+          "branch": "CSM",
+          "section": "D",
+          "subject": "Constitution of India",
+          "_id": "69913aac3fa93b4b2ef14df3"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": "2026-02-15T07:09:12.868Z",
+      "createdAt": "2026-02-15T03:10:43.759Z",
+      "updatedAt": "2026-02-15T09:10:03.225Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139342f65d9fe235ae1d5",
+      "name": "Mr. P. Upendar",
+      "email": "p.upendar@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC18",
+      "designation": "Mr.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "E",
+          "subject": "Data Structures",
+          "_id": "69913aac3fa93b4b2ef14df8"
+        },
+        {
+          "branch": "CSM",
+          "section": "E",
+          "subject": "Data Structures",
+          "_id": "69913aac3fa93b4b2ef14df9"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:44.123Z",
+      "updatedAt": "2026-02-15T09:10:03.419Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139342f65d9fe235ae1db",
+      "name": "Ms. A. Goutami",
+      "email": "a.goutami@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC19",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "E",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14dff"
+        },
+        {
+          "branch": "CSE",
+          "section": "F",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14e00"
+        },
+        {
+          "branch": "CSM",
+          "section": "E",
+          "subject": "Operating Systems",
+          "_id": "69913aac3fa93b4b2ef14e01"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:44.461Z",
+      "updatedAt": "2026-02-15T09:10:03.628Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139342f65d9fe235ae1e2",
+      "name": "Ms. B. Madhurika",
+      "email": "b.madhurika@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC20",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "E",
+          "subject": "Machine Learning",
+          "_id": "69913aac3fa93b4b2ef14e06"
+        },
+        {
+          "branch": "CSM",
+          "section": "E",
+          "subject": "Machine Learning",
+          "_id": "69913aac3fa93b4b2ef14e07"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:44.883Z",
+      "updatedAt": "2026-02-15T09:10:03.831Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139352f65d9fe235ae1e8",
+      "name": "Dr. G. Narendar",
+      "email": "g.narendar@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC21",
+      "designation": "Dr.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "F",
+          "subject": "Data Structures",
+          "_id": "69913aac3fa93b4b2ef14e0b"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:45.270Z",
+      "updatedAt": "2026-02-15T09:10:04.034Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139352f65d9fe235ae1ed",
+      "name": "Ms. Pavani",
+      "email": "pavani@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC22",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "F",
+          "subject": "Machine Learning",
+          "_id": "69913aad3fa93b4b2ef14e0f"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:45.629Z",
+      "updatedAt": "2026-02-15T09:10:04.238Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139352f65d9fe235ae1f2",
+      "name": "Ms. Sandhya",
+      "email": "sandhya@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC23",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "F",
+          "subject": "Constitution of India",
+          "_id": "69913aad3fa93b4b2ef14e13"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:46.001Z",
+      "updatedAt": "2026-02-15T09:10:04.448Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139362f65d9fe235ae1f7",
+      "name": "Ms. Ch. Mani Pushpa",
+      "email": "ch.mani.pushpa@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC24",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "G",
+          "subject": "Data Structures",
+          "_id": "69913aad3fa93b4b2ef14e17"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:46.518Z",
+      "updatedAt": "2026-02-15T09:10:04.750Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139362f65d9fe235ae1fc",
+      "name": "Ms. T. Rupa Devi",
+      "email": "t.rupa.devi@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC25",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "G",
+          "subject": "Machine Learning",
+          "_id": "69913aad3fa93b4b2ef14e1b"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:46.907Z",
+      "updatedAt": "2026-02-15T09:10:04.959Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139372f65d9fe235ae201",
+      "name": "Ms. Nasreen Sultana",
+      "email": "nasreen.sultana@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC26",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "H",
+          "subject": "Operating Systems",
+          "_id": "69913aad3fa93b4b2ef14e1f"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:47.407Z",
+      "updatedAt": "2026-02-15T09:10:05.160Z",
+      "__v": 2
+    },
+    {
+      "_id": "699139372f65d9fe235ae206",
+      "name": "Ms. B. Manasa",
+      "email": "b.manasa@kmit.ac.in",
+      "role": "faculty",
+      "avatar": "",
+      "isActive": true,
+      "employeeId": "FAC27",
+      "designation": "Ms.",
+      "teachingAssignments": [
+        {
+          "branch": "CSE",
+          "section": "I",
+          "subject": "Operating Systems",
+          "_id": "69913aad3fa93b4b2ef14e23"
+        }
+      ],
+      "stats": {
+        "quizzesAttended": 0,
+        "quizzesCreated": 0,
+        "averageScore": 0,
+        "totalPoints": 0,
+        "bestRank": null
+      },
+      "lastLogin": null,
+      "createdAt": "2026-02-15T03:10:47.786Z",
+      "updatedAt": "2026-02-15T09:10:05.364Z",
+      "__v": 2
+    }
+  ]
+}

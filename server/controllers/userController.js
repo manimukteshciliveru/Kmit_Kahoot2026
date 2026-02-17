@@ -15,6 +15,9 @@ exports.getUsers = async (req, res) => {
         if (status === 'active') query.isActive = true;
         if (status === 'inactive') query.isActive = false;
 
+        if (req.query.department) query.department = req.query.department;
+        if (req.query.section) query.section = req.query.section;
+
         if (search) {
             query.$or = [
                 { name: { $regex: search, $options: 'i' } },
@@ -396,6 +399,58 @@ exports.getAnalytics = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to fetch analytics',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Search students by branch/section
+// @route   POST /api/users/search-students
+// @access  Private (Admin/Faculty)
+exports.searchStudents = async (req, res) => {
+    try {
+        const { branches } = req.body;
+        // branches structure: [{ name: 'CSE', sections: ['A', 'B'] }, ...]
+
+        if (!branches || !Array.isArray(branches) || branches.length === 0) {
+            return res.status(200).json({ success: true, count: 0, data: [] });
+        }
+
+        const conditions = branches.map(b => {
+            const deptName = b.name || b;
+            if (!deptName) return null;
+
+            const cond = {
+                department: deptName,
+                role: 'student',
+                isActive: true
+            };
+
+            if (b.sections && Array.isArray(b.sections) && b.sections.length > 0) {
+                cond.section = { $in: b.sections };
+            }
+
+            return cond;
+        }).filter(Boolean);
+
+        if (conditions.length === 0) {
+            return res.status(200).json({ success: true, count: 0, data: [] });
+        }
+
+        const students = await User.find({ $or: conditions })
+            .select('_id name email department section rollNumber studentId')
+            .sort({ rollNumber: 1, name: 1 });
+
+        res.status(200).json({
+            success: true,
+            count: students.length,
+            data: students
+        });
+    } catch (error) {
+        console.error('Search students error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to search students',
             error: error.message
         });
     }

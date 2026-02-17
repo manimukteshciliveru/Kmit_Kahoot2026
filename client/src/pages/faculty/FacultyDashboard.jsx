@@ -7,7 +7,7 @@ import {
     FiPlay, FiEdit2, FiTrash2, FiCopy, FiEye, FiAward,
     FiStopCircle, FiClock, FiCheckCircle, FiBarChart2,
     FiCalendar, FiPercent, FiUserCheck, FiUserX, FiActivity,
-    FiMoreVertical, FiFileText
+    FiMoreVertical, FiFileText, FiUser
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './FacultyDashboard.css';
@@ -547,6 +547,9 @@ const FacultyDashboard = () => {
                         <h3><FiTrendingUp /> Quick Actions</h3>
                     </div>
                     <div className="quick-grid">
+                        <Link to="/profile" className="quick-btn">
+                            <FiUser /> My Profile
+                        </Link>
                         <Link to="/create-quiz" className="quick-btn">
                             <FiPlus /> New Quiz
                         </Link>

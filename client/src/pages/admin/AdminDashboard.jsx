@@ -16,10 +16,14 @@ import {
     FiDownload,
     FiUpload,
     FiCpu,
-    FiHardDrive
+    FiHardDrive,
+    FiBook,
+    FiAward,
+    FiShield
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import '../Dashboard.css';
+import './AdminPages.css';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -132,7 +136,7 @@ const AdminDashboard = () => {
     ] : [];
 
     return (
-        <div className="dashboard">
+        <div className="dashboard admin-dashboard">
             <div className="dashboard-header">
                 <div className="welcome-section">
                     <h1>Admin Dashboard 🛡️</h1>
@@ -175,7 +179,7 @@ const AdminDashboard = () => {
                                 </span>
                             </div>
                             <div className="card-body">
-                                <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                                <div className="stats-grid">
                                     <div className="stat-card stat-info">
                                         <div className="stat-icon"><FiServer /></div>
                                         <div className="stat-info">
@@ -228,39 +232,39 @@ const AdminDashboard = () => {
                             <div className="card-body">
                                 <div className="user-distribution">
                                     <div className="dist-item">
-                                        <div className="dist-bar">
+                                        <div className="dist-header">
+                                            <span className="dist-label"><FiBook /> Students</span>
+                                            <span className="dist-value">{analytics?.users?.students || 0}</span>
+                                        </div>
+                                        <div className="dist-bar-container">
                                             <div
-                                                className="dist-fill students"
+                                                className="dist-bar-fill bar-students"
                                                 style={{ width: `${analytics?.users?.total ? (analytics.users.students / analytics.users.total) * 100 : 0}%` }}
                                             ></div>
                                         </div>
-                                        <div className="dist-info">
-                                            <span className="dist-label">Students</span>
-                                            <span className="dist-value">{analytics?.users?.students || 0}</span>
-                                        </div>
                                     </div>
                                     <div className="dist-item">
-                                        <div className="dist-bar">
+                                        <div className="dist-header">
+                                            <span className="dist-label"><FiAward /> Faculty</span>
+                                            <span className="dist-value">{analytics?.users?.faculty || 0}</span>
+                                        </div>
+                                        <div className="dist-bar-container">
                                             <div
-                                                className="dist-fill faculty"
+                                                className="dist-bar-fill bar-faculty"
                                                 style={{ width: `${analytics?.users?.total ? (analytics.users.faculty / analytics.users.total) * 100 : 0}%` }}
                                             ></div>
                                         </div>
-                                        <div className="dist-info">
-                                            <span className="dist-label">Faculty</span>
-                                            <span className="dist-value">{analytics?.users?.faculty || 0}</span>
-                                        </div>
                                     </div>
                                     <div className="dist-item">
-                                        <div className="dist-bar">
+                                        <div className="dist-header">
+                                            <span className="dist-label"><FiShield /> Admins</span>
+                                            <span className="dist-value">{analytics?.users?.admins || 0}</span>
+                                        </div>
+                                        <div className="dist-bar-container">
                                             <div
-                                                className="dist-fill admins"
+                                                className="dist-bar-fill bar-admins"
                                                 style={{ width: `${analytics?.users?.total ? (analytics.users.admins / analytics.users.total) * 100 : 0}%` }}
                                             ></div>
-                                        </div>
-                                        <div className="dist-info">
-                                            <span className="dist-label">Admins</span>
-                                            <span className="dist-value">{analytics?.users?.admins || 0}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -317,7 +321,13 @@ const AdminDashboard = () => {
                                     <div className="action-icon secondary">
                                         <FiActivity />
                                     </div>
-                                    <span>Analytics</span>
+                                    <span>Server Health</span>
+                                </Link>
+                                <Link to="/quiz-analytics" className="action-item">
+                                    <div className="action-icon info">
+                                        <FiGrid />
+                                    </div>
+                                    <span>Quiz Metrics</span>
                                 </Link>
                                 <Link to="/users" className="action-item">
                                     <div className="action-icon accent">

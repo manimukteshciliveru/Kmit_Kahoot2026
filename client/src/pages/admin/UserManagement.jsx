@@ -35,7 +35,7 @@ const UserManagement = () => {
     const fetchUsers = async () => {
         try {
             setLoading(true);
-            const response = await userAPI.getAll();
+            const response = await userAPI.getAll({ limit: 2000 });
             // API returns { data: { users: [...], pagination: {...} } }
             setUsers(response.data.data?.users || response.data.data || []);
         } catch (error) {
@@ -116,7 +116,10 @@ const UserManagement = () => {
         return user.name.toLowerCase().includes(searchLower) ||
             user.email.toLowerCase().includes(searchLower) ||
             (user.studentId && user.studentId.toLowerCase().includes(searchLower)) ||
-            (user.employeeId && user.employeeId.toLowerCase().includes(searchLower));
+            (user.rollNumber && user.rollNumber.toLowerCase().includes(searchLower)) ||
+            (user.employeeId && user.employeeId.toLowerCase().includes(searchLower)) ||
+            (user.department && user.department.toLowerCase().includes(searchLower)) ||
+            (user.section && user.section.toLowerCase().includes(searchLower));
     });
 
     const getRoleIcon = (role) => {
@@ -148,7 +151,7 @@ const UserManagement = () => {
                     <h1><FiUsers /> User Management</h1>
                 </div>
                 <div className="header-actions">
-                    <Link to="/users/bulk" className="btn btn-secondary">
+                    <Link to="/users/bulk" className="btn-highlight">
                         <FiUpload /> Bulk Upload
                     </Link>
                     <Link to="/users/new" className="btn btn-primary">
@@ -160,7 +163,7 @@ const UserManagement = () => {
             {/* User Type Tabs */}
             <div className="user-tabs">
                 <button
-                    className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}
+                    className={`tab-btn ${activeTab === 'students' ? 'active active-pink' : ''}`}
                     onClick={() => setActiveTab('students')}
                 >
                     <FiBook /> {getTabLabel('students')}
@@ -187,13 +190,13 @@ const UserManagement = () => {
 
             <div className="filters-bar">
                 <div className="search-box">
-                    <FiSearch className="search-icon" />
                     <input
                         type="text"
-                        placeholder={`Search ${activeTab === 'all' ? 'users' : activeTab} by name, email, or ID...`}
+                        placeholder={`Search ${activeTab === 'all' ? 'users' : activeTab} by name, email, ID, dept or section...`}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                    <FiSearch className="search-icon" />
                 </div>
             </div>
 
@@ -264,13 +267,29 @@ const UserManagement = () => {
                                                 <span className="email-cell"><FiMail /> {user.email}</span>
                                             )}
                                         </td>
-                                        {activeTab === 'students' && (
-                                            <>
-                                                <td>{user.studentId || '-'}</td>
-                                                <td>{user.department || '-'}</td>
-                                                <td>{user.section || '-'}</td>
-                                            </>
-                                        )}
+                                        {activeTab === 'students' && (() => {
+                                            let dept = user.department;
+                                            let sec = user.section;
+                                            // Handle "Branch-Section" format (e.g., CSE-E)
+                                            // Prioritize splitting if section contains hyphen, assuming it holds the combined data
+                                            if (sec && sec.includes('-')) {
+                                                const parts = sec.split('-');
+                                                if (parts.length === 2) {
+                                                    // If department is empty or '-', use the extracted branch
+                                                    if (!dept || dept === '-') {
+                                                        dept = parts[0];
+                                                    }
+                                                    sec = parts[1];
+                                                }
+                                            }
+                                            return (
+                                                <>
+                                                    <td>{user.rollNumber || user.studentId || '-'}</td>
+                                                    <td>{dept || '-'}</td>
+                                                    <td>{sec || '-'}</td>
+                                                </>
+                                            );
+                                        })()}
                                         {activeTab === 'faculty' && (
                                             <>
                                                 <td>{user.employeeId || '-'}</td>
@@ -329,13 +348,14 @@ const UserManagement = () => {
                             )}
                         </tbody>
                     </table>
-                </div>
-            )}
+                </div >
+            )
+            }
 
             <div className="table-footer">
                 <span>Showing {filteredUsers.length} {activeTab === 'all' ? 'users' : activeTab}</span>
             </div>
-        </div>
+        </div >
     );
 };
 

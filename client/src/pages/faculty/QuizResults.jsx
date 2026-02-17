@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
     FiArrowLeft,
     FiDownload,
@@ -13,8 +13,7 @@ import {
     FiBarChart2,
     FiChevronDown,
     FiChevronUp,
-    FiUser,
-    FiMail,
+    FiUserMinus,
     FiFileText
 } from 'react-icons/fi';
 import { quizAPI } from '../../services/api';
@@ -38,6 +37,7 @@ const QuizResults = () => {
     const fetchResults = async () => {
         try {
             const response = await quizAPI.getResults(quizId);
+            console.log('Quiz Results Data:', response.data.data); // Debug log
             setData(response.data.data);
         } catch (error) {
             console.error('Failed to fetch results:', error);
@@ -50,76 +50,44 @@ const QuizResults = () => {
 
     const formatTime = (ms) => {
         if (!ms) return '0s';
-        const seconds = Math.round(ms / 1000);
+        const seconds = Math.round(Math.abs(ms) / 1000);
         if (seconds < 60) return `${seconds}s`;
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
     };
 
-    const formatDate = (date) => {
-        if (!date) return '-';
-        return new Date(date).toLocaleDateString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
+    const downloadReport = async () => {
+        try {
+            const loadingToast = toast.loading('Generating Excel report...');
+            const response = await quizAPI.downloadReport(quizId);
 
-    const downloadReport = () => {
-        if (!data) return;
+            // Create blob link to download
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
 
-        const { quiz, analytics, responses, questionAnalytics } = data;
+            // Content-Disposition header check (optional, but good practice)
+            const contentDisposition = response.headers['content-disposition'];
+            let fileName = `Quiz_Report_${quizId}.xlsx`;
+            if (contentDisposition) {
+                const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/);
+                if (fileNameMatch && fileNameMatch.length === 2)
+                    fileName = fileNameMatch[1];
+            }
 
-        // Create CSV content
-        let csv = `Quiz Report: ${quiz.title}\n`;
-        csv += `Generated: ${new Date().toLocaleString()}\n\n`;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
 
-        // Quiz Info
-        csv += `QUIZ INFORMATION\n`;
-        csv += `Title,${quiz.title}\n`;
-        csv += `Code,${quiz.code}\n`;
-        csv += `Created By,${quiz.createdBy}\n`;
-        csv += `Status,${quiz.status}\n`;
-        csv += `Total Questions,${quiz.totalQuestions}\n`;
-        csv += `Total Points,${quiz.totalPoints}\n`;
-        csv += `Passing Score,${quiz.passingScore}%\n\n`;
-
-        // Analytics
-        csv += `ANALYTICS SUMMARY\n`;
-        csv += `Total Participants,${analytics.totalParticipants}\n`;
-        csv += `Completed,${analytics.completedCount}\n`;
-        csv += `Average Score,${analytics.avgScore}%\n`;
-        csv += `Average Time,${formatTime(analytics.avgTime)}\n`;
-        csv += `Pass Rate,${analytics.passRate}%\n`;
-        csv += `Highest Score,${analytics.highestScore}%\n`;
-        csv += `Lowest Score,${analytics.lowestScore}%\n`;
-        csv += `Tab Switchers,${analytics.tabSwitchersCount}\n\n`;
-
-        // Student Results
-        csv += `STUDENT RESULTS\n`;
-        csv += `Rank,Name,Email,Score,Percentage,Correct,Wrong,Unanswered,Time Taken,Status,Passed,Tab Switches\n`;
-        responses.forEach(r => {
-            csv += `${r.rank || '-'},${r.student.name},${r.student.email},${r.totalScore}/${r.maxPossibleScore},${r.percentage}%,${r.correctCount},${r.wrongCount},${r.unansweredCount},${formatTime(r.totalTimeTaken)},${r.status},${r.passed ? 'Yes' : 'No'},${r.tabSwitchCount}\n`;
-        });
-
-        csv += `\nQUESTION ANALYSIS\n`;
-        csv += `Q#,Question,Correct Answer,Attempts,Correct Attempts,Accuracy\n`;
-        questionAnalytics.forEach(q => {
-            csv += `${q.questionNumber},"${q.questionText.replace(/"/g, '""')}","${q.correctAnswer}",${q.totalAttempts},${q.correctAttempts},${q.accuracy}%\n`;
-        });
-
-        // Download
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Quiz_Report_${quiz.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-        toast.success('Report downloaded!');
+            toast.dismiss(loadingToast);
+            toast.success('Report downloaded successfully!');
+        } catch (error) {
+            console.error('Download failed:', error);
+            toast.dismiss();
+            toast.error('Failed to download report. Please try again.');
+        }
     };
 
     if (loading) {
@@ -135,7 +103,7 @@ const QuizResults = () => {
 
     if (!data) return null;
 
-    const { quiz, analytics, responses, questionAnalytics, leaderboard } = data;
+    const { quiz, analytics, responses = [], questionAnalytics, leaderboard, absentStudents } = data;
 
     return (
         <div className="results-page">
@@ -161,19 +129,19 @@ const QuizResults = () => {
                     className={`tab ${activeTab === 'overview' ? 'active' : ''}`}
                     onClick={() => setActiveTab('overview')}
                 >
-                    <FiBarChart2 /> Overview
+                    <FiBarChart2 /> Overview ({analytics.totalParticipants})
                 </button>
                 <button
                     className={`tab ${activeTab === 'students' ? 'active' : ''}`}
                     onClick={() => setActiveTab('students')}
                 >
-                    <FiUsers /> Students ({analytics.totalParticipants})
+                    <FiUsers /> Students
                 </button>
                 <button
                     className={`tab ${activeTab === 'questions' ? 'active' : ''}`}
                     onClick={() => setActiveTab('questions')}
                 >
-                    <FiFileText /> Questions ({quiz.totalQuestions})
+                    <FiFileText /> Questions
                 </button>
                 <button
                     className={`tab ${activeTab === 'leaderboard' ? 'active' : ''}`}
@@ -181,6 +149,14 @@ const QuizResults = () => {
                 >
                     <FiAward /> Leaderboard
                 </button>
+                {absentStudents && absentStudents.length > 0 && (
+                    <button
+                        className={`tab ${activeTab === 'absent' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('absent')}
+                    >
+                        <FiUserMinus /> Absent ({absentStudents.length})
+                    </button>
+                )}
             </div>
 
             {/* Overview Tab */}
@@ -223,35 +199,45 @@ const QuizResults = () => {
                         <div className="section-card">
                             <h3>Top Performers</h3>
                             <div className="performers-list">
-                                {[...responses].sort((a, b) => b.percentage - a.percentage).slice(0, 3).map((r, i) => (
-                                    <div key={i} className="performer-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontWeight: '500' }}>{r.student.name}</span>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{r.student.email}</span>
+                                {[...responses].sort((a, b) => b.percentage - a.percentage).slice(0, 3).map((r, i) => {
+                                    const s = r.student || {};
+                                    return (
+                                        <div key={i} className="performer-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontWeight: '600' }}>{s.name || 'Unknown'}</span>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                    {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
+                                                </span>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <span style={{ fontWeight: 'bold', color: 'var(--success)', display: 'block' }}>{r.percentage}%</span>
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--success)' }}>Distinction</span>
+                                            </div>
                                         </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <span style={{ fontWeight: 'bold', color: 'var(--success)', display: 'block' }}>{r.percentage}%</span>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--success)' }}>Distinction</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                         <div className="section-card">
                             <h3>Needs Attention</h3>
                             <div className="performers-list">
-                                {[...responses].sort((a, b) => a.percentage - b.percentage).slice(0, 3).filter(r => r.percentage < 60).map((r, i) => (
-                                    <div key={i} className="performer-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontWeight: '500' }}>{r.student.name}</span>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{r.student.email}</span>
+                                {[...responses].sort((a, b) => a.percentage - b.percentage).slice(0, 3).filter(r => r.percentage < 60).map((r, i) => {
+                                    const s = r.student || {};
+                                    return (
+                                        <div key={i} className="performer-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontWeight: '600' }}>{s.name || 'Unknown'}</span>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                    {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
+                                                </span>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <span style={{ fontWeight: 'bold', color: 'var(--danger)', display: 'block' }}>{r.percentage}%</span>
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--danger)' }}>Review Needed</span>
+                                            </div>
                                         </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <span style={{ fontWeight: 'bold', color: 'var(--danger)', display: 'block' }}>{r.percentage}%</span>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--danger)' }}>Review Needed</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {[...responses].filter(r => r.percentage < 60).length === 0 && (
                                     <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                         <FiCheckCircle style={{ fontSize: '1.5rem', color: 'var(--success)', marginBottom: '0.5rem' }} />
@@ -347,95 +333,106 @@ const QuizResults = () => {
             {/* Students Tab */}
             {activeTab === 'students' && (
                 <div className="tab-content">
-                    <div className="students-table">
-                        <table>
+                    <div className="students-table-container leaderboard-table-container">
+                        <table className="leaderboard-table">
                             <thead>
                                 <tr>
                                     <th>Rank</th>
-                                    <th>Student</th>
+                                    <th>Student Details</th>
+                                    <th>Branch/Section</th>
                                     <th>Score</th>
-                                    <th>Correct</th>
-                                    <th>Wrong</th>
                                     <th>Time</th>
                                     <th>Status</th>
                                     <th>Details</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {responses.map((r, idx) => (
-                                    <>
-                                        <tr key={r.student.id} className={r.passed ? 'passed' : 'failed'}>
-                                            <td className="rank-cell">
-                                                {r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank || idx + 1}`}
-                                            </td>
-                                            <td className="student-cell">
-                                                <div className="student-info">
-                                                    <span className="student-name">{r.student.name}</span>
-                                                    <span className="student-email">{r.student.email}</span>
-                                                </div>
-                                            </td>
-                                            <td className="score-cell">
-                                                <strong>{r.percentage}%</strong>
-                                                <span className="score-detail">{r.totalScore}/{r.maxPossibleScore}</span>
-                                            </td>
-                                            <td className="correct">{r.correctCount}</td>
-                                            <td className="wrong">{r.wrongCount}</td>
-                                            <td>{formatTime(r.totalTimeTaken)}</td>
-                                            <td>
-                                                <span className={`status-badge ${r.status}`}>
-                                                    {r.status}
-                                                    {r.tabSwitchCount > 0 && <FiAlertTriangle title={`${r.tabSwitchCount} tab switches`} />}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <button
-                                                    className="btn btn-sm btn-ghost"
-                                                    onClick={() => setExpandedStudent(expandedStudent === r.student.id ? null : r.student.id)}
-                                                >
-                                                    {expandedStudent === r.student.id ? <FiChevronUp /> : <FiChevronDown />}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        {expandedStudent === r.student.id && (
-                                            <tr className="expanded-row">
-                                                <td colSpan="8">
-                                                    <div className="student-answers">
-                                                        <h4>Answer Details for {r.student.name}</h4>
-                                                        <div className="answers-grid">
-                                                            {r.answers.map((a, aIdx) => (
-                                                                <div key={aIdx} className={`answer-card ${a.isCorrect ? 'correct' : 'incorrect'}`}>
-                                                                    <div className="answer-header">
-                                                                        <span className="q-num">Q{aIdx + 1}</span>
-                                                                        <span className={`answer-status ${a.isCorrect ? 'correct' : 'incorrect'}`}>
-                                                                            {a.isCorrect ? <FiCheckCircle /> : <FiXCircle />}
-                                                                            {a.pointsEarned}/{a.maxPoints} pts
-                                                                        </span>
-                                                                    </div>
-                                                                    <p className="q-text">{a.questionText}</p>
-                                                                    <div className="answer-details">
-                                                                        <div className={`answer-row ${a.isCorrect ? 'correct' : 'student'}`}>
-                                                                            <span className="answer-label">Student's Answer:</span>
-                                                                            <span className="answer-value">{a.studentAnswer || '(No answer)'}</span>
-                                                                        </div>
-                                                                        {!a.isCorrect && (
-                                                                            <div className="answer-row correct">
-                                                                                <span className="answer-label">Correct Answer:</span>
-                                                                                <span className="answer-value">{a.correctAnswer}</span>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="answer-time">
-                                                                        <FiClock /> {formatTime(a.timeTaken)}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
+                                {responses.map((r, idx) => {
+                                    const s = r.student || {};
+                                    return (
+                                        <>
+                                            <tr key={s.id || idx} className={r.passed ? 'passed' : 'failed'}>
+                                                <td className="rank-col">
+                                                    {r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank || idx + 1}`}
+                                                </td>
+                                                <td className="student-col">
+                                                    <div className="student-meta">
+                                                        <span className="name">{s.name || 'Unknown User'}</span>
+                                                        <span className="roll">{s.rollNumber || 'N/A'}</span>
                                                     </div>
                                                 </td>
+                                                <td className="branch-col">
+                                                    <div className="branch-meta">
+                                                        <span className="dept">{s.department || '-'}</span>
+                                                        <span className="sec">Section {s.section || '-'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="score-col">
+                                                    <div className="score-meta">
+                                                        <span className="marks">{r.percentage}%</span>
+                                                        <span className="info-tag" style={{ fontSize: '0.7rem', padding: '2px 6px', marginTop: '4px' }}>
+                                                            {r.totalScore}/{r.maxPossibleScore} pts
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="time-col">{formatTime(r.totalTimeTaken)}</td>
+                                                <td>
+                                                    <span className={`status-badge ${r.status}`}>
+                                                        {r.status}
+                                                        {(r.tabSwitchCount || 0) > 0 && <FiAlertTriangle title={`${r.tabSwitchCount} tab switches`} />}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <button
+                                                        className="btn btn-sm btn-ghost"
+                                                        onClick={() => setExpandedStudent(expandedStudent === s.id ? null : s.id)}
+                                                        disabled={!s.id}
+                                                    >
+                                                        {expandedStudent === s.id ? <FiChevronUp /> : <FiChevronDown />}
+                                                    </button>
+                                                </td>
                                             </tr>
-                                        )}
-                                    </>
-                                ))}
+                                            {expandedStudent === s.id && (
+                                                <tr className="expanded-row">
+                                                    <td colSpan="8">
+                                                        <div className="student-answers">
+                                                            <h4>Answer Details for {s.name}</h4>
+                                                            <div className="answers-grid">
+                                                                {r.answers && r.answers.map((a, aIdx) => (
+                                                                    <div key={aIdx} className={`answer-card ${a.isCorrect ? 'correct' : 'incorrect'}`}>
+                                                                        <div className="answer-header">
+                                                                            <span className="q-num">Q{aIdx + 1}</span>
+                                                                            <span className={`answer-status ${a.isCorrect ? 'correct' : 'incorrect'}`}>
+                                                                                {a.isCorrect ? <FiCheckCircle /> : <FiXCircle />}
+                                                                                {a.pointsEarned}/{a.points || 0} pts
+                                                                            </span>
+                                                                        </div>
+                                                                        <p className="q-text">{a.questionText}</p>
+                                                                        <div className="answer-details">
+                                                                            <div className={`answer-row ${a.isCorrect ? 'correct' : 'student'}`}>
+                                                                                <span className="answer-label">Student's Answer:</span>
+                                                                                <span className="answer-value">{a.studentAnswer || '(No answer)'}</span>
+                                                                            </div>
+                                                                            {!a.isCorrect && (
+                                                                                <div className="answer-row correct">
+                                                                                    <span className="answer-label">Correct Answer:</span>
+                                                                                    <span className="answer-value">{a.correctAnswer}</span>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="answer-time">
+                                                                            <FiClock /> {formatTime(a.timeTaken)}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -453,13 +450,13 @@ const QuizResults = () => {
                                     <span className={`difficulty ${q.difficulty}`}>{q.difficulty}</span>
                                     <span className="points">{q.points} pts</span>
                                 </div>
-                                <p className="question-text">{q.questionText}</p>
+                                <p className="question-text">{q.text || q.questionText}</p>
                                 <div className="question-meta">
                                     <div className="meta-item">
                                         <span className="meta-label">Correct Answer</span>
                                         <span className="meta-value correct">{q.correctAnswer}</span>
                                     </div>
-                                    {q.options.length > 0 && (
+                                    {q.options && q.options.length > 0 && (
                                         <div className="meta-item options">
                                             <span className="meta-label">Options</span>
                                             <div className="options-list">
@@ -474,7 +471,7 @@ const QuizResults = () => {
                                 </div>
                                 <div className="accuracy-bar">
                                     <div className="accuracy-label">
-                                        Accuracy: <strong>{q.accuracy}%</strong> ({q.correctAttempts}/{q.totalAttempts} correct)
+                                        Accuracy: <strong>{q.accuracy}%</strong> ({q.correctAttempts}/{q.attempts} correct)
                                     </div>
                                     <div className="bar">
                                         <div className="fill" style={{ width: `${q.accuracy}%` }}></div>
@@ -489,39 +486,134 @@ const QuizResults = () => {
             {/* Leaderboard Tab */}
             {activeTab === 'leaderboard' && (
                 <div className="tab-content">
-                    <div className="leaderboard">
-                        {/* Podium */}
-                        <div className="podium">
-                            {leaderboard.slice(0, 3).map((r, idx) => (
-                                <div key={r.student.id} className={`podium-item rank-${idx + 1}`}>
-                                    <div className="podium-medal">
-                                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                    <div className="leaderboard-v2">
+                        {/* Top 3 Featured Cards */}
+                        <div className="featured-winners">
+                            {leaderboard.slice(0, 3).map((r, idx) => {
+                                const s = r.student || {};
+                                return (
+                                    <div key={s.id || idx} className={`winner-card rank-${idx + 1}`}>
+                                        <div className="winner-rank">
+                                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                                            <span>#{idx + 1}</span>
+                                        </div>
+                                        <div className="winner-details">
+                                            <div className="winner-main">
+                                                <h3>{s.name || 'Unknown'}</h3>
+                                                <span className="roll">{s.rollNumber || 'N/A'}</span>
+                                            </div>
+                                            <div className="winner-sub">
+                                                <span className="info-tag"><FiAward /> {s.department || '-'}</span>
+                                                <span className="info-tag section-tag">Section: {s.section || '-'}</span>
+                                            </div>
+                                        </div>
+                                        <div className="winner-stats">
+                                            <div className="stat-group">
+                                                <span className="stat-val">{r.totalScore}/{r.maxPossibleScore}</span>
+                                                <span className="stat-lbl">Marks ({r.percentage}%)</span>
+                                            </div>
+                                            <div className="stat-group">
+                                                <span className="stat-val">{formatTime(r.totalTimeTaken)}</span>
+                                                <span className="stat-lbl">Time Taken</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="podium-name">{r.student.name}</div>
-                                    <div className="podium-score">{r.percentage}%</div>
-                                    <div className="podium-points">{r.totalScore} pts</div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
-                        {/* Full List */}
-                        <div className="leaderboard-list">
-                            {leaderboard.map((r, idx) => (
-                                <div key={r.student.id} className={`lb-item ${idx < 3 ? 'top' : ''}`}>
-                                    <span className="lb-rank">
-                                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
-                                    </span>
-                                    <div className="lb-student">
-                                        <span className="lb-name">{r.student.name}</span>
-                                        <span className="lb-email">{r.student.email}</span>
-                                    </div>
-                                    <div className="lb-stats">
-                                        <span className="lb-score">{r.percentage}%</span>
-                                        <span className="lb-time">{formatTime(r.totalTimeTaken)}</span>
-                                    </div>
-                                </div>
-                            ))}
+                        {/* Full Leaderboard Table */}
+                        <div className="leaderboard-table-container">
+                            <table className="leaderboard-table">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Student Details</th>
+                                        <th>Branch/Section</th>
+                                        <th>Performance</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {leaderboard.map((r, idx) => {
+                                        const s = r.student || {};
+                                        return (
+                                            <tr key={s.id || idx} className={idx < 3 ? `top-rank rank-${idx + 1}` : ''}>
+                                                <td className="rank-col">
+                                                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                                                </td>
+                                                <td className="student-col">
+                                                    <div className="student-meta">
+                                                        <span className="name">{s.name || 'Unknown'}</span>
+                                                        <span className="roll">{s.rollNumber || 'N/A'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="branch-col">
+                                                    <div className="branch-meta">
+                                                        <span className="dept">{s.department || '-'}</span>
+                                                        <span className="sec">Section {s.section || '-'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="score-col">
+                                                    <div className="score-meta">
+                                                        <span className="marks">{r.totalScore}/{r.maxPossibleScore}</span>
+                                                        <div className="progress-mini">
+                                                            <div className="fill" style={{ width: `${r.percentage}%` }}></div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="time-col">
+                                                    <span className="time">{formatTime(r.totalTimeTaken)}</span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Absent Tab */}
+            {activeTab === 'absent' && absentStudents && (
+                <div className="tab-content">
+                    <div className="leaderboard-table-container">
+                        <div className="section-card danger" style={{ margin: '20px', border: 'none', background: 'rgba(226, 27, 60, 0.05)' }}>
+                            <h3 style={{ color: 'var(--danger)', marginBottom: '5px' }}><FiUserMinus /> Absent Students</h3>
+                            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>These students were eligible but did not attempt the quiz.</p>
+                        </div>
+                        <table className="leaderboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Student Details</th>
+                                    <th>Branch/Section</th>
+                                    <th>Roll Number</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {absentStudents.map((s, idx) => (
+                                    <tr key={s.id || idx} className="failed">
+                                        <td className="student-col">
+                                            <div className="student-meta">
+                                                <span className="name">{s.name}</span>
+                                                <span className="roll" style={{ opacity: 0.7 }}>{s.email}</span>
+                                            </div>
+                                        </td>
+                                        <td className="branch-col">
+                                            <div className="branch-meta">
+                                                <span className="dept">{s.department} - Section {s.section}</span>
+                                            </div>
+                                        </td>
+                                        <td><span className="roll">{s.rollNumber}</span></td>
+                                        <td>
+                                            <span className="status-badge terminated">Absent</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}

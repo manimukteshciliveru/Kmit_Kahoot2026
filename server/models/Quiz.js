@@ -9,7 +9,7 @@ const questionSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['mcq', 'fill-blank', 'qa'],
+        enum: ['mcq', 'msq', 'fill-blank', 'qa'],
         required: true
     },
     options: [String],
@@ -25,9 +25,9 @@ const questionSchema = new mongoose.Schema({
     },
     timeLimit: {
         type: Number, // seconds
-        default: 30,
-        min: 5,
-        max: 300
+        default: 0,
+        min: 0,
+        max: 600
     },
     difficulty: {
         type: String,
@@ -51,6 +51,12 @@ const quizSchema = new mongoose.Schema({
         trim: true,
         minlength: [3, 'Title must be at least 3 characters'],
         maxlength: [100, 'Title cannot exceed 100 characters']
+    },
+    subject: {
+        type: String,
+        required: [true, 'Subject is required'],
+        trim: true,
+        default: 'General'
     },
     description: {
         type: String,
@@ -76,7 +82,7 @@ const quizSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['draft', 'scheduled', 'active', 'paused', 'completed'],
+        enum: ['draft', 'scheduled', 'active', 'paused', 'completed', 'finished'],
         default: 'draft'
     },
     settings: {
@@ -155,10 +161,33 @@ const quizSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    expiresAt: {
+        type: Date,
+        default: null
+    },
     sourceFile: {
         filename: String,
         fileType: String, // pdf, excel, audio, video
         uploadedAt: Date
+    },
+    accessControl: {
+        isPublic: {
+            type: Boolean,
+            default: true
+        },
+        allowedBranches: [{
+            name: { type: String, trim: true }, // e.g., 'CSE', 'CSM'
+            sections: [{ type: String, trim: true }] // e.g., ['A', 'B']
+        }],
+        mode: {
+            type: String,
+            enum: ['ALL', 'SPECIFIC'],
+            default: 'ALL'
+        },
+        allowedStudents: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }]
     }
 }, {
     timestamps: true
@@ -183,7 +212,7 @@ quizSchema.virtual('questionCount').get(function () {
 
 // Virtual for total points
 quizSchema.virtual('totalPoints').get(function () {
-    return this.questions.reduce((sum, q) => sum + q.points, 0);
+    return this.questions ? this.questions.reduce((sum, q) => sum + q.points, 0) : 0;
 });
 
 // Method to shuffle questions for a student

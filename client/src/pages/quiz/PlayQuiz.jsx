@@ -11,16 +11,60 @@ import {
     FiUsers,
     FiTrendingUp,
     FiAlertTriangle,
-    FiArrowLeft
+    FiArrowLeft,
+    FiZap
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 import './PlayQuiz.css';
+
+const CircularTimer = ({ timeLeft, totalTime, size = 60 }) => {
+    const radius = size * 0.4;
+    const circumference = 2 * Math.PI * radius;
+    const progress = totalTime > 0 ? timeLeft / totalTime : 0;
+    const offset = circumference - progress * circumference;
+
+    const color = timeLeft <= 5 ? 'var(--danger)' : timeLeft <= 10 ? 'var(--warning)' : 'var(--primary)';
+
+    return (
+        <div className="circular-timer-container" style={{ width: size, height: size }}>
+            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                <circle
+                    className="timer-bg"
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    stroke="var(--bg-tertiary)"
+                    strokeWidth="4"
+                    fill="none"
+                />
+                <circle
+                    className="timer-progress"
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    stroke={color}
+                    strokeWidth="4"
+                    fill="none"
+                    strokeLinecap="round"
+                    style={{
+                        strokeDasharray: circumference,
+                        strokeDashoffset: isNaN(offset) ? 0 : offset,
+                        transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease'
+                    }}
+                    transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                />
+            </svg>
+            <div className="timer-text" style={{ color }}>{timeLeft}</div>
+        </div>
+    );
+};
 
 const PlayQuiz = () => {
     const { quizId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { socket, joinQuiz, leaveQuiz, submitAnswer, reportTabSwitch, on, off } = useSocket();
+    const { socket, joinQuiz, leaveQuiz, submitAnswer, completeQuiz, reportTabSwitch, on, off } = useSocket();
 
     // Quiz State
     const [quiz, setQuiz] = useState(null);
@@ -35,27 +79,156 @@ const PlayQuiz = () => {
     const [textAnswer, setTextAnswer] = useState('');
     const [isAnswered, setIsAnswered] = useState(false);
     const [feedback, setFeedback] = useState(null);
+    const [savedAnswers, setSavedAnswers] = useState({}); // { questionId: answer }
 
     // Timer State
-    const [timeLeft, setTimeLeft] = useState(0);
+    const [overallTimeLeft, setOverallTimeLeft] = useState(0); // Global quiz timer
+    const [timeLeft, setTimeLeft] = useState(0); // Per-question timer
     const timerRef = useRef(null);
+    const globalTimerRef = useRef(null);
 
     // Score State
     const [score, setScore] = useState(0);
-    const [totalPoints, setTotalPoints] = useState(0);
     const [correctCount, setCorrectCount] = useState(0);
 
     // Leaderboard State
     const [leaderboard, setLeaderboard] = useState([]);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-    // Tab Switch State
+    // Tab Switch State (Cheating Detection)
     const [tabSwitchCount, setTabSwitchCount] = useState(0);
     const [showTabWarning, setShowTabWarning] = useState(false);
 
     // Review State
     const [reviewMode, setReviewMode] = useState(false);
     const [reviewData, setReviewData] = useState(null);
+
+    // Question Panel State
+    const [showQuestionPanel, setShowQuestionPanel] = useState(false);
+
+    const handleAnswerSubmit = useCallback(async (isTimeout = false, answerOverride = null) => {
+        if (status !== 'active') return;
+
+        const currentQuestion = questions[currentIndex];
+        const isMcqLike = currentQuestion?.type === 'mcq' || currentQuestion?.type === 'msq';
+
+        // Use override if provided (for immediate auto-save), otherwise state
+        const answer = answerOverride !== null ? answerOverride : (isMcqLike ? selectedAnswer : textAnswer);
+
+        // Silent return if empty and not timeout - just don't submit empty unless forced
+        if (!answer && !isTimeout) {
+            return;
+        }
+
+        // Persist locally
+        setSavedAnswers(prev => ({ ...prev, [currentQuestion?._id]: answer || '' }));
+        setIsAnswered(true);
+
+        try {
+            const timeLimit = quiz?.settings?.questionTimer || 0;
+            const timeTaken = timeLimit > 0 ? (timeLimit - timeLeft) * 1000 : 0;
+
+            submitAnswer({
+                quizId,
+                questionId: currentQuestion?._id,
+                answer: answer || '',
+                timeTaken: timeTaken
+            });
+        } catch (error) {
+            console.error('Failed to submit answer:', error);
+        }
+    }, [status, questions, currentIndex, selectedAnswer, textAnswer, timeLeft, submitAnswer, quizId, quiz]);
+
+    // Handle jump to specific question
+    const goToQuestion = (index) => {
+        if (index === currentIndex) return;
+
+        setCurrentIndex(index);
+        const nextQ = questions[index];
+        const savedAns = savedAnswers[nextQ?._id];
+
+        if (savedAns) {
+            setSelectedAnswer(savedAns);
+            setTextAnswer(savedAns);
+            setIsAnswered(true);
+        } else {
+            setSelectedAnswer('');
+            setTextAnswer('');
+            setIsAnswered(false);
+        }
+        setFeedback(null);
+        setShowQuestionPanel(false); // Close panel on selection
+    };
+
+    // Handle Option Click for MCQ
+    // Handle Option Click for MCQ with Auto-Save
+    const handleOptionSelect = (option) => {
+        const q = questions[currentIndex];
+        let newAnswer = option;
+
+        if (q?.type === 'mcq') {
+            setSelectedAnswer(option);
+        } else if (q?.type === 'msq') {
+            const current = selectedAnswer.split(',').filter(Boolean);
+            let next;
+            if (current.includes(option)) {
+                next = current.filter(a => a !== option);
+            } else {
+                next = [...current, option];
+            }
+            newAnswer = next.join(',');
+            setSelectedAnswer(newAnswer);
+        }
+
+        // Trigger auto-save immediately with the new value
+        handleAnswerSubmit(false, newAnswer);
+    };
+
+    const handleSubmitQuiz = useCallback(async (force = false) => {
+        const answeredCount = Object.keys(savedAnswers).length;
+        const total = questions.length;
+
+        if (!force) {
+            if (answeredCount < total) {
+                if (!window.confirm(`You have only answered ${answeredCount} out of ${total} questions. Submit anyway?`)) {
+                    return;
+                }
+            } else {
+                if (!window.confirm("Are you sure you want to submit your quiz?")) {
+                    return;
+                }
+            }
+        }
+
+        try {
+            if (completeQuiz) {
+                completeQuiz(quizId);
+            } else if (socket) {
+                socket.emit('quiz:complete', { quizId });
+            }
+
+            setStatus('completed'); // Optimistic update
+            localStorage.removeItem(`quiz_${quizId}_answers`);
+        } catch (error) {
+            console.error('Submit Quiz Error:', error);
+            toast.error("Failed to submit quiz. Please try again.");
+        }
+    }, [savedAnswers, questions, completeQuiz, socket, quizId]);
+
+    // Persistence: Load from LocalStorage
+    useEffect(() => {
+        const saved = localStorage.getItem(`quiz_${quizId}_answers`);
+        if (saved) {
+            setSavedAnswers(JSON.parse(saved));
+        }
+    }, [quizId]);
+
+    // Persistence: Save to LocalStorage
+    useEffect(() => {
+        if (Object.keys(savedAnswers).length > 0) {
+            localStorage.setItem(`quiz_${quizId}_answers`, JSON.stringify(savedAnswers));
+        }
+    }, [savedAnswers, quizId]);
 
     const handleViewReview = async () => {
         try {
@@ -79,11 +252,69 @@ const PlayQuiz = () => {
                 const quizData = response.data.data.quiz;
                 setQuiz(quizData);
                 setQuestions(quizData.questions || []);
-                setStatus(quizData.status === 'active' ? 'active' : 'waiting');
+
+                const isFinished = quizData.status === 'completed' || quizData.status === 'finished';
+                setStatus(quizData.status === 'active' ? 'active' : isFinished ? 'finished' : 'waiting');
+
+                if (isFinished) {
+                    try {
+                        const lbRes = await quizAPI.getLeaderboard(quizId);
+                        setLeaderboard(lbRes.data.data.leaderboard || []);
+                    } catch (err) {
+                        console.error('Failed to fetch leaderboard:', err);
+                    }
+                }
 
                 if (quizData.status === 'active') {
                     setCurrentIndex(quizData.currentQuestionIndex >= 0 ? quizData.currentQuestionIndex : 0);
-                    setTimeLeft(quizData.settings?.questionTimer || 30);
+
+                    // Initialize Overall Timer using expiresAt STRICTLY
+                    if (quizData.expiresAt) {
+                        const expires = new Date(quizData.expiresAt).getTime();
+                        const now = Date.now();
+                        const remaining = Math.max(0, Math.floor((expires - now) / 1000));
+                        setOverallTimeLeft(remaining);
+                        // If already expired
+                        if (remaining <= 0) {
+                            handleSubmitQuiz(true);
+                        }
+                    } else if (quizData.settings?.quizTimer > 0 && quizData.startedAt) {
+                        // Fallback but prioritize expiresAt if available
+                        const start = new Date(quizData.startedAt).getTime();
+                        const now = Date.now();
+                        const elapsed = Math.floor((now - start) / 1000);
+                        const remaining = Math.max(0, quizData.settings.quizTimer - elapsed);
+                        setOverallTimeLeft(remaining);
+                    }
+
+                    // RESUME LOGIC: Fetch existing response data
+                    try {
+                        const respRes = await responseAPI.getMyResponse(quizId);
+                        const responseData = respRes.data.data.response;
+
+                        if (responseData) {
+                            setScore(responseData.totalScore || 0);
+                            setCorrectCount(responseData.correctCount || 0);
+
+                            const existingAnswers = {};
+                            responseData.answers.forEach(ans => {
+                                if (ans.answer) {
+                                    existingAnswers[ans.questionId] = ans.answer;
+                                }
+                            });
+
+                            setSavedAnswers(prev => ({ ...prev, ...existingAnswers }));
+
+                            const currentQId = quizData.questions[quizData.currentQuestionIndex]?._id;
+                            if (existingAnswers[currentQId]) {
+                                setSelectedAnswer(existingAnswers[currentQId]);
+                                setTextAnswer(existingAnswers[currentQId]);
+                                setIsAnswered(true);
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('No existing response found or failed to fetch:', err);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch quiz:', error);
@@ -95,51 +326,60 @@ const PlayQuiz = () => {
         };
 
         fetchQuiz();
-    }, [quizId, navigate]);
+    }, [quizId, navigate, handleSubmitQuiz]);
 
     // Join quiz room
     useEffect(() => {
         if (socket && quizId) {
-            console.log('Attempting to join quiz room:', quizId);
             joinQuiz(quizId);
-
-            // Set up a timeout to check if we actually joined or received data
-            const connectionTimeout = setTimeout(() => {
-                if (status === 'waiting' && !socket.connected) {
-                    setConnectionError(true);
-                    toast.error('Connection issue detected. Trying to reconnect...');
-                }
-            }, 5000);
-
-            return () => {
-                clearTimeout(connectionTimeout);
-                leaveQuiz(quizId);
-            };
+            return () => leaveQuiz(quizId);
         }
-    }, [socket, quizId, joinQuiz, leaveQuiz, status]);
+    }, [socket, quizId, joinQuiz, leaveQuiz]);
 
     // Socket event listeners
     useEffect(() => {
         if (!socket) return;
 
         const handleQuizStart = (data) => {
+            console.log('Socket: quiz:started', data);
             setStatus('active');
             setQuestions(data.questions || questions);
             setCurrentIndex(0);
-            setTimeLeft(data.questionTimer || 30);
+
+            if (data.expiresAt) {
+                const expires = new Date(data.expiresAt).getTime();
+                const now = Date.now();
+                const remaining = Math.max(0, Math.floor((expires - now) / 1000));
+                setOverallTimeLeft(remaining);
+            } else if (data.settings?.quizTimer) {
+                setOverallTimeLeft(data.settings.quizTimer);
+            }
+
             toast.success('Quiz has started!');
         };
 
         const handleQuestionUpdate = (data) => {
+            console.log('Socket: quiz:question', data);
             setCurrentIndex(data.questionIndex);
-            setSelectedAnswer('');
-            setTextAnswer('');
-            setIsAnswered(false);
+
+            // Check if we already have an answer for this question
+            const currentQ = questions[data.questionIndex];
+            const savedAns = savedAnswers[currentQ?._id];
+
+            if (savedAns) {
+                setSelectedAnswer(savedAns);
+                setTextAnswer(savedAns);
+                setIsAnswered(true);
+            } else {
+                setSelectedAnswer('');
+                setTextAnswer('');
+                setIsAnswered(false);
+            }
             setFeedback(null);
-            setTimeLeft(data.timeLimit || quiz?.settings?.questionTimer || 30);
         };
 
         const handleAnswerFeedback = (data) => {
+            console.log('Socket: answer:feedback', data);
             setFeedback(data);
             setScore(data.totalScore);
             if (data.isCorrect) {
@@ -152,10 +392,34 @@ const PlayQuiz = () => {
         };
 
         const handleQuizEnd = (data) => {
-            setStatus('completed');
+            console.log('Socket: quiz:ended', data);
+
+            // Stop timer locally immediately
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (globalTimerRef.current) clearInterval(globalTimerRef.current);
+            setTimeLeft(0);
+            setOverallTimeLeft(0);
+
+            setStatus('finished');
             setLeaderboard(data.leaderboard || []);
             setShowLeaderboard(true);
-            clearInterval(timerRef.current);
+
+            toast(data.autoEnded ? "⏰ Quiz time expired! Auto-submitted." : "🏁 Quiz has been ended by the host.", {
+                icon: '🏁',
+                duration: 5000
+            });
+
+            localStorage.removeItem(`quiz_${quizId}_answers`);
+
+            // Explicitly leave quiz room
+            if (leaveQuiz) {
+                leaveQuiz(quizId);
+            }
+        };
+
+        const handleQuizTerminated = (data) => {
+            toast.error(data.reason || 'You have been removed from the quiz.');
+            navigate('/dashboard');
         };
 
         const cleanups = [
@@ -163,201 +427,191 @@ const PlayQuiz = () => {
             on('quiz:question', handleQuestionUpdate),
             on('answer:feedback', handleAnswerFeedback),
             on('leaderboard:update', handleLeaderboardUpdate),
-            on('quiz:ended', handleQuizEnd)
+            on('quiz:ended', handleQuizEnd),
+            on('quiz:terminated', handleQuizTerminated)
         ];
 
         return () => cleanups.forEach(cleanup => cleanup && cleanup());
-    }, [socket, on, questions, quiz]);
+    }, [socket, on, questions, savedAnswers, quizId, leaveQuiz]);
 
-    // Timer countdown
+    // Overall Global Timer logic
     useEffect(() => {
-        if (status !== 'active' || timeLeft <= 0) return;
+        if (status !== 'active' || overallTimeLeft <= 0) return;
 
-        timerRef.current = setInterval(() => {
-            setTimeLeft(prev => {
+        globalTimerRef.current = setInterval(() => {
+            setOverallTimeLeft(prev => {
                 if (prev <= 1) {
-                    clearInterval(timerRef.current);
-                    if (!isAnswered) {
-                        handleAnswerSubmit(true); // Auto-submit on timeout
-                    }
+                    clearInterval(globalTimerRef.current);
+                    toast.error('Quiz time is up!');
+                    // Force submit on expiry
+                    handleSubmitQuiz(true);
                     return 0;
                 }
                 return prev - 1;
             });
         }, 1000);
 
-        return () => clearInterval(timerRef.current);
-    }, [status, currentIndex]);
+        return () => {
+            if (globalTimerRef.current) clearInterval(globalTimerRef.current);
+        };
+    }, [status, overallTimeLeft > 0, handleSubmitQuiz]);
 
-    // Tab visibility detection
+    // Per-Question Timer Logic
     useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.hidden && status === 'active' && !quiz?.settings?.allowTabSwitch) {
-                setTabSwitchCount(prev => prev + 1);
-                setShowTabWarning(true);
-                reportTabSwitch(quizId);
+        if (status === 'active' && quiz?.settings?.questionTimer > 0) {
+            setTimeLeft(quiz.settings.questionTimer);
+        }
+    }, [currentIndex, status, quiz]);
 
-                if (quiz?.settings?.maxTabSwitches && tabSwitchCount >= quiz.settings.maxTabSwitches) {
-                    toast.error('Quiz terminated due to tab switching');
-                    setStatus('completed');
+    useEffect(() => {
+        if (status !== 'active' || timeLeft <= 0 || isAnswered) return;
+
+        timerRef.current = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timerRef.current);
+                    return 0;
                 }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, [status, currentIndex, isAnswered, timeLeft > 0]);
+
+    // Auto-submit on per-question timeout
+    useEffect(() => {
+        if (status === 'active' && timeLeft === 0 && !isAnswered && quiz?.settings?.questionTimer > 0) {
+            handleAnswerSubmit(true);
+        }
+    }, [timeLeft, status, isAnswered, quiz, handleAnswerSubmit]);
+
+    // Cheating Detection
+    useEffect(() => {
+        const handleCheating = () => {
+            if (status === 'active' && !quiz?.settings?.allowTabSwitch) {
+                setTabSwitchCount(prev => {
+                    const newCount = prev + 1;
+                    setShowTabWarning(true);
+                    reportTabSwitch(quizId);
+
+                    if (quiz?.settings?.maxTabSwitches > 0 && newCount >= quiz.settings.maxTabSwitches) {
+                        toast.error('Quiz terminated due to unauthorized activity');
+                        setStatus('completed');
+                    }
+                    return newCount;
+                });
             }
         };
 
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [status, quiz, tabSwitchCount, reportTabSwitch, quizId]);
+        const handleBlur = () => {
+            // Emit focus lost event for trust score deduction
+            if (socket && status === 'active') {
+                socket.emit('focus:lost', { quizId });
+            }
+            handleCheating();
+        };
 
-    const handleAnswerSubmit = useCallback(async (isTimeout = false) => {
-        if (isAnswered || status !== 'active') return;
+        document.addEventListener('visibilitychange', () => { if (document.hidden) handleCheating(); });
+        window.addEventListener('blur', handleBlur);
 
-        const currentQuestion = questions[currentIndex];
-        const answer = currentQuestion?.type === 'mcq' ? selectedAnswer : textAnswer;
+        return () => {
+            document.removeEventListener('visibilitychange', handleCheating);
+            window.removeEventListener('blur', handleBlur);
+        };
+    }, [status, quiz, reportTabSwitch, quizId, socket]);
 
-        if (!answer && !isTimeout) {
-            toast.error('Please select an answer');
-            return;
-        }
-
-        setIsAnswered(true);
-        clearInterval(timerRef.current);
-
-        try {
-            submitAnswer({
-                quizId,
-                questionId: currentQuestion?._id,
-                answer: answer || '',
-                timeTaken: ((currentQuestion?.timeLimit || quiz?.settings?.questionTimer || 30) - timeLeft) * 1000
-            });
-        } catch (error) {
-            console.error('Failed to submit answer:', error);
-        }
-    }, [isAnswered, status, questions, currentIndex, selectedAnswer, textAnswer, timeLeft, submitAnswer, quizId, quiz]);
-
-    const handleNextQuestion = useCallback(() => {
+    const handleNextQuestion = () => {
         if (currentIndex < questions.length - 1) {
-            const nextIndex = currentIndex + 1;
-            setCurrentIndex(nextIndex);
-            setSelectedAnswer('');
-            setTextAnswer('');
-            setIsAnswered(false);
-            setFeedback(null);
-            setTimeLeft(questions[nextIndex]?.timeLimit || quiz?.settings?.questionTimer || 30);
-        } else {
-            // Quiz completed
-            setStatus('completed');
-            setShowLeaderboard(true);
+            goToQuestion(currentIndex + 1);
         }
-    }, [currentIndex, questions, quiz]);
-
-    const getTimerClass = () => {
-        if (timeLeft <= 5) return 'danger';
-        if (timeLeft <= 10) return 'warning';
-        return 'normal';
     };
 
-    if (loading) {
-        return (
-            <div className="quiz-loading">
-                <div className="spinner"></div>
-                <p>Loading quiz...</p>
-            </div>
-        );
-    }
+    const handlePrevQuestion = () => {
+        if (currentIndex > 0) {
+            goToQuestion(currentIndex - 1);
+        }
+    };
 
-    if (connectionError && !socket?.connected) {
-        return (
-            <div className="quiz-error">
-                <div className="error-content">
-                    <FiAlertTriangle className="error-icon" />
-                    <h2>Connection Lost</h2>
-                    <p>We're having trouble connecting to the quiz server.</p>
-                    <button className="btn btn-primary" onClick={() => window.location.reload()}>
-                        Refresh Page
-                    </button>
-                </div>
-            </div>
-        );
-    }
+    const formatTime = useCallback((seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }, []);
 
-    // Waiting Screen
+    if (loading) return <div className="quiz-loading-modern"><div className="loader-orbit"></div><p>Syncing with Server...</p></div>;
+
+    // Waiting Screen (Modern)
     if (status === 'waiting') {
         return (
-            <div className="quiz-waiting">
-                <div className="waiting-card animate-slideUp">
-                    <div className="waiting-icon animate-bounce">⏳</div>
-                    <h1>Waiting for Quiz to Start</h1>
-                    <p>The instructor will start the quiz shortly</p>
+            <div className="quiz-waiting-modern">
+                <div className="waiting-glass-card">
+                    <div className="pulse-logo">
+                        <FiZap className="zap-icon" />
+                    </div>
+                    <h1>Ready for the Challenge?</h1>
+                    <p className="waiting-text">The instructor will launch the quiz shortly. Brace yourself!</p>
 
-                    <div className="quiz-info">
-                        <h2>{quiz?.title}</h2>
-                        <p>{quiz?.description}</p>
-                        <div className="quiz-meta">
-                            <span><FiUsers /> {quiz?.participants?.length || 0} participants</span>
-                            <span><FiClock /> {questions.length} questions</span>
+                    <div className="quiz-stats-banner">
+                        <div className="stat-banner-item">
+                            <FiUsers />
+                            <span>{quiz?.participants?.length || 0} competing</span>
+                        </div>
+                        <div className="stat-banner-item">
+                            <FiZap />
+                            <span>{questions.length} questions</span>
+                        </div>
+                        <div className="stat-banner-item">
+                            <FiClock />
+                            <span>{quiz?.settings?.quizTimer ? formatTime(quiz.settings.quizTimer) : 'No limit'}</span>
                         </div>
                     </div>
 
-                    <div className="waiting-tips">
-                        <h3>While you wait:</h3>
-                        <ul>
-                            <li>Stay on this page</li>
-                            <li>Ensure stable internet connection</li>
-                            <li>Get ready to answer quickly!</li>
-                        </ul>
+                    <div className="waiting-footer">
+                        <div className="loading-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <p>Waiting for Host...</p>
                     </div>
                 </div>
             </div>
         );
     }
 
-    // Completed Screen
-    if (status === 'completed' || showLeaderboard) {
+    // Completed View (Premium Leaderboard)
+    if (status === 'completed' || status === 'finished' || showLeaderboard) {
         if (reviewMode && reviewData) {
             return (
-                <div className="play-quiz review-mode">
-                    <div className="review-container animate-slideUp">
-                        <div className="review-header">
-                            <button className="btn btn-ghost" onClick={() => setReviewMode(false)}>
-                                <FiArrowLeft /> Back to Summary
-                            </button>
-                            <h1>Review Answers</h1>
+                <div className="play-quiz-premium review-mode">
+                    <div className="review-scroll-container">
+                        <div className="review-header-sticky">
+                            <button className="back-link-btn" onClick={() => setReviewMode(false)}><FiArrowLeft /> Return to Results</button>
+                            <h1>Question Analysis</h1>
                         </div>
-
-                        <div className="review-list">
-                            {reviewData.quizId?.questions?.map((q, qIdx) => {
+                        <div className="review-cards-stack">
+                            {reviewData.quizId?.questions?.map((q, idx) => {
                                 const answer = reviewData.answers.find(a => a.questionId === q._id);
-                                const isCorrect = answer?.isCorrect;
-
                                 return (
-                                    <div key={q._id} className={`review-card ${isCorrect ? 'correct' : 'incorrect'}`}>
-                                        <div className="review-card-header">
-                                            <span className="q-num">Q{qIdx + 1}</span>
-                                            <span className={`status ${isCorrect ? 'correct' : 'incorrect'}`}>
-                                                {isCorrect ? <FiCheckCircle /> : <FiXCircle />}
-                                                {isCorrect ? 'Correct' : 'Incorrect'}
-                                            </span>
-                                            <span className="points">{answer?.pointsEarned || 0}/{q.points} pts</span>
-                                        </div>
-                                        <p className="q-text">{q.text}</p>
-
-                                        <div className="review-details">
-                                            <div className="review-answer user">
-                                                <span className="label">Your Answer:</span>
-                                                <span className="value">{answer?.answer || '(No answer)'}</span>
+                                    <div key={q._id} className={`premium-review-card ${answer?.isCorrect ? 'is-correct' : 'is-incorrect'}`}>
+                                        <div className="review-card-top">
+                                            <span className="q-label">QUESTION {idx + 1}</span>
+                                            <div className="score-tag">
+                                                {answer?.pointsEarned || 0} / {q.points} PTS
                                             </div>
-                                            {!isCorrect && (
-                                                <div className="review-answer correct">
-                                                    <span className="label">Correct Answer:</span>
-                                                    <span className="value">{q.correctAnswer}</span>
-                                                </div>
-                                            )}
                                         </div>
-                                        {q.explanation && (
-                                            <div className="review-explanation">
-                                                <strong>Explanation:</strong> {q.explanation}
+                                        <h3 className="review-q-text">{q.text}</h3>
+                                        <div className="comparison-grid">
+                                            <div className="comparison-item yours">
+                                                <label>YOUR RESPONSE</label>
+                                                <div className="value">{answer?.answer || 'Skipped'}</div>
                                             </div>
-                                        )}
+                                            <div className="comparison-item correct">
+                                                <label>CORRECT ANSWER</label>
+                                                <div className="value">{q.correctAnswer}</div>
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -366,249 +620,225 @@ const PlayQuiz = () => {
                 </div>
             );
         }
-        const userRank = leaderboard.findIndex(l => l.studentId === user?._id) + 1;
+
+        const userRank = leaderboard.findIndex(l => String(l.userId?._id || l.studentId) === String(user?._id)) + 1;
         const percentage = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
 
         return (
-            <div className="quiz-completed">
-                <div className="completed-card animate-slideUp">
-                    <div className="completed-header">
-                        <div className={`result-icon ${percentage >= 70 ? 'success' : percentage >= 40 ? 'warning' : 'danger'}`}>
-                            {percentage >= 70 ? '🎉' : percentage >= 40 ? '👍' : '💪'}
-                        </div>
-                        <h1>Quiz Completed!</h1>
-                        <p>{quiz?.title}</p>
+            <div className="quiz-finished-premium">
+                <div className="results-hero-card animate-popIn">
+                    <div className="hero-glow"></div>
+                    <div className="results-header">
+                        <h1>Mission Accomplished!</h1>
+                        <p className="quiz-title-muted">{quiz?.title}</p>
                     </div>
 
-                    <div className="score-summary">
-                        <div className="score-item primary">
-                            <span className="score-value">{score}</span>
-                            <span className="score-label">Points</span>
+                    <div className="glory-stats-grid">
+                        <div className="glory-stat-card primary">
+                            <FiZap className="stat-icon" />
+                            <span className="stat-val">{score}</span>
+                            <span className="stat-lbl">TOTAL POINTS</span>
                         </div>
-                        <div className="score-item success">
-                            <span className="score-value">{correctCount}/{questions.length}</span>
-                            <span className="score-label">Correct</span>
+                        <div className="glory-stat-card success">
+                            <FiTrendingUp className="stat-icon" />
+                            <span className="stat-val">{percentage}%</span>
+                            <span className="stat-lbl">ACCURACY</span>
                         </div>
-                        <div className="score-item accent">
-                            <span className="score-value">{percentage}%</span>
-                            <span className="score-label">Score</span>
+                        <div className="glory-stat-card gold">
+                            <FiAward className="stat-icon" />
+                            <span className="stat-val">#{userRank || 'N/A'}</span>
+                            <span className="stat-lbl">FINAL RANK</span>
                         </div>
-                        {userRank > 0 && (
-                            <div className="score-item info">
-                                <span className="score-value">#{userRank}</span>
-                                <span className="score-label">Rank</span>
-                            </div>
-                        )}
                     </div>
 
-                    {leaderboard.length > 0 && (
-                        <div className="final-leaderboard">
-                            <h2><FiAward /> Leaderboard</h2>
-                            <div className="leaderboard-list">
-                                {leaderboard.slice(0, 10).map((entry, index) => (
-                                    <div
-                                        key={entry.studentId}
-                                        className={`leaderboard-item ${entry.studentId === user?._id ? 'current-user' : ''}`}
-                                    >
-                                        <span className={`rank ${index < 3 ? `top-${index + 1}` : ''}`}>
-                                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
-                                        </span>
-                                        <span className="name">{entry.studentName}</span>
-                                        <span className="points">{entry.score} pts</span>
+                    <div className="podium-area">
+                        <h3>Battlefield Standings</h3>
+                        <div className="leaderboard-premium-list">
+                            {leaderboard.slice(0, 5).map((entry, idx) => (
+                                <div key={idx} className={`leaderboard-row ${String(entry.userId?._id || entry.studentId) === String(user?._id) ? 'is-me' : ''}`}>
+                                    <div className="rank-disk">{idx + 1}</div>
+                                    <div className="player-info">
+                                        <span className="p-name">{entry.userId?.name || entry.studentName}</span>
+                                        {String(entry.userId?._id || entry.studentId) === String(user?._id) && <span className="me-tag">YOU</span>}
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="p-score">{entry.totalScore || entry.score} PTS</div>
+                                </div>
+                            ))}
                         </div>
-                    )}
+                    </div>
 
-                    <div className="completed-actions">
-                        <button className="btn btn-secondary btn-lg" onClick={handleViewReview}>
-                            <FiCheckCircle /> Review Answers
-                        </button>
-                        <button
-                            className="btn btn-primary btn-lg"
-                            onClick={() => navigate('/dashboard')}
-                        >
-                            Back to Dashboard
-                        </button>
+                    <div className="results-actions">
+                        <button className="btn-premium secondary" onClick={handleViewReview}>ANALYSIS</button>
+                        <button className="btn-premium primary" onClick={() => navigate('/dashboard')}>EXIT GAME</button>
                     </div>
                 </div>
             </div>
         );
     }
 
-    // Active Quiz Screen
     const currentQuestion = questions[currentIndex];
 
-    return (
-        <div className="play-quiz">
-            {/* Tab Switch Warning Modal */}
-            {showTabWarning && (
-                <div className="warning-modal">
-                    <div className="warning-content">
-                        <FiAlertTriangle className="warning-icon" />
-                        <h2>Tab Switch Detected!</h2>
-                        <p>Switching tabs is not allowed during the quiz.</p>
-                        <p className="warning-count">Warning {tabSwitchCount}/{quiz?.settings?.maxTabSwitches || '∞'}</p>
-                        <button
-                            className="btn btn-primary"
-                            onClick={() => setShowTabWarning(false)}
-                        >
-                            Continue Quiz
-                        </button>
-                    </div>
+    // Navigation Drawer Component
+    const QuestionDrawer = () => (
+        <>
+            <div className={`nav-backdrop ${showQuestionPanel ? 'active' : ''}`} onClick={() => setShowQuestionPanel(false)}></div>
+            <div className={`question-drawer ${showQuestionPanel ? 'open' : ''}`}>
+                <div className="drawer-header">
+                    <h3>Questions Panel</h3>
+                    <button className="close-btn" onClick={() => setShowQuestionPanel(false)}><FiXCircle /></button>
                 </div>
-            )}
-
-            {/* Quiz Header */}
-            <div className="quiz-header">
-                <div className="quiz-progress">
-                    <span className="question-count">
-                        Question {currentIndex + 1}/{questions.length}
-                    </span>
-                    <div className="progress-bar">
-                        <div
-                            className="progress-fill"
-                            style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-                        ></div>
-                    </div>
-                </div>
-
-                <div className={`quiz-timer ${getTimerClass()}`}>
-                    <FiClock />
-                    <span>{timeLeft}s</span>
-                </div>
-
-                <div className="quiz-score">
-                    <FiTrendingUp />
-                    <span>{score} pts</span>
-                </div>
-            </div>
-
-            {/* Question Card */}
-            <div className="question-card animate-slideUp" key={currentIndex}>
-                <div className="question-header">
-                    <span className={`difficulty ${currentQuestion?.difficulty}`}>
-                        {currentQuestion?.difficulty}
-                    </span>
-                    <span className="points">{currentQuestion?.points} points</span>
-                </div>
-
-                <h2 className="question-text">{currentQuestion?.text}</h2>
-
-                {/* MCQ Options */}
-                {currentQuestion?.type === 'mcq' && (
-                    <div className="options-grid">
-                        {currentQuestion?.options?.map((option, index) => (
+                <div className="drawer-grid">
+                    {questions.map((q, idx) => {
+                        const isAnsweredQ = !!savedAnswers[q?._id];
+                        const isCurrentQ = idx === currentIndex;
+                        return (
                             <button
-                                key={index}
-                                className={`option-btn ${selectedAnswer === option ? 'selected' : ''} 
-                  ${isAnswered && feedback?.correctAnswer === option ? 'correct' : ''} 
-                  ${isAnswered && selectedAnswer === option && !feedback?.isCorrect ? 'incorrect' : ''}`}
-                                onClick={() => !isAnswered && setSelectedAnswer(option)}
-                                disabled={isAnswered}
+                                key={idx}
+                                className={`drawer-cell ${isAnsweredQ ? 'answered' : 'unanswered'} ${isCurrentQ ? 'current' : ''}`}
+                                onClick={() => goToQuestion(idx)}
                             >
-                                <span className="option-letter">{String.fromCharCode(65 + index)}</span>
-                                <span className="option-text">{option}</span>
-                                {isAnswered && feedback?.correctAnswer === option && (
-                                    <FiCheckCircle className="option-icon correct" />
-                                )}
-                                {isAnswered && selectedAnswer === option && !feedback?.isCorrect && (
-                                    <FiXCircle className="option-icon incorrect" />
-                                )}
+                                <span className="cell-num">{idx + 1}</span>
+                                {isAnsweredQ && <FiCheckCircle className="cell-icon" />}
                             </button>
-                        ))}
-                    </div>
-                )}
-
-                {/* Text Answer */}
-                {(currentQuestion?.type === 'fill-blank' || currentQuestion?.type === 'qa') && (
-                    <div className="text-answer">
-                        <input
-                            type="text"
-                            className="form-input answer-input"
-                            placeholder="Type your answer..."
-                            value={textAnswer}
-                            onChange={(e) => setTextAnswer(e.target.value)}
-                            disabled={isAnswered}
-                            autoFocus
-                        />
-                        {isAnswered && feedback && (
-                            <div className={`answer-feedback ${feedback.isCorrect ? 'correct' : 'incorrect'}`}>
-                                {feedback.isCorrect ? (
-                                    <><FiCheckCircle /> Correct!</>
-                                ) : (
-                                    <><FiXCircle /> Incorrect. Answer: {feedback.correctAnswer}</>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Submit / Next Button */}
-                <div className="question-actions">
-                    {!isAnswered ? (
-                        <button
-                            className="btn btn-primary btn-lg submit-btn"
-                            onClick={() => handleAnswerSubmit()}
-                            disabled={currentQuestion?.type === 'mcq' ? !selectedAnswer : !textAnswer}
-                        >
-                            Submit Answer
-                        </button>
-                    ) : (
-                        <button
-                            className="btn btn-primary btn-lg next-btn"
-                            onClick={handleNextQuestion}
-                        >
-                            {currentIndex < questions.length - 1 ? 'Next Question' : 'Finish Quiz'}
-                        </button>
-                    )}
+                        );
+                    })}
                 </div>
-
-                {/* Feedback */}
-                {isAnswered && feedback && quiz?.settings?.showInstantFeedback && (
-                    <div className={`feedback-card ${feedback.isCorrect ? 'correct' : 'incorrect'}`}>
-                        <div className="feedback-header">
-                            {feedback.isCorrect ? (
-                                <>
-                                    <FiCheckCircle className="feedback-icon" />
-                                    <span>Correct! +{feedback.pointsEarned} points</span>
-                                </>
-                            ) : (
-                                <>
-                                    <FiXCircle className="feedback-icon" />
-                                    <span>Incorrect</span>
-                                </>
-                            )}
-                        </div>
-                        {currentQuestion?.explanation && (
-                            <p className="explanation">{currentQuestion.explanation}</p>
-                        )}
-                    </div>
-                )}
+                <div className="drawer-legend">
+                    <div className="legend-item"><span className="dot current"></span> Current</div>
+                    <div className="legend-item"><span className="dot answered"></span> Answered</div>
+                    <div className="legend-item"><span className="dot unanswered"></span> Pending</div>
+                </div>
             </div>
+        </>
+    );
 
-            {/* Mini Leaderboard */}
-            {quiz?.settings?.showLeaderboard && leaderboard.length > 0 && (
-                <div className="mini-leaderboard">
-                    <h3><FiAward /> Top 5</h3>
-                    <div className="mini-list">
-                        {leaderboard.slice(0, 5).map((entry, index) => (
-                            <div
-                                key={entry.studentId}
-                                className={`mini-item ${entry.studentId === user?._id ? 'current' : ''}`}
-                            >
-                                <span className="mini-rank">
-                                    {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
-                                </span>
-                                <span className="mini-name">{entry.studentName}</span>
-                                <span className="mini-score">{entry.score}</span>
+    return (
+        <ErrorBoundary>
+            <div className="play-quiz-game">
+                <QuestionDrawer />
+
+                {showTabWarning && (
+                    <div className="security-overlay">
+                        <div className="security-card animate-shake">
+                            <FiAlertTriangle className="warn-icon" />
+                            <h2>Violation Detected</h2>
+                            <p>Switching windows or tabs is strictly prohibited in competitive mode.</p>
+                            <div className="warning-meter">
+                                <span>Risk Level: {tabSwitchCount}/{quiz?.settings?.maxTabSwitches || '∞'}</span>
+                                <div className="meter-bg"><div className="meter-fill" style={{ width: `${(tabSwitchCount / (quiz?.settings?.maxTabSwitches || 10)) * 100}%` }}></div></div>
                             </div>
-                        ))}
+                            <button className="btn-modern-primary" onClick={() => setShowTabWarning(false)}>I UNDERSTAND</button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="game-hud">
+                    <div className="hud-left">
+                        <button className="questions-panel-btn" onClick={() => setShowQuestionPanel(true)}>
+                            <FiZap /> <span>Questions {currentIndex + 1}/{questions.length}</span>
+                        </button>
+                    </div>
+
+                    <div className="hud-center">
+                        {/* Removed random palette */}
+                        <div className="quiz-title-hud">{quiz?.title}</div>
+                    </div>
+
+                    <div className="hud-right">
+                        <div className="score-ticker">
+                            <FiZap className="zap-icon-score" />
+                            <span className="score-num">{score}</span>
+                        </div>
+                        {overallTimeLeft > 0 && (
+                            <div className={`countdown-clock ${overallTimeLeft <= 60 ? 'critical' : ''}`}>
+                                <FiClock />
+                                <span>{formatTime(overallTimeLeft)}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
-            )}
-        </div>
+
+                <main className="question-theatre">
+                    <div className="question-stage animate-fadeInUp" key={currentIndex}>
+                        <div className="question-meta-tags">
+                            <span className={`difficulty-tag ${currentQuestion?.difficulty}`}>{currentQuestion?.difficulty}</span>
+                            <span className="points-tag">{currentQuestion?.points} PTS</span>
+                        </div>
+
+                        <h2 className="main-question-text">{currentQuestion?.text}</h2>
+
+                        {(currentQuestion?.type === 'mcq' || currentQuestion?.type === 'msq') && (
+                            <div className="modern-options-grid">
+                                {currentQuestion?.options?.map((option, idx) => {
+                                    const isSelected = currentQuestion?.type === 'mcq'
+                                        ? selectedAnswer === option
+                                        : selectedAnswer.split(',').filter(Boolean).includes(option);
+
+                                    const isCorrectOpt = isAnswered && (
+                                        currentQuestion.type === 'mcq'
+                                            ? feedback?.correctAnswer === option
+                                            : feedback?.correctAnswer?.split(',').includes(option)
+                                    );
+
+                                    const isWrongOpt = isAnswered && isSelected && !isCorrectOpt;
+
+                                    return (
+                                        <button
+                                            key={idx}
+                                            className={`modern-option-card ${isSelected ? 'is-selected' : ''} ${isCorrectOpt ? 'is-correct' : ''} ${isWrongOpt ? 'is-wrong' : ''}`}
+                                            onClick={() => handleOptionSelect(option)}
+                                            style={{ opacity: 1 }} // Keep full opacity for better visibility
+                                        >
+                                            <div className="option-indicator">
+                                                {currentQuestion.type === 'msq' ? (
+                                                    <input type="checkbox" checked={isSelected} readOnly />
+                                                ) : (
+                                                    String.fromCharCode(65 + idx)
+                                                )}
+                                            </div>
+                                            <div className="option-content-text">{option}</div>
+                                            {isCorrectOpt && <FiCheckCircle className="opt-feedback-icon" />}
+                                            {isWrongOpt && <FiXCircle className="opt-feedback-icon" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {(currentQuestion?.type === 'fill-blank' || currentQuestion?.type === 'qa') && (
+                            <div className="modern-input-field">
+                                <input
+                                    type="text"
+                                    className="game-text-input"
+                                    value={textAnswer}
+                                    onChange={(e) => setTextAnswer(e.target.value)}
+                                    onBlur={() => handleAnswerSubmit(false, textAnswer)} // Auto-save on blur
+                                    placeholder="TYPE YOUR RESPONSE HERE..."
+                                    autoFocus
+                                />
+                            </div>
+                        )}
+
+                        <div className="game-controls">
+                            <div className="navigation-group">
+                                <button className="ctrl-btn secondary" onClick={handlePrevQuestion} disabled={currentIndex === 0}>
+                                    PREVIOUS
+                                </button>
+                                <button className="ctrl-btn secondary" onClick={handleNextQuestion} disabled={currentIndex === questions.length - 1}>
+                                    NEXT
+                                </button>
+                            </div>
+
+                            <div className="right-controls">
+                                <button className="ctrl-btn success" onClick={() => handleSubmitQuiz(false)}>
+                                    SUBMIT QUIZ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </ErrorBoundary>
     );
 };
 

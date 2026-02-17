@@ -147,17 +147,19 @@
 }
 
 /* Dark theme - Navy Blue styling */
+/* Dark theme - High Visibility */
 [data-theme="dark"] .theme-btn {
-    background: rgba(56, 189, 248, 0.15);
-    color: #38BDF8;
-    border-color: #38BDF8;
+    background: #FF7F11;
+    /* Solid Saffron */
+    color: #FFFFFF;
+    border-color: #FF7F11;
+    box-shadow: 0 0 10px rgba(255, 127, 17, 0.4);
 }
 
 [data-theme="dark"] .theme-btn:hover {
-    background: #FF7F11;
-    /* Saffron */
-    color: #FFFFFF;
-    border-color: #FF7F11;
+    background: #FFFFFF;
+    color: #FF7F11;
+    border-color: #FFFFFF;
 }
 
 /* Connection Status */
@@ -172,13 +174,17 @@
 }
 
 .connection-status.connected {
-    background: rgba(16, 185, 129, 0.15);
-    color: var(--secondary);
+    background: #10B981;
+    /* Solid Green */
+    color: white;
+    box-shadow: 0 2px 5px rgba(16, 185, 129, 0.3);
 }
 
 .connection-status.disconnected {
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--danger);
+    background: #EF4444;
+    /* Solid Red */
+    color: white;
+    box-shadow: 0 2px 5px rgba(239, 68, 68, 0.3);
 }
 
 .status-dot {
@@ -189,11 +195,11 @@
 }
 
 .connected .status-dot {
-    background: var(--secondary);
+    background: white;
 }
 
 .disconnected .status-dot {
-    background: var(--danger);
+    background: white;
 }
 
 /* User Menu */

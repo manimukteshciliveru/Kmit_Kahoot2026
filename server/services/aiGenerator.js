@@ -145,13 +145,25 @@ class AIQuestionGenerator {
             qa: `Each question must have: "text", "options" ([]), "correctAnswer", "explanation".`
         };
 
-        const prompt = `You are an expert quiz creator. Generate exactly ${count} ${difficulty} difficulty ${type === 'mcq' ? 'multiple choice' : type === 'fill-blank' ? 'fill in the blank' : 'question and answer'} questions based on the provided content (text, audio, video, or documents).
+        const prompt = `You are an expert academic quiz creator. Your task is to generate exactly ${count} high-quality, professional, ${difficulty} difficulty ${type === 'mcq' ? 'multiple choice' : type === 'fill-blank' ? 'fill in the blank' : 'question and answer'} questions based STRICTLY on the provided content.
 
 ${typeInstructions[type]}
 
-IMPORTANT: Return ONLY a valid JSON array. No markdown, no explanation.
+PROMPT GUIDELINES:
+- DO NOT use prefixes like "Based on the content..." or "According to the text...".
+- The question text should be direct and professional (e.g., "What is the primary function of...?" instead of "Which term relates to...?").
+- Ensure the questions test meaningful knowledge, not just keyword matching.
+- For MCQ, distractors must be plausible academic alternatives.
+
+CRITICAL QUALITY GUIDELINES:
+1. ACCURACY: All questions must be 100% factually correct based on the content.
+2. DISTRACTORS (for MCQ): Wrong options must be plausible and related to the topic, not obviously fake or silly.
+3. CLARITY: Questions must be unambiguous and clearly phrased.
+4. STANDARD: Use academic standard language. Use only the provided content.
+
+IMPORTANT: Return ONLY a valid JSON array.
 Format:
-[{"text":"...","type":"${type}","options":[...],"correctAnswer":"...","explanation":"..."}]`;
+[{"text":"What is the capital of France?","type":"mcq","options":["Paris", "London", "Berlin", "Madrid"],"correctAnswer":"Paris","explanation":"Paris has been the capital of France since..."}]`;
 
         try {
             console.log('Sending multimodal request to Gemini...');
@@ -180,7 +192,7 @@ Format:
                 correctAnswer: q.correctAnswer || '',
                 explanation: q.explanation || '',
                 points: this.getPointsForDifficulty(difficulty),
-                timeLimit: this.getTimeLimitForType(type),
+                timeLimit: 0, // No per-question timer
                 difficulty,
                 order: index
             }));
@@ -218,8 +230,7 @@ Format:
     }
 
     getTimeLimitForType(type) {
-        const map = { mcq: 20, 'fill-blank': 30, qa: 60 };
-        return map[type] || 30;
+        return 0; // Disabled per user request
     }
 
     // Fallback question generator when AI is unavailable
@@ -255,82 +266,49 @@ Format:
 
         for (let i = 0; i < count; i++) {
             let question;
+            const baseSentence = sentences[i % sentences.length] || `The study of this subject involves understanding key components.`;
 
             if (type === 'mcq') {
-                // Find a sentence to create a question from
-                let baseSentence = sentences[i % sentences.length] || `This is a question about the topic`;
-
-                // Avoid reusing the exact same sentence
-                let attempts = 0;
-                while (usedSentences.has(baseSentence) && attempts < sentences.length) {
-                    baseSentence = sentences[(i + attempts) % sentences.length] || baseSentence;
-                    attempts++;
-                }
-                usedSentences.add(baseSentence);
-
-                // Extract a key term to ask about
-                const sentenceWords = baseSentence.split(/\s+/).filter(w => w.length > 4);
+                const sentenceWords = baseSentence.split(/\s+/).filter(w => w.length > 5);
                 const keyTerm = sentenceWords[Math.floor(Math.random() * sentenceWords.length)] || 'concept';
 
-                // Generate options
+                const questionText = baseSentence.replace(keyTerm, '__________');
                 const correctAnswer = keyTerm.replace(/[^a-zA-Z0-9\s]/g, '');
                 const wrongOptions = uniqueKeywords
                     .filter(k => k.toLowerCase() !== correctAnswer.toLowerCase())
                     .slice(0, 3)
                     .map(k => k.replace(/[^a-zA-Z0-9\s]/g, ''));
 
-                // Ensure we have 4 options
                 while (wrongOptions.length < 3) {
-                    wrongOptions.push(`Option ${wrongOptions.length + 1}`);
+                    wrongOptions.push(`Related concept ${wrongOptions.length + 1}`);
                 }
 
                 const allOptions = [correctAnswer, ...wrongOptions].sort(() => Math.random() - 0.5);
 
                 question = {
-                    text: `Based on the content, which term best relates to: "${baseSentence.substring(0, 80)}..."?`,
+                    text: `Identify the missing term: "${questionText}"`,
                     type: 'mcq',
                     options: allOptions,
                     correctAnswer: correctAnswer,
-                    explanation: `This question is based on the provided content about ${keyTerm}.`,
+                    explanation: `Refers to ${correctAnswer} in the context provided.`,
                     points: this.getPointsForDifficulty(difficulty),
-                    timeLimit: this.getTimeLimitForType(type),
-                    difficulty,
-                    order: i
-                };
-            } else if (type === 'fill-blank') {
-                const baseSentence = sentences[i % sentences.length] || 'The main topic is about learning';
-                const words = baseSentence.split(/\s+/);
-                const blankIndex = Math.floor(words.length / 2);
-                const answer = words[blankIndex] || 'answer';
-                words[blankIndex] = '___';
-
-                question = {
-                    text: words.join(' '),
-                    type: 'fill-blank',
-                    options: [],
-                    correctAnswer: answer.replace(/[^a-zA-Z0-9\s]/g, ''),
-                    explanation: `The correct answer completes the sentence from the content.`,
-                    points: this.getPointsForDifficulty(difficulty),
-                    timeLimit: this.getTimeLimitForType(type),
+                    timeLimit: 0,
                     difficulty,
                     order: i
                 };
             } else {
-                // Q&A type
-                const baseSentence = sentences[i % sentences.length] || 'Explain the main concept';
                 question = {
-                    text: `Explain the following: ${baseSentence.substring(0, 100)}`,
+                    text: `Describe the following concept: ${baseSentence.substring(0, 100)}`,
                     type: 'qa',
                     options: [],
                     correctAnswer: baseSentence,
-                    explanation: `Answer should be based on the provided content.`,
+                    explanation: `Detailed explanation based on content.`,
                     points: this.getPointsForDifficulty(difficulty),
-                    timeLimit: this.getTimeLimitForType(type),
+                    timeLimit: 0,
                     difficulty,
                     order: i
                 };
             }
-
             questions.push(question);
         }
 

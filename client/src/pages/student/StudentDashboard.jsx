@@ -1,25 +1,54 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { responseAPI } from '../../services/api';
+import { useSocket } from '../../context/SocketContext';
+import { quizAPI, responseAPI } from '../../services/api';
 import {
     FiGrid,
     FiAward,
     FiTrendingUp,
     FiClock,
     FiArrowRight,
-    FiZap
+    FiZap,
+    FiUser
 } from 'react-icons/fi';
 import '../Dashboard.css';
 
 const StudentDashboard = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
+    const { on } = useSocket();
     const [recentQuizzes, setRecentQuizzes] = useState([]);
+    const [upcomingQuizzes, setUpcomingQuizzes] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchRecentQuizzes();
+        const fetchAll = async () => {
+            setLoading(true);
+            await Promise.all([
+                fetchRecentQuizzes(),
+                fetchUpcomingQuizzes()
+            ]);
+            setLoading(false);
+        };
+        fetchAll();
     }, []);
+
+    useEffect(() => {
+        if (!on) return;
+
+        const handleStatusUpdate = (data) => {
+            console.log('Real-time status update:', data);
+            setUpcomingQuizzes(prev => prev.map(q =>
+                q._id === data.quizId ? { ...q, status: data.status } : q
+            ));
+        };
+
+        const cleanup = on('quiz:status_update', handleStatusUpdate);
+        return () => {
+            if (cleanup) cleanup();
+        };
+    }, [on]);
 
     const fetchRecentQuizzes = async () => {
         try {
@@ -27,8 +56,16 @@ const StudentDashboard = () => {
             setRecentQuizzes(response.data.data.responses || []);
         } catch (error) {
             console.error('Failed to fetch recent quizzes:', error);
-        } finally {
-            setLoading(false);
+        }
+    };
+
+    const fetchUpcomingQuizzes = async () => {
+        try {
+            // Fetch quizzes with default status (active, scheduled) for students
+            const response = await quizAPI.getAll({ limit: 10 });
+            setUpcomingQuizzes(response.data.data.quizzes || []);
+        } catch (error) {
+            console.error('Failed to fetch upcoming quizzes:', error);
         }
     };
 
@@ -91,9 +128,61 @@ const StudentDashboard = () => {
             <div className="dashboard-row">
                 <div className="dashboard-card">
                     <div className="card-header">
+                        <h2>Available Quizzes</h2>
+                        <span className="badge badge-info">{upcomingQuizzes.length} Available</span>
+                    </div>
+                    <div className="card-body">
+                        {loading ? (
+                            <div className="loading-state">
+                                <div className="spinner"></div>
+                            </div>
+                        ) : upcomingQuizzes.length > 0 ? (
+                            <div className="quiz-list">
+                                {upcomingQuizzes.map((quiz) => (
+                                    <div key={quiz._id} className="quiz-item">
+                                        <div className="quiz-info">
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <h3>{quiz.title}</h3>
+                                                <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>{quiz.subject}</span>
+                                            </div>
+                                            <span className="quiz-meta">
+                                                <FiClock />
+                                                {quiz.status === 'active' ? (
+                                                    <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>Live Now</span>
+                                                ) : (
+                                                    `Scheduled: ${quiz.scheduledAt ? new Date(quiz.scheduledAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Soon'}`
+                                                )}
+                                            </span>
+                                        </div>
+                                        <div className="quiz-status" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+                                            <div className={`status-badge ${quiz.status === 'active' ? 'active' : quiz.status === 'finished' ? 'finished' : 'scheduled'}`}>
+                                                {quiz.status === 'active' ? 'Live' : quiz.status === 'finished' ? 'Finished' : 'Upcoming'}
+                                            </div>
+                                            <button
+                                                className={`btn btn-sm ${quiz.status === 'active' ? 'btn-primary' : 'btn-ghost'}`}
+                                                onClick={() => quiz.status !== 'finished' && navigate(`/quiz/${quiz._id}/play`)}
+                                                style={{ fontSize: '0.75rem', padding: '4px 12px' }}
+                                                disabled={quiz.status === 'finished'}
+                                            >
+                                                {quiz.status === 'active' ? 'Join Now' : quiz.status === 'finished' ? 'Ended' : 'Enter Lobby'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="empty-state small">
+                                <p>No quizzes available for your section at this time.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="dashboard-card">
+                    <div className="card-header">
                         <h2>Recent Quizzes</h2>
                         <Link to="/history" className="view-all">
-                            View All <FiArrowRight />
+                            Test Analytics <FiArrowRight />
                         </Link>
                     </div>
                     <div className="card-body">
@@ -105,7 +194,7 @@ const StudentDashboard = () => {
                         ) : recentQuizzes.length > 0 ? (
                             <div className="quiz-list">
                                 {recentQuizzes.map((response) => (
-                                    <div key={response._id} className="quiz-item">
+                                    <Link key={response._id} to="/history" className="quiz-item" style={{ textDecoration: 'none', color: 'inherit' }}>
                                         <div className="quiz-info">
                                             <h3>{response.quizId?.title || 'Unknown Quiz'}</h3>
                                             <span className="quiz-meta">
@@ -121,7 +210,7 @@ const StudentDashboard = () => {
                                                 <span className="rank">Rank #{response.rank}</span>
                                             )}
                                         </div>
-                                    </div>
+                                    </Link>
                                 ))}
                             </div>
                         ) : (
@@ -149,23 +238,11 @@ const StudentDashboard = () => {
                                 </div>
                                 <span>Join Quiz</span>
                             </Link>
-                            <Link to="/history" className="action-item">
-                                <div className="action-icon secondary">
-                                    <FiClock />
-                                </div>
-                                <span>View History</span>
-                            </Link>
                             <Link to="/profile" className="action-item">
                                 <div className="action-icon accent">
-                                    <FiAward />
+                                    <FiUser />
                                 </div>
                                 <span>My Profile</span>
-                            </Link>
-                            <Link to="/leaderboard" className="action-item">
-                                <div className="action-icon info">
-                                    <FiTrendingUp />
-                                </div>
-                                <span>Leaderboard</span>
                             </Link>
                         </div>
                     </div>

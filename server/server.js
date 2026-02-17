@@ -9,6 +9,7 @@ const path = require('path');
 
 const connectDB = require('./config/db');
 const socketHandler = require('./socket/socketHandler');
+const { initScheduler } = require('./services/schedulerService');
 
 // Route imports
 const authRoutes = require('./routes/auth');
@@ -22,8 +23,11 @@ const adminRoutes = require('./routes/admin'); // Import admin routes
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.io with CORS
-const io = new Server(server, {
+// Initialize Socket.io with CORS and Redis Adapter (if configured)
+const { createAdapter } = require('@socket.io/redis-adapter');
+const { createRedisClient, initRedis } = require('./config/redis');
+
+const ioConfig = {
     cors: {
         origin: process.env.CLIENT_URL || 'http://localhost:5173',
         methods: ['GET', 'POST'],
@@ -31,7 +35,26 @@ const io = new Server(server, {
     },
     pingTimeout: 60000,
     pingInterval: 25000
-});
+};
+
+const io = new Server(server, ioConfig);
+
+// Configure Redis Adapter for Multi-Node Scaling
+// We need separate pub/sub clients for the adapter
+const pubClient = createRedisClient();
+const subClient = createRedisClient();
+
+if (pubClient && subClient) {
+    // ioredis connects automatically. We can just pass them to the adapter.
+    // The adapter will handle the rest.
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log('✅ Socket.io Redis Adapter configured for horizontal scaling.');
+
+    // Also initialize the singleton client for other app usages (like caching/leaderboards)
+    initRedis();
+} else {
+    console.log('ℹ️ Running in Single-Node mode (Redis not configured). Horizontal scaling disabled.');
+}
 
 // Make io accessible to routes
 app.set('io', io);
@@ -51,15 +74,20 @@ app.use(cors({
 }));
 
 // Rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // limit each IP to 1000 requests per windowMs
-    message: {
-        success: false,
-        message: 'Too many requests, please try again later'
+const { limiter: defaultLimiter, authLimiter } = require('./middleware/rateLimiter');
+
+// Use the distributed rate limiter
+app.use('/api/', defaultLimiter);
+app.use('/api/auth/login', authLimiter);
+
+// Fallback error handler for Redis if it's not running
+process.on('unhandledRejection', (reason, promise) => {
+    // console.warn('Unhandled Rejection at:', promise, 'reason:', reason);
+    if (reason && reason.code === 'ECONNREFUSED') {
+        console.warn('⚠️ Redis connection refused. Rate limiting might degrade to memory store or fail.');
     }
 });
-app.use('/api/', limiter);
+
 
 // Body parsing
 app.use(express.json({ limit: '50mb' })); // Increased limit for backup restore
@@ -114,6 +142,9 @@ app.use((err, req, res, next) => {
 
 // Initialize Socket.io handlers
 socketHandler(io);
+
+// Initialize Quiz Scheduler
+initScheduler(io);
 
 // Start server
 const PORT = process.env.PORT || 5000;

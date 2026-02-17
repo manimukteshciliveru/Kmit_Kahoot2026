@@ -10,7 +10,8 @@ const {
     deleteUser,
     toggleUserStatus,
     getAnalytics,
-    bulkCreateUsers
+    bulkCreateUsers,
+    searchStudents
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -37,8 +38,13 @@ const upload = multer({
     }
 });
 
-// All routes require authentication and admin role
+// All routes require authentication
 router.use(protect);
+
+// Allow Faculty to search students
+router.post('/search-students', authorize('admin', 'faculty'), searchStudents);
+
+// From here on, restrict to Admin only
 router.use(authorize('admin'));
 
 // Analytics

@@ -49,7 +49,8 @@ const Navbar = () => {
             case 'admin':
                 return [
                     { path: '/dashboard', icon: <FiHome />, label: 'Dashboard' },
-                    { path: '/analytics', icon: <FiActivity />, label: 'Analytics' },
+                    { path: '/analytics', icon: <FiActivity />, label: 'Server Health' },
+                    { path: '/quiz-analytics', icon: <FiGrid />, label: 'Quiz Metrics' },
                     { path: '/users', icon: <FiUsers />, label: 'Users' },
                     { path: '/settings', icon: <FiSettings />, label: 'Settings' }
                 ];
@@ -127,11 +128,8 @@ const Navbar = () => {
                         <button onClick={toggleTheme} className="theme-btn" title="Toggle Theme">
                             {theme === 'dark' ? <FiSun /> : <FiMoon />}
                         </button>
-                        <Link to="/login" className="btn btn-ghost">
+                        <Link to="/login" className="btn btn-primary">
                             Log In
-                        </Link>
-                        <Link to="/register" className="btn btn-primary">
-                            Sign Up
                         </Link>
                     </div>
                 )}

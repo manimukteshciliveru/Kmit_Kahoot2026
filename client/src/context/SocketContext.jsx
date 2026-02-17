@@ -21,9 +21,10 @@ export const SocketProvider = ({ children }) => {
     useEffect(() => {
         if (isAuthenticated && token) {
             const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+            const sessionId = Math.random().toString(36).substring(7) + Date.now();
 
             const newSocket = io(socketUrl, {
-                auth: { token },
+                auth: { token, sessionId },
                 transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionAttempts: 5,

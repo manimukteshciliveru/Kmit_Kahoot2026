@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { quizAPI, aiAPI } from '../../services/api';
+import { quizAPI, aiAPI, userAPI } from '../../services/api';
 import {
     FiPlus,
     FiTrash2,
@@ -29,11 +29,11 @@ const CreateQuiz = () => {
 
     const [quizData, setQuizData] = useState({
         title: '',
+        subject: '',
         description: '',
         mode: 'mcq',
         settings: {
-            quizTimer: 0,
-            questionTimer: 30,
+            quizTimer: 600, // Default 10 mins
             shuffleQuestions: true,
             shuffleOptions: true,
             showInstantFeedback: true,
@@ -43,7 +43,12 @@ const CreateQuiz = () => {
             difficultyLevel: 'medium',
             passingScore: 40,
             showLeaderboard: true
-        }
+        },
+        accessControl: {
+            isPublic: true,
+            allowedBranches: [] // [{ name: 'CSE', sections: ['A', 'B'] }]
+        },
+        scheduledAt: null
     });
 
     const [questions, setQuestions] = useState([]);
@@ -53,7 +58,6 @@ const CreateQuiz = () => {
         options: ['', '', '', ''],
         correctAnswer: '',
         points: 10,
-        timeLimit: 30,
         difficulty: 'medium',
         explanation: ''
     });
@@ -67,6 +71,30 @@ const CreateQuiz = () => {
         difficulty: 'medium',
         type: 'mcq'
     });
+
+    const [availableStudents, setAvailableStudents] = useState([]);
+    const [fetchingStudents, setFetchingStudents] = useState(false);
+
+    useEffect(() => {
+        const fetchStudents = async () => {
+            const access = quizData.accessControl;
+            if (access.mode === 'SPECIFIC' && access.allowedBranches.length > 0) {
+                setFetchingStudents(true);
+                try {
+                    const res = await userAPI.searchStudents(access.allowedBranches);
+                    setAvailableStudents(res.data.data || []);
+                } catch (error) {
+                    console.error('Fetch students error:', error);
+                    // toast.error('Failed to fetch students for selection');
+                } finally {
+                    setFetchingStudents(false);
+                }
+            }
+        };
+
+        const timer = setTimeout(fetchStudents, 500);
+        return () => clearTimeout(timer);
+    }, [quizData.accessControl.mode, quizData.accessControl.allowedBranches]);
 
     useEffect(() => {
         if (quizId) {
@@ -82,6 +110,7 @@ const CreateQuiz = () => {
 
             setQuizData({
                 title: quiz.title,
+                subject: quiz.subject || '',
                 description: quiz.description || '',
                 mode: quiz.mode || 'mcq',
                 settings: {
@@ -96,7 +125,12 @@ const CreateQuiz = () => {
                     difficultyLevel: quiz.settings?.difficultyLevel || 'medium',
                     passingScore: quiz.settings?.passingScore || 40,
                     showLeaderboard: quiz.settings?.showLeaderboard ?? true
-                }
+                },
+                accessControl: quiz.accessControl || {
+                    isPublic: true,
+                    allowedBranches: []
+                },
+                scheduledAt: quiz.scheduledAt || null
             });
             setQuestions(quiz.questions || []);
         } catch (error) {
@@ -128,6 +162,55 @@ const CreateQuiz = () => {
         const newOptions = [...currentQuestion.options];
         newOptions[index] = value;
         setCurrentQuestion({ ...currentQuestion, options: newOptions });
+    };
+
+    // Access Control Handlers
+    const handleAccessControlChange = (field, value) => {
+        setQuizData(prev => ({
+            ...prev,
+            accessControl: {
+                ...prev.accessControl,
+                [field]: value
+            }
+        }));
+    };
+
+    const handleBranchToggle = (branchName) => {
+        const currentBranches = quizData.accessControl.allowedBranches || [];
+        const exists = currentBranches.find(b => b.name === branchName);
+
+        let newBranches;
+        if (exists) {
+            // Remove branch
+            newBranches = currentBranches.filter(b => b.name !== branchName);
+        } else {
+            // Add branch with default empty sections
+            newBranches = [...currentBranches, { name: branchName, sections: [] }];
+        }
+
+        handleAccessControlChange('allowedBranches', newBranches);
+    };
+
+    const handleSectionToggle = (branchName, section) => {
+        const currentBranches = quizData.accessControl.allowedBranches || [];
+        const branchIndex = currentBranches.findIndex(b => b.name === branchName);
+
+        if (branchIndex === -1) return; // Should not happen
+
+        const branch = currentBranches[branchIndex];
+        const sectionExists = branch.sections.includes(section);
+
+        let newSections;
+        if (sectionExists) {
+            newSections = branch.sections.filter(s => s !== section);
+        } else {
+            newSections = [...branch.sections, section].sort();
+        }
+
+        const newBranches = [...currentBranches];
+        newBranches[branchIndex] = { ...branch, sections: newSections };
+
+        handleAccessControlChange('allowedBranches', newBranches);
     };
 
     const startEditing = (index) => {
@@ -169,7 +252,7 @@ const CreateQuiz = () => {
             toast.error('Please enter question text');
             return;
         }
-        if (currentQuestion.type === 'mcq' && currentQuestion.options.filter(o => o.trim()).length < 2) {
+        if ((currentQuestion.type === 'mcq' || currentQuestion.type === 'msq') && currentQuestion.options.filter(o => o.trim()).length < 2) {
             toast.error('Please add at least 2 options');
             return;
         }
@@ -185,7 +268,6 @@ const CreateQuiz = () => {
             options: ['', '', '', ''],
             correctAnswer: '',
             points: 10,
-            timeLimit: 30,
             difficulty: quizData.settings.difficultyLevel,
             explanation: ''
         });
@@ -258,6 +340,21 @@ const CreateQuiz = () => {
             return;
         }
 
+        // Access Control Validation
+        if (!quizData.accessControl.isPublic) {
+            if (quizData.accessControl.allowedBranches.length === 0) {
+                toast.error('Please select at least one branch for restricted quiz');
+                setStep(3);
+                return;
+            }
+            if (quizData.accessControl.mode === 'SPECIFIC' &&
+                (!quizData.accessControl.allowedStudents || quizData.accessControl.allowedStudents.length === 0)) {
+                toast.error('Please select at least one student for Specific mode');
+                setStep(3);
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             const payload = {
@@ -323,6 +420,16 @@ const CreateQuiz = () => {
                             />
                         </div>
 
+                        <div className="form-group">
+                            <label className="form-label">Subject *</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="e.g., Biology"
+                                value={quizData.subject}
+                                onChange={(e) => handleQuizDataChange('subject', e.target.value)}
+                            />
+                        </div>
                         <div className="form-group">
                             <label className="form-label">Description</label>
                             <textarea
@@ -418,9 +525,18 @@ const CreateQuiz = () => {
                                             <select
                                                 className="form-select"
                                                 value={currentQuestion.type}
-                                                onChange={(e) => handleQuestionChange('type', e.target.value)}
+                                                onChange={(e) => {
+                                                    const newType = e.target.value;
+                                                    // Reset correct answer when switching between single and multiple choice
+                                                    setCurrentQuestion({
+                                                        ...currentQuestion,
+                                                        type: newType,
+                                                        correctAnswer: ''
+                                                    });
+                                                }}
                                             >
-                                                <option value="mcq">Multiple Choice</option>
+                                                <option value="mcq">Multiple Choice (Single Answer)</option>
+                                                <option value="msq">Multiple Select (Multiple Answers)</option>
                                                 <option value="fill-blank">Fill in the Blank</option>
                                                 <option value="qa">Question & Answer</option>
                                             </select>
@@ -436,35 +552,75 @@ const CreateQuiz = () => {
                                             />
                                         </div>
 
-                                        {currentQuestion.type === 'mcq' && (
+                                        {(currentQuestion.type === 'mcq' || currentQuestion.type === 'msq') && (
                                             <div className="form-group">
-                                                <label className="form-label">Options</label>
-                                                <div className="options-list">
-                                                    {currentQuestion.options.map((option, index) => (
-                                                        <div key={index} className="option-input">
-                                                            <span className="option-label">{String.fromCharCode(65 + index)}</span>
-                                                            <input
-                                                                type="text"
-                                                                className="form-input"
-                                                                placeholder={`Option ${index + 1}`}
-                                                                value={option}
-                                                                onChange={(e) => handleOptionChange(index, e.target.value)}
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                className={`correct-btn ${currentQuestion.correctAnswer === option && option ? 'active' : ''}`}
-                                                                onClick={() => handleQuestionChange('correctAnswer', option)}
-                                                                disabled={!option}
-                                                            >
-                                                                ✓
-                                                            </button>
-                                                        </div>
-                                                    ))}
+                                                <label className="form-label">Options (Check the correct answer/s)</label>
+                                                <div className="options-selection-area">
+                                                    {currentQuestion.options.map((option, index) => {
+                                                        const isCorrect = currentQuestion.type === 'mcq'
+                                                            ? currentQuestion.correctAnswer === option && option !== ''
+                                                            : currentQuestion.correctAnswer.split(',').filter(Boolean).includes(option) && option !== '';
+
+                                                        return (
+                                                            <div key={index} className={`option-item-row ${isCorrect ? 'is-correct' : ''}`}>
+                                                                <div className="option-control">
+                                                                    {currentQuestion.type === 'mcq' ? (
+                                                                        <input
+                                                                            type="radio"
+                                                                            name="correct-opt"
+                                                                            checked={isCorrect}
+                                                                            onChange={() => handleQuestionChange('correctAnswer', option)}
+                                                                            disabled={!option.trim()}
+                                                                        />
+                                                                    ) : (
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isCorrect}
+                                                                            onChange={() => {
+                                                                                const current = currentQuestion.correctAnswer.split(',').filter(Boolean);
+                                                                                let next;
+                                                                                if (current.includes(option)) {
+                                                                                    next = current.filter(a => a !== option);
+                                                                                } else {
+                                                                                    next = [...current, option];
+                                                                                }
+                                                                                handleQuestionChange('correctAnswer', next.join(','));
+                                                                            }}
+                                                                            disabled={!option.trim()}
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                                <input
+                                                                    type="text"
+                                                                    className="form-input"
+                                                                    placeholder={`Option ${index + 1}`}
+                                                                    value={option}
+                                                                    onChange={(e) => {
+                                                                        const oldVal = option;
+                                                                        const newVal = e.target.value;
+                                                                        handleOptionChange(index, newVal);
+
+                                                                        // Update correctAnswer if this option was selected
+                                                                        if (currentQuestion.type === 'mcq' && currentQuestion.correctAnswer === oldVal) {
+                                                                            handleQuestionChange('correctAnswer', newVal);
+                                                                        } else if (currentQuestion.type === 'msq') {
+                                                                            const current = currentQuestion.correctAnswer.split(',').filter(Boolean);
+                                                                            if (current.includes(oldVal)) {
+                                                                                const next = current.map(a => a === oldVal ? newVal : a);
+                                                                                handleQuestionChange('correctAnswer', next.join(','));
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
+                                                <small className="form-hint">At least 2 options required. Mark the correct answer using radio/box.</small>
                                             </div>
                                         )}
 
-                                        {currentQuestion.type !== 'mcq' && (
+                                        {currentQuestion.type !== 'mcq' && currentQuestion.type !== 'msq' && (
                                             <div className="form-group">
                                                 <label className="form-label">Correct Answer *</label>
                                                 <input
@@ -488,17 +644,6 @@ const CreateQuiz = () => {
                                                     max="100"
                                                     value={currentQuestion.points}
                                                     onChange={(e) => handleQuestionChange('points', parseInt(e.target.value))}
-                                                />
-                                            </div>
-                                            <div className="form-group">
-                                                <label className="form-label">Time Limit (sec)</label>
-                                                <input
-                                                    type="number"
-                                                    className="form-input"
-                                                    min="5"
-                                                    max="300"
-                                                    value={currentQuestion.timeLimit}
-                                                    onChange={(e) => handleQuestionChange('timeLimit', parseInt(e.target.value))}
                                                 />
                                             </div>
                                         </div>
@@ -566,7 +711,8 @@ const CreateQuiz = () => {
                                                     value={aiSettings.type}
                                                     onChange={(e) => setAiSettings({ ...aiSettings, type: e.target.value })}
                                                 >
-                                                    <option value="mcq">MCQ</option>
+                                                    <option value="mcq">MCQ (Single)</option>
+                                                    <option value="msq">MSQ (Multi)</option>
                                                     <option value="fill-blank">Fill-blank</option>
                                                     <option value="qa">Q&A</option>
                                                 </select>
@@ -594,13 +740,13 @@ const CreateQuiz = () => {
                                                 type="file"
                                                 id="file-upload"
                                                 multiple
-                                                accept=".pdf,.xlsx,.xls,.csv,.txt,.mp3,.wav,.mp4,.webm"
+                                                accept=".pdf,.xlsx,.xls,.csv,.txt,.mp3,.wav,.mp4,.webm,.md,.js,.jsx,.ts,.tsx,.py,.java,.cpp,.c,.cs,.html,.css,.json,.sql,.go,.rb,.php"
                                                 onChange={(e) => setAiFiles(Array.from(e.target.files))}
                                             />
                                             <label htmlFor="file-upload" className="file-upload-label">
                                                 <FiUpload className="upload-icon" />
                                                 <span>{aiFiles.length > 0 ? `${aiFiles.length} files selected` : 'Click to select files'}</span>
-                                                <small>PDF, Excel, Audio, Video, or Text</small>
+                                                <small>PDF, Excel, Audio, Video, Text, or Code</small>
                                             </label>
                                         </div>
 
@@ -642,7 +788,8 @@ const CreateQuiz = () => {
                                                     value={aiSettings.type}
                                                     onChange={(e) => setAiSettings({ ...aiSettings, type: e.target.value })}
                                                 >
-                                                    <option value="mcq">MCQ</option>
+                                                    <option value="mcq">MCQ (Single)</option>
+                                                    <option value="msq">MSQ (Multi)</option>
                                                     <option value="fill-blank">Fill-blank</option>
                                                     <option value="qa">Q&A</option>
                                                 </select>
@@ -692,41 +839,69 @@ const CreateQuiz = () => {
                                                             />
                                                         </div>
 
-                                                        {tempQuestion.type === 'mcq' && (
+                                                        {(tempQuestion.type === 'mcq' || tempQuestion.type === 'msq') && (
                                                             <div className="edit-options-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-                                                                {tempQuestion.options.map((opt, i) => (
-                                                                    <div key={i} className="edit-option" style={{ display: 'flex', gap: '5px' }}>
-                                                                        <input
-                                                                            type="text"
-                                                                            className="form-input"
-                                                                            value={opt}
-                                                                            onChange={(e) => handleTempOptionChange(i, e.target.value)}
-                                                                            placeholder={`Option ${i + 1}`}
-                                                                            style={{ padding: '6px', fontSize: '0.9rem' }}
-                                                                        />
-                                                                        <button
-                                                                            className={`btn-icon ${tempQuestion.correctAnswer === opt ? 'text-success' : 'text-muted'}`}
-                                                                            onClick={() => handleTempChange('correctAnswer', opt)}
-                                                                            title="Mark as correct"
-                                                                        >
-                                                                            ✓
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
+                                                                {tempQuestion.options.map((opt, i) => {
+                                                                    const isCorrect = tempQuestion.type === 'mcq'
+                                                                        ? tempQuestion.correctAnswer === opt && opt !== ''
+                                                                        : tempQuestion.correctAnswer.split(',').filter(Boolean).includes(opt) && opt !== '';
+
+                                                                    return (
+                                                                        <div key={i} className={`edit-option ${isCorrect ? 'is-correct-bg' : ''}`} style={{ display: 'flex', gap: '5px', alignItems: 'center', padding: '4px', borderRadius: '4px' }}>
+                                                                            {tempQuestion.type === 'mcq' ? (
+                                                                                <input
+                                                                                    type="radio"
+                                                                                    name={`edit-correct-${editingIndex}`}
+                                                                                    checked={isCorrect}
+                                                                                    onChange={() => handleTempChange('correctAnswer', opt)}
+                                                                                    disabled={!opt.trim()}
+                                                                                />
+                                                                            ) : (
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={isCorrect}
+                                                                                    onChange={() => {
+                                                                                        const current = tempQuestion.correctAnswer.split(',').filter(Boolean);
+                                                                                        let next;
+                                                                                        if (current.includes(opt)) {
+                                                                                            next = current.filter(a => a !== opt);
+                                                                                        } else {
+                                                                                            next = [...current, opt];
+                                                                                        }
+                                                                                        handleTempChange('correctAnswer', next.join(','));
+                                                                                    }}
+                                                                                    disabled={!opt.trim()}
+                                                                                />
+                                                                            )}
+                                                                            <input
+                                                                                type="text"
+                                                                                className="form-input"
+                                                                                value={opt}
+                                                                                onChange={(e) => {
+                                                                                    const oldVal = opt;
+                                                                                    const newVal = e.target.value;
+                                                                                    handleTempOptionChange(i, newVal);
+
+                                                                                    if (tempQuestion.type === 'mcq' && tempQuestion.correctAnswer === oldVal) {
+                                                                                        handleTempChange('correctAnswer', newVal);
+                                                                                    } else if (tempQuestion.type === 'msq') {
+                                                                                        const current = tempQuestion.correctAnswer.split(',').filter(Boolean);
+                                                                                        if (current.includes(oldVal)) {
+                                                                                            const next = current.map(a => a === oldVal ? newVal : a);
+                                                                                            handleTempChange('correctAnswer', next.join(','));
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                                placeholder={`Option ${i + 1}`}
+                                                                                style={{ padding: '6px', fontSize: '0.9rem', flex: 1 }}
+                                                                            />
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         )}
 
                                                         <div className="edit-meta-row" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                                <span style={{ fontSize: '0.8rem' }}>Time (s):</span>
-                                                                <input
-                                                                    type="number"
-                                                                    className="form-input"
-                                                                    style={{ width: '60px', padding: '4px' }}
-                                                                    value={tempQuestion.timeLimit}
-                                                                    onChange={(e) => handleTempChange('timeLimit', parseInt(e.target.value))}
-                                                                />
-                                                            </div>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                                 <span style={{ fontSize: '0.8rem' }}>Points:</span>
                                                                 <input
@@ -753,9 +928,6 @@ const CreateQuiz = () => {
                                                                 </span>
                                                                 <span className="meta-item">{q.type.toUpperCase()}</span>
                                                                 <span className="meta-item">{q.points} pts</span>
-                                                                <span className="meta-item" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                    <FiClock size={12} /> {q.timeLimit}s
-                                                                </span>
                                                             </div>
                                                             {q.type === 'mcq' && (
                                                                 <div className="preview-options" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '8px' }}>
@@ -814,7 +986,8 @@ const CreateQuiz = () => {
                         </button>
                     </div>
                 </div >
-            )}
+            )
+            }
 
             {/* Step 3: Settings */}
             {
@@ -836,18 +1009,6 @@ const CreateQuiz = () => {
                                         onChange={(e) => handleQuizDataChange('settings.quizTimer', e.target.value === '' ? 0 : parseInt(e.target.value) * 60)}
                                     />
                                     <small className="form-hint">Set to 0 for no overall time limit</small>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Default Question Timer (seconds)</label>
-                                    <input
-                                        type="number"
-                                        className="form-input"
-                                        min="5"
-                                        max="300"
-                                        value={quizData.settings.questionTimer}
-                                        onChange={(e) => handleQuizDataChange('settings.questionTimer', e.target.value === '' ? 30 : parseInt(e.target.value))}
-                                    />
                                 </div>
                             </div>
 
@@ -904,6 +1065,165 @@ const CreateQuiz = () => {
                             </div>
 
                             <div className="form-card">
+                                <h2>🔒 Access Control</h2>
+                                <div className="toggle-group">
+                                    <label className="toggle-label">
+                                        <span>Public Quiz (Anyone can join)</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={quizData.accessControl.isPublic}
+                                            onChange={(e) => handleAccessControlChange('isPublic', e.target.checked)}
+                                        />
+                                        <span className="toggle-switch"></span>
+                                    </label>
+                                </div>
+
+                                {!quizData.accessControl.isPublic && (
+                                    <div className="access-control-panel">
+                                        <p className="section-subtitle">Select Allowed Branches & Sections</p>
+
+                                        {/* CSE Branch */}
+                                        <div className="branch-group">
+                                            <div className="branch-header">
+                                                <input
+                                                    type="checkbox"
+                                                    id="branch-cse"
+                                                    checked={quizData.accessControl.allowedBranches.some(b => b.name === 'CSE')}
+                                                    onChange={() => handleBranchToggle('CSE')}
+                                                />
+                                                <label htmlFor="branch-cse">CSE (Computer Science & Engineering)</label>
+                                            </div>
+
+                                            {quizData.accessControl.allowedBranches.some(b => b.name === 'CSE') && (
+                                                <div className="section-grid">
+                                                    {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].map(section => (
+                                                        <label key={`cse-${section}`} className="section-checkbox">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={quizData.accessControl.allowedBranches.find(b => b.name === 'CSE')?.sections.includes(section) || false}
+                                                                onChange={() => handleSectionToggle('CSE', section)}
+                                                            />
+                                                            <span>Sec {section}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* CSM Branch */}
+                                        <div className="branch-group" style={{ marginTop: '15px' }}>
+                                            <div className="branch-header">
+                                                <input
+                                                    type="checkbox"
+                                                    id="branch-csm"
+                                                    checked={quizData.accessControl.allowedBranches.some(b => b.name === 'CSM')}
+                                                    onChange={() => handleBranchToggle('CSM')}
+                                                />
+                                                <label htmlFor="branch-csm">CSM (CSE - AI & ML)</label>
+                                            </div>
+
+                                            {quizData.accessControl.allowedBranches.some(b => b.name === 'CSM') && (
+                                                <div className="section-grid">
+                                                    {['A', 'B', 'C', 'D', 'E'].map(section => (
+                                                        <label key={`csm-${section}`} className="section-checkbox">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={quizData.accessControl.allowedBranches.find(b => b.name === 'CSM')?.sections.includes(section) || false}
+                                                                onChange={() => handleSectionToggle('CSM', section)}
+                                                            />
+                                                            <span>Sec {section}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="eligibility-mode-section" style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--border-color)' }}>
+                                            <p className="section-subtitle" style={{ marginBottom: '10px', display: 'block', fontWeight: '600' }}>Eligibility Mode</p>
+
+                                            <div className="toggle-group" style={{ marginBottom: '15px' }}>
+                                                <label className="radio-label" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: '20px' }}>
+                                                    <input
+                                                        type="radio"
+                                                        name="eligibility_mode"
+                                                        checked={quizData.accessControl.mode === 'ALL' || !quizData.accessControl.mode}
+                                                        onChange={() => handleAccessControlChange('mode', 'ALL')}
+                                                        style={{ marginRight: '8px' }}
+                                                    />
+                                                    <span>All Students in Selected Sections</span>
+                                                </label>
+
+                                                <label className="radio-label" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="radio"
+                                                        name="eligibility_mode"
+                                                        checked={quizData.accessControl.mode === 'SPECIFIC'}
+                                                        onChange={() => handleAccessControlChange('mode', 'SPECIFIC')}
+                                                        style={{ marginRight: '8px' }}
+                                                    />
+                                                    <span>Specific Students Only</span>
+                                                </label>
+                                            </div>
+
+                                            {quizData.accessControl.mode === 'SPECIFIC' && (
+                                                <div className="student-selector-panel" style={{ background: 'var(--bg-tertiary)', padding: '15px', borderRadius: '8px' }}>
+                                                    <p style={{ fontSize: '0.9rem', marginBottom: '8px', fontWeight: '500' }}>
+                                                        Select Students ({quizData.accessControl.allowedStudents?.length || 0} selected)
+                                                    </p>
+
+                                                    {fetchingStudents ? (
+                                                        <div style={{ padding: '20px', textAlign: 'center' }}>
+                                                            <span className="spinner spinner-sm"></span> Loading students...
+                                                        </div>
+                                                    ) : (
+                                                        <div className="student-list" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                                                            {availableStudents.length === 0 ? (
+                                                                <p className="text-muted" style={{ padding: '10px', textAlign: 'center' }}>
+                                                                    No students found in the selected branches/sections.
+                                                                </p>
+                                                            ) : (
+                                                                availableStudents.map(student => (
+                                                                    <label key={student._id} className="student-checkbox-item" style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        padding: '8px',
+                                                                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                                                        cursor: 'pointer'
+                                                                    }}>
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={(quizData.accessControl.allowedStudents || []).includes(student._id)}
+                                                                            onChange={(e) => {
+                                                                                const current = quizData.accessControl.allowedStudents || [];
+                                                                                let next;
+                                                                                if (e.target.checked) {
+                                                                                    next = [...current, student._id];
+                                                                                } else {
+                                                                                    next = current.filter(id => id !== student._id);
+                                                                                }
+                                                                                handleAccessControlChange('allowedStudents', next);
+                                                                            }}
+                                                                            style={{ marginRight: '10px' }}
+                                                                        />
+                                                                        <div>
+                                                                            <div style={{ fontWeight: '500', fontSize: '0.9rem' }}>{student.name} ({student.rollNumber})</div>
+                                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                                                {student.department} - Section {student.section}
+                                                                            </div>
+                                                                        </div>
+                                                                    </label>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-card">
                                 <h2>🔒 Security</h2>
 
                                 <div className="toggle-group">
@@ -943,6 +1263,47 @@ const CreateQuiz = () => {
                                         onChange={(e) => handleQuizDataChange('settings.passingScore', e.target.value === '' ? 0 : parseInt(e.target.value))}
                                     />
                                 </div>
+                            </div>
+
+                            <div className="form-card">
+                                <h2><FiClock /> Scheduling</h2>
+                                <div className="toggle-group">
+                                    <label className="toggle-label">
+                                        <span>Schedule for later</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={!!quizData.scheduledAt}
+                                            onChange={(e) => handleQuizDataChange('scheduledAt', e.target.checked ? new Date(Date.now() + 3600000).toISOString().slice(0, 16) : null)}
+                                        />
+                                        <span className="toggle-switch"></span>
+                                    </label>
+                                </div>
+
+                                {quizData.scheduledAt && (
+                                    <>
+                                        <div className="form-group">
+                                            <label className="form-label">Scheduled Date & Time</label>
+                                            <input
+                                                type="datetime-local"
+                                                className="form-input"
+                                                value={typeof quizData.scheduledAt === 'string' ? quizData.scheduledAt.slice(0, 16) : new Date(quizData.scheduledAt).toISOString().slice(0, 16)}
+                                                onChange={(e) => handleQuizDataChange('scheduledAt', e.target.value)}
+                                                min={new Date().toISOString().slice(0, 16)}
+                                            />
+                                        </div>
+                                        <div className="toggle-group">
+                                            <label className="toggle-label">
+                                                <span>Auto-start at scheduled time</span>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={quizData.settings.autoStart}
+                                                    onChange={(e) => handleQuizDataChange('settings.autoStart', e.target.checked)}
+                                                />
+                                                <span className="toggle-switch"></span>
+                                            </label>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 

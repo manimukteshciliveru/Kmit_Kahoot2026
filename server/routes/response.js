@@ -3,6 +3,7 @@ const router = express.Router();
 const {
     submitAnswer,
     getMyResponse,
+    getResponseById,
     getQuizResponses,
     reportTabSwitch,
     completeQuiz,
@@ -19,6 +20,7 @@ router.post('/tab-switch', authorize('student'), reportTabSwitch);
 router.post('/complete', authorize('student'), completeQuiz);
 router.get('/history', authorize('student'), getQuizHistory);
 router.get('/quiz/:quizId', getMyResponse);
+router.get('/:id', getResponseById);
 
 // Faculty routes
 router.get('/quiz/:quizId/all', authorize('faculty', 'admin'), getQuizResponses);

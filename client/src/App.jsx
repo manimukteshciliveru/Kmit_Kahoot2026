@@ -9,7 +9,6 @@ import Layout from './components/common/Layout';
 
 // Auth Pages
 import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
 
 // Dashboard Pages
 import StudentDashboard from './pages/student/StudentDashboard';
@@ -21,10 +20,16 @@ import UserManagement from './pages/admin/UserManagement';
 import AddUser from './pages/admin/AddUser';
 import BulkUpload from './pages/admin/BulkUpload';
 import Analytics from './pages/admin/Analytics';
+import QuizAnalytics from './pages/admin/QuizAnalytics';
 import Settings from './pages/admin/Settings';
 
 // Student Pages
 import JoinQuiz from './pages/student/JoinQuiz';
+
+// Common Pages
+import Profile from './pages/common/Profile';
+import History from './pages/student/History';
+import QuizReport from './pages/student/QuizReport';
 
 // Faculty Pages
 import CreateQuiz from './pages/faculty/CreateQuiz';
@@ -110,7 +115,6 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
 
               {/* Protected Routes with Layout */}
               <Route
@@ -137,8 +141,16 @@ function App() {
                 <Route
                   path="history"
                   element={
-                    <ProtectedRoute allowedRoles={['student']}>
-                      <StudentDashboard />
+                    <ProtectedRoute allowedRoles={['student', 'admin']}>
+                      <History />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="history/report/:responseId"
+                  element={
+                    <ProtectedRoute allowedRoles={['student', 'admin']}>
+                      <QuizReport />
                     </ProtectedRoute>
                   }
                 />
@@ -230,6 +242,14 @@ function App() {
                   }
                 />
                 <Route
+                  path="quiz-analytics"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <QuizAnalytics />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="settings"
                   element={
                     <ProtectedRoute allowedRoles={['admin']}>
@@ -239,7 +259,7 @@ function App() {
                 />
 
                 {/* Profile */}
-                <Route path="profile" element={<StudentDashboard />} />
+                <Route path="profile" element={<Profile />} />
               </Route>
 
               {/* Catch all */}

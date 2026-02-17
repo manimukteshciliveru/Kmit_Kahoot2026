@@ -33,21 +33,28 @@ exports.submitAnswer = async (req, res) => {
             });
         }
 
-        // Get or create response
-        let response = await Response.findOne({ quizId, userId: req.user._id });
-
-        if (!response) {
+        // Timer Integrity Check
+        // 1. Check if quiz is expired (database field)
+        if (quiz.expiresAt && new Date() > new Date(quiz.expiresAt)) {
             return res.status(400).json({
                 success: false,
-                message: 'You have not joined this quiz'
+                message: 'Quiz time has expired'
             });
         }
 
-        if (response.status === 'terminated' || response.status === 'completed') {
-            return res.status(400).json({
-                success: false,
-                message: `Quiz already ${response.status}`
-            });
+        // 2. Check if calculated time exceeded (redundant but safe)
+        if (quiz.settings?.quizTimer > 0 && quiz.startedAt) {
+            const start = new Date(quiz.startedAt).getTime();
+            const now = new Date().getTime();
+            const elapsed = Math.floor((now - start) / 1000);
+
+            // Allow 10s grace period for network latency
+            if (elapsed > quiz.settings.quizTimer + 10) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Quiz time has expired'
+                });
+            }
         }
 
         // Find the question in quiz
@@ -63,24 +70,53 @@ exports.submitAnswer = async (req, res) => {
         const isCorrect = checkAnswer(question, answer);
         const pointsEarned = isCorrect ? question.points : 0;
 
-        // Update answer in response
-        const answerIndex = response.answers.findIndex(
-            a => a.questionId.toString() === questionId.toString()
+        // Atomic update of the specific answer
+        // This prevents race conditions where multiple tabs might overwrite each other
+        const response = await Response.findOneAndUpdate(
+            {
+                quizId,
+                userId: req.user._id,
+                "answers.questionId": questionId,
+                status: { $in: ['waiting', 'in-progress'] }
+            },
+            {
+                $set: {
+                    "answers.$.answer": answer,
+                    "answers.$.isCorrect": isCorrect,
+                    "answers.$.pointsEarned": pointsEarned,
+                    "answers.$.timeTaken": timeTaken || 0,
+                    "answers.$.answeredAt": new Date(),
+                    lastActivityAt: new Date(),
+                    status: 'in-progress'
+                }
+            },
+            { new: true }
         );
 
-        if (answerIndex !== -1) {
-            response.answers[answerIndex] = {
-                ...response.answers[answerIndex].toObject(),
-                answer,
-                isCorrect,
-                pointsEarned,
-                timeTaken: timeTaken || 0,
-                answeredAt: new Date()
-            };
+        if (!response) {
+            return res.status(400).json({
+                success: false,
+                message: 'Failed to submit answer or quiz already finished'
+            });
         }
 
-        response.lastActivityAt = new Date();
-        await response.save();
+        // Trigger stats recalculation
+        // Using findById to get a fully hydrated document to ensure pre-save hooks work correctly
+        const updatedResponse = await Response.findById(response._id);
+        if (updatedResponse) {
+            // Explicitly update the answer in the array in memory if needed, 
+            // but findOneAndUpdate should have done it in DB. 
+            // We need to trigger the pre-save hook which iterates over `this.answers`
+
+            // IMPORTANT: The pre-save hook relies on `this.answers`.
+            // `updatedResponse` has the updated answers from DB.
+            // Calling .save() will trigger the hook.
+
+            await updatedResponse.save();
+
+            // Update variable for response to user
+            response.totalScore = updatedResponse.totalScore;
+        }
 
         // Emit real-time update for faculty
         const io = req.app.get('io');
@@ -98,7 +134,7 @@ exports.submitAnswer = async (req, res) => {
                 isCorrect,
                 pointsEarned,
                 timeTaken,
-                currentScore: response.totalScore + pointsEarned
+                currentScore: response.totalScore
             });
         }
 
@@ -163,6 +199,52 @@ exports.getMyResponse = async (req, res) => {
         });
     } catch (error) {
         console.error('Get response error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch response',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Get response by ID
+// @route   GET /api/responses/:id
+// @access  Private
+exports.getResponseById = async (req, res) => {
+    try {
+        const response = await Response.findById(req.params.id)
+            .populate({
+                path: 'quizId',
+                select: 'title subject createdBy startedAt endedAt questions settings',
+                populate: {
+                    path: 'createdBy',
+                    select: 'name'
+                }
+            });
+
+        if (!response) {
+            return res.status(404).json({
+                success: false,
+                message: 'Response not found'
+            });
+        }
+
+        // Authorization check
+        if (response.userId.toString() !== req.user._id.toString() &&
+            req.user.role !== 'admin' &&
+            response.quizId?.createdBy?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: 'Not authorized to view this response'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: { response }
+        });
+    } catch (error) {
+        console.error('Get response by ID error:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch response',
@@ -365,7 +447,14 @@ exports.getQuizHistory = async (req, res) => {
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         const responses = await Response.find({ userId: req.user._id })
-            .populate('quizId', 'title code mode createdAt')
+            .populate({
+                path: 'quizId',
+                select: 'title subject createdBy startedAt endedAt questions',
+                populate: {
+                    path: 'createdBy',
+                    select: 'name'
+                }
+            })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));

@@ -81,55 +81,86 @@ exports.register = async (req, res) => {
     }
 };
 
+const logger = require('../utils/logger');
+
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
 exports.login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
+    const { email, password } = req.body;
+    logger.info(`[LOGIN ATTEMPT] Email/ID: ${email ? email.substring(0, 3) + '***' : 'MISSING'} | IP: ${req.ip}`);
 
-        // Validate input
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please provide email and password'
-            });
+    try {
+        // 2. Critical Environment Check
+        if (!process.env.JWT_SECRET) {
+            logger.error('[CRITICAL CONFIG] JWT_SECRET is missing');
+            return res.status(500).json({ success: false, message: 'Server configuration error. Please contact admin.' });
         }
 
-        // Find user with password
-        const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+        // 3. Input Validation
+        if (!email || !password) {
+            logger.warn('[LOGIN FAILED] Missing credentials', { ip: req.ip });
+            return res.status(400).json({ success: false, message: 'Please provide email/roll number and password' });
+        }
+
+        // 4. Database User Lookup
+        // Find user by email OR roll number OR employeeID (case-insensitive)
+        const normalizeInput = email.trim();
+        const userQuery = {
+            $or: [
+                { email: normalizeInput.toLowerCase() },
+                { rollNumber: normalizeInput.toUpperCase() },
+                { employeeId: normalizeInput.toUpperCase() },
+                { employeeId: normalizeInput } // Fallback
+            ]
+        };
+
+        logger.info(`[LOGIN DB LOOKUP] Query: ${normalizeInput}`);
+        const user = await User.findOne(userQuery).select('+password');
 
         if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid credentials'
-            });
+            logger.warn(`[LOGIN FAILED] User not found: ${normalizeInput}`);
+            return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
-        // Check if account is active
+        logger.info(`[LOGIN USER FOUND] ID: ${user._id} | Role: ${user.role} | Active: ${user.isActive}`);
+
+        // 5. Account Status Check
         if (!user.isActive) {
-            return res.status(401).json({
-                success: false,
-                message: 'Account has been deactivated. Please contact admin.'
-            });
+            logger.warn(`[LOGIN BLOCKED] User ${user._id} inactive`);
+            return res.status(401).json({ success: false, message: 'Account has been deactivated. Please contact admin.' });
         }
 
-        // Check password
-        const isMatch = await user.comparePassword(password);
+        // 6. Password Comparison
+        // Wrap bcrypt in try-catch to catch hashing errors
+        let isMatch = false;
+        try {
+            isMatch = await user.comparePassword(password);
+        } catch (bcryptError) {
+            logger.error(`[LOGIN ERROR] Bcrypt failed for ${user._id}`, bcryptError);
+            return res.status(500).json({ success: false, message: 'Authentication service error' });
+        }
 
         if (!isMatch) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid credentials'
-            });
+            logger.warn(`[LOGIN FAILED] Password mismatch for: ${user._id}`);
+            return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
-        // Update last login (use updateOne to avoid triggering pre-save hooks)
-        await User.updateOne({ _id: user._id }, { lastLogin: new Date() });
+        logger.info(`[LOGIN SUCCESS] User: ${user._id}`);
 
-        // Generate token
+        // 7. Update Last Login (Non-blocking)
+        User.updateOne({ _id: user._id }, { lastLogin: new Date() }).catch(err =>
+            logger.error(`[LOGIN WARNING] Update lastLogin failed: ${user._id}`, err)
+        );
+
+        // 8. Generate Token
         const token = generateToken(user._id);
 
+        if (!token) {
+            throw new Error('Token generation failed');
+        }
+
+        // 9. Send Response
         res.status(200).json({
             success: true,
             message: 'Login successful',
@@ -139,18 +170,26 @@ exports.login = async (req, res) => {
                     name: user.name,
                     email: user.email,
                     role: user.role,
+                    rollNumber: user.rollNumber,
+                    department: user.department,
+                    section: user.section,
                     avatar: user.avatar,
                     stats: user.stats
                 },
                 token
             }
         });
+
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({
+        logger.error('[LOGIN CRITICAL ERROR]', error);
+
+        // Differentiate between Mongoose/DB errors and generic server errors
+        const statusCode = error.name === 'ValidationError' ? 400 : 500;
+
+        res.status(statusCode).json({
             success: false,
-            message: 'Login failed',
-            error: error.message
+            message: 'Login failed due to server error',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };
@@ -170,6 +209,9 @@ exports.getMe = async (req, res) => {
                     name: user.name,
                     email: user.email,
                     role: user.role,
+                    rollNumber: user.rollNumber,
+                    department: user.department,
+                    section: user.section,
                     avatar: user.avatar,
                     stats: user.stats,
                     isActive: user.isActive,
@@ -214,6 +256,9 @@ exports.updateProfile = async (req, res) => {
                     name: user.name,
                     email: user.email,
                     role: user.role,
+                    rollNumber: user.rollNumber,
+                    department: user.department,
+                    section: user.section,
                     avatar: user.avatar,
                     stats: user.stats
                 }

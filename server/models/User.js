@@ -43,6 +43,12 @@ const userSchema = new mongoose.Schema({
         trim: true,
         sparse: true
     },
+    rollNumber: {
+        type: String,
+        trim: true,
+        uppercase: true,
+        sparse: true
+    },
     department: {
         type: String,
         trim: true
@@ -74,6 +80,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    teachingAssignments: [{
+        branch: String,
+        section: String,
+        subject: String
+    }],
 
     stats: {
         quizzesAttended: { type: Number, default: 0 },
@@ -116,6 +127,7 @@ userSchema.methods.generateAvatar = function () {
 
 // Indexes
 userSchema.index({ email: 1 });
+userSchema.index({ rollNumber: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 

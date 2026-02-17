@@ -39,9 +39,24 @@ api.interceptors.response.use(
 );
 
 // Auth API
+const LOGIN_REQUESTS = new Map();
+
 export const authAPI = {
     register: (data) => api.post('/auth/register', data),
-    login: (data) => api.post('/auth/login', data),
+    login: (data) => {
+        // Idempotency Key: Use email/username + timestamp(minute resolution) or just duplicate check
+        const key = JSON.stringify(data);
+        if (LOGIN_REQUESTS.has(key)) {
+            return LOGIN_REQUESTS.get(key);
+        }
+
+        const request = api.post('/auth/login', data).finally(() => {
+            setTimeout(() => LOGIN_REQUESTS.delete(key), 500); // Clear after 500ms
+        });
+
+        LOGIN_REQUESTS.set(key, request);
+        return request;
+    },
     getMe: () => api.get('/auth/me'),
     updateProfile: (data) => api.put('/auth/profile', data),
     changePassword: (data) => api.put('/auth/password', data)
@@ -57,14 +72,17 @@ export const quizAPI = {
     join: (code) => api.post(`/quizzes/join/${code}`),
     start: (id) => api.post(`/quizzes/${id}/start`),
     end: (id) => api.post(`/quizzes/${id}/end`),
+    reset: (id) => api.post(`/quizzes/${id}/reset`),
     getLeaderboard: (id) => api.get(`/quizzes/${id}/leaderboard`),
-    getResults: (id) => api.get(`/quizzes/${id}/results`)
+    getResults: (id) => api.get(`/quizzes/${id}/results`),
+    downloadReport: (id) => api.get(`/quizzes/${id}/report`, { responseType: 'blob' })
 };
 
 // Response API
 export const responseAPI = {
     submitAnswer: (data) => api.post('/responses/answer', data),
     getMyResponse: (quizId) => api.get(`/responses/quiz/${quizId}`),
+    getById: (id) => api.get(`/responses/${id}`),
     getAllResponses: (quizId) => api.get(`/responses/quiz/${quizId}/all`),
     reportTabSwitch: (data) => api.post('/responses/tab-switch', data),
     completeQuiz: (data) => api.post('/responses/complete', data),
@@ -91,7 +109,8 @@ export const userAPI = {
     getAnalytics: () => api.get('/users/analytics'),
     bulkCreate: (formData) => api.post('/users/bulk', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    }),
+    searchStudents: (branches) => api.post('/users/search-students', { branches })
 };
 
 // Admin System API

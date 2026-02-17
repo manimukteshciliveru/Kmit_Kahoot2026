@@ -113,6 +113,21 @@ const responseSchema = new mongoose.Schema({
     lastActivityAt: {
         type: Date,
         default: null
+    },
+    // --- Enterprise / Anti-Cheat Fields ---
+    trustScore: {
+        type: Number,
+        default: 100,
+        min: 0,
+        max: 100
+    },
+    focusLostCount: {
+        type: Number,
+        default: 0
+    },
+    aiFeedback: {
+        type: String, // Generated summary from AI
+        default: null
     }
 }, {
     timestamps: true
@@ -125,7 +140,7 @@ responseSchema.index({ quizId: 1, userId: 1 }, { unique: true });
 responseSchema.index({ quizId: 1, totalScore: -1, totalTimeTaken: 1 });
 
 // Calculate stats before saving
-responseSchema.pre('save', async function() {
+responseSchema.pre('save', async function () {
     try {
         if (this.answers && this.answers.length > 0) {
             this.correctCount = this.answers.filter(a => a.isCorrect).length;
@@ -156,27 +171,41 @@ responseSchema.pre('save', async function() {
 
 // Static method to get leaderboard for a quiz
 responseSchema.statics.getLeaderboard = async function (quizId, limit = 100) {
-    return this.find({
-        quizId,
-        status: { $in: ['in-progress', 'completed'] }
-    })
-        .populate('userId', 'name email avatar')
-        .sort({ totalScore: -1, totalTimeTaken: 1 })
-        .limit(limit)
-        .lean();
+    try {
+        // Find all responses for this quiz first to see what's there
+        const allResponses = await this.find({ quizId }).lean();
+
+        const leaderboard = await this.find({
+            quizId,
+            status: { $in: ['in-progress', 'completed'] }
+        })
+            .populate('userId', 'name email avatar department section rollNumber')
+            .sort({ totalScore: -1, totalTimeTaken: 1 })
+            .limit(limit)
+            .lean();
+
+        return leaderboard;
+    } catch (error) {
+        console.error('Error in getLeaderboard static:', error);
+        throw error;
+    }
 };
 
-// Static method to calculate and update ranks
+// Static method to calculate and update ranks using bulkWrite for efficiency
 responseSchema.statics.updateRanks = async function (quizId) {
     const responses = await this.find({
         quizId,
         status: { $in: ['in-progress', 'completed'] }
     })
+        .select('_id totalScore totalTimeTaken')
         .sort({ totalScore: -1, totalTimeTaken: 1 });
+
+    if (responses.length === 0) return [];
 
     let currentRank = 0;
     let lastScore = null;
     let lastTime = null;
+    const bulkOps = [];
 
     for (let i = 0; i < responses.length; i++) {
         const response = responses[i];
@@ -186,11 +215,19 @@ responseSchema.statics.updateRanks = async function (quizId) {
             currentRank = i + 1;
         }
 
-        response.rank = currentRank;
+        bulkOps.push({
+            updateOne: {
+                filter: { _id: response._id },
+                update: { $set: { rank: currentRank } }
+            }
+        });
+
         lastScore = response.totalScore;
         lastTime = response.totalTimeTaken;
+    }
 
-        await response.save();
+    if (bulkOps.length > 0) {
+        await this.bulkWrite(bulkOps);
     }
 
     return responses;

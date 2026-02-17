@@ -73,9 +73,7 @@ const JoinQuiz = () => {
                             />
                             <div className="code-underline">
                                 {[...Array(6)].map((_, i) => (
-                                    <span key={i} className={`underline-segment ${code[i] ? 'filled' : ''}`}>
-                                        {code[i] || ''}
-                                    </span>
+                                    <span key={i} className={`underline-segment ${code[i] ? 'filled' : ''}`}></span>
                                 ))}
                             </div>
                         </div>
