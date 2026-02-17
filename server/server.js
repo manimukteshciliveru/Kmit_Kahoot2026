@@ -4,7 +4,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const connectDB = require('./config/db');
@@ -17,10 +16,10 @@ const quizRoutes = require('./routes/quiz');
 const responseRoutes = require('./routes/response');
 const aiRoutes = require('./routes/ai');
 const userRoutes = require('./routes/user');
-const adminRoutes = require('./routes/admin'); // Import admin routes
+const adminRoutes = require('./routes/admin');
 
 // --- 1. Environment Variables Check ---
-const requiredEnv = ['MONGODB_URI', 'JWT_SECRET', 'CLIENT_URL'];
+const requiredEnv = ['MONGODB_URI', 'JWT_SECRET'];
 requiredEnv.forEach((key) => {
     if (!process.env[key]) {
         console.error(`❌ CRITICAL ERROR: Missing ${key} environment variable.`);
@@ -36,25 +35,23 @@ const server = http.createServer(app);
 const { createAdapter } = require('@socket.io/redis-adapter');
 const { createRedisClient, initRedis } = require('./config/redis');
 
-// --- 2. CORS Fix ---
-const allowedOrigins = [
-    process.env.CLIENT_URL, // e.g. https://kmit-kahoot.vercel.app
-    'http://localhost:5173', // Local development
-    'https://kmit-kahoot.vercel.app' // Explicit fallback
-];
-
+// --- 2. CORS Configuration (Strict Production Setup) ---
 const corsOptions = {
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.warn(`Blocked CORS request from: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true
+    origin: [
+        "https://kmit-kahoot.vercel.app",
+        "http://localhost:5173" // Keep local dev working
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
 };
 
+// Apply CORS to Express
+app.use(cors(corsOptions));
+// Handle Preflight Requests explicitly
+app.options('*', cors(corsOptions));
+
+// --- 3. Socket.io Configuration ---
 const ioConfig = {
     cors: corsOptions,
     pingTimeout: 60000,
@@ -86,9 +83,6 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
-// CORS Middleware
-app.use(cors(corsOptions));
-
 // Rate limiting
 const { limiter: defaultLimiter, authLimiter } = require('./middleware/rateLimiter');
 
@@ -96,17 +90,8 @@ const { limiter: defaultLimiter, authLimiter } = require('./middleware/rateLimit
 app.use('/api/', defaultLimiter);
 app.use('/api/auth/login', authLimiter);
 
-// Fallback error handler for Redis if it's not running
-process.on('unhandledRejection', (reason, promise) => {
-    // console.warn('Unhandled Rejection at:', promise, 'reason:', reason);
-    if (reason && reason.code === 'ECONNREFUSED') {
-        console.warn('⚠️ Redis connection refused. Rate limiting might degrade to memory store or fail.');
-    }
-});
-
-
 // Body parsing
-app.use(express.json({ limit: '50mb' })); // Increased limit for backup restore
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Static files for uploads
@@ -118,7 +103,7 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/responses', responseRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/admin', adminRoutes); // Use admin routes
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -137,9 +122,9 @@ app.use((req, res) => {
     });
 });
 
-// Error handler
+// --- 4. Global Error Handler ---
 app.use((err, req, res, next) => {
-    console.error('Error:', err);
+    console.error('GLOBAL ERROR:', err);
 
     // Multer file size error
     if (err.code === 'LIMIT_FILE_SIZE') {
@@ -151,8 +136,7 @@ app.use((err, req, res, next) => {
 
     res.status(err.status || 500).json({
         success: false,
-        message: err.message || 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+        message: err.message || 'Internal Server Error'
     });
 });
 
@@ -166,33 +150,11 @@ initScheduler(io);
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-    console.log(`
-  ╔══════════════════════════════════════════════════════════╗
-  ║                                                          ║
-  ║   🎓 QuizMaster Pro Server                               ║
-  ║                                                          ║
-  ║   📡 REST API:    http://localhost:${PORT}/api             ║
-  ║   🔌 Socket.io:   ws://localhost:${PORT}                   ║
-  ║   🌍 Environment: ${process.env.NODE_ENV || 'development'}                           ║
-  ║                                                          ║
-  ╚══════════════════════════════════════════════════════════╝
-  `);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-    console.error('Unhandled Rejection:', err);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
-    process.exit(1);
-});
-
-module.exports = { app, server, io };
-
-// --- 6. Production Safety: Global Error Handlers ---
+// --- 5. Production Safety: Crash Handlers ---
 process.on('unhandledRejection', (err) => {
     console.error('❌ UNHANDLED REJECTION! 💥 Shutting down...');
     console.error(err.name, err.message);
@@ -206,3 +168,5 @@ process.on('uncaughtException', (err) => {
     console.error(err.name, err.message);
     process.exit(1);
 });
+
+module.exports = { app, server, io };
