@@ -33,25 +33,34 @@ const server = http.createServer(app);
 
 // Initialize Socket.io with CORS and Redis Adapter (if configured)
 const { createAdapter } = require('@socket.io/redis-adapter');
-const { createRedisClient, initRedis } = require('./config/redis');
+const redis = require('./config/redis');
 
-const ioConfig = {
-    cors: corsOptions,
-    pingTimeout: 60000,
-    pingInterval: 25000
-};
+// ... (CORS config is injected via separate step) ...
 
 const io = new Server(server, ioConfig);
 
 // Configure Redis Adapter for Multi-Node Scaling
-const pubClient = createRedisClient();
-const subClient = createRedisClient();
+if (redis) {
+    try {
+        const pubClient = redis.duplicate();
+        const subClient = redis.duplicate();
 
-if (pubClient && subClient) {
-    // Only use adapter if BOTH clients connected successfully
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log('✅ Socket.io Redis Adapter configured for horizontal scaling.');
-    initRedis();
+        // Prevent crashes on Pub/Sub clients
+        pubClient.on('error', (err) => console.error("❌ Redis Pub Error:", err.message));
+        subClient.on('error', (err) => console.error("❌ Redis Sub Error:", err.message));
+
+        Promise.all([pubClient.connect(), subClient.connect()])
+            .then(() => {
+                io.adapter(createAdapter(pubClient, subClient));
+                console.log('✅ Socket.io Redis Adapter configured for horizontal scaling.');
+            })
+            .catch((err) => {
+                console.warn("⚠️ Redis Adapter failed to connect. Running in Single-Node mode.", err.message);
+            });
+
+    } catch (e) {
+        console.warn("⚠️ Redis Adapter Setup Failed:", e.message);
+    }
 } else {
     console.log('ℹ️ Running in Single-Node mode (Redis disabled).');
 }
