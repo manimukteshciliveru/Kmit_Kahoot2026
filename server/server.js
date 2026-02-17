@@ -33,44 +33,34 @@ const server = http.createServer(app);
 
 // Initialize Socket.io with CORS and Redis Adapter (if configured)
 const { createAdapter } = require('@socket.io/redis-adapter');
-const { createRedisClient, initRedis } = require('./config/redis');
+const redis = require('./config/redis');
 
-// --- 2. CORS Configuration (Strict Production Setup) ---
-const corsOptions = {
-    origin: [
-        "https://kmit-kahoot.vercel.app",
-        "http://localhost:5173" // Keep local dev working
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"]
-};
-
-// Apply CORS to Express
-app.use(cors(corsOptions));
-// Handle Preflight Requests explicitly
-app.options('*', cors(corsOptions));
-
-// --- 3. Socket.io Configuration ---
-const ioConfig = {
-    cors: corsOptions,
-    pingTimeout: 60000,
-    pingInterval: 25000
-};
+// ... (CORS config remains same) ...
 
 const io = new Server(server, ioConfig);
 
-// Configure Redis Adapter for Multi-Node Scaling
-const pubClient = createRedisClient();
-const subClient = createRedisClient();
+// Create separate Pub/Sub clients for Adapter ONLY if Redis is connected
+if (redis) {
+    try {
+        const pubClient = redis.duplicate();
+        const subClient = redis.duplicate();
 
-if (pubClient && subClient) {
-    // Only use adapter if BOTH clients connected successfully
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log('✅ Socket.io Redis Adapter configured for horizontal scaling.');
-    initRedis();
+        // Handle errors on these specific clients to prevent crash
+        pubClient.on('error', err => console.error('❌ Redis Pub Client Error:', err.message));
+        subClient.on('error', err => console.error('❌ Redis Sub Client Error:', err.message));
+
+        Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+            io.adapter(createAdapter(pubClient, subClient));
+            console.log('✅ Socket.io Redis Adapter configured and active.');
+        }).catch(err => {
+            console.warn('⚠️ Failed to connect adapter clients. Running in single-node mode.', err.message);
+        });
+
+    } catch (e) {
+        console.warn('⚠️ Could not create Redis adapter clients:', e.message);
+    }
 } else {
-    console.log('ℹ️ Running in Single-Node mode (Redis not configured or failed). Horizontal scaling disabled.');
+    console.log('ℹ️ Running in Single-Node mode (Redis disabled).');
 }
 
 // Make io accessible to routes

@@ -2,39 +2,24 @@ const rateLimit = require('express-rate-limit');
 const RateLimitRedis = require('rate-limit-redis');
 // Robustly handle different export formats (CJS/ESM/Default)
 const RedisStore = RateLimitRedis.RedisStore || RateLimitRedis.default || RateLimitRedis;
-const Redis = require('ioredis');
-
-// Initialize Redis client only if configured
-const useRedis = !!process.env.REDIS_HOST;
-let redisClient;
-
-if (useRedis) {
-    redisClient = new Redis({
-        host: process.env.REDIS_HOST,
-        port: process.env.REDIS_PORT || 6379,
-        enableOfflineQueue: false,
-    });
-
-    redisClient.on('error', (err) => {
-        console.warn('⚠️ Redis connection error. Rate limiting will rely on fallback handling:', err.message);
-    });
-} else {
-    console.log('ℹ️ No REDIS_HOST found. Using MemoryStore for rate limiting.');
-}
+const redis = require('../config/redis');
 
 // Function to create store based on availability
 const createStore = () => {
-    if (!useRedis || !redisClient) return undefined; // undefined = MemoryStore
+    if (!redis) {
+        console.log('ℹ️ Redis not available. Using MemoryStore for rate limiting.');
+        return undefined; // undefined = MemoryStore
+    }
 
     // Wrap RedisStore to fail open if Redis is down
     try {
         return new RedisStore({
             sendCommand: async (...args) => {
-                if (redisClient.status !== 'ready') {
+                if (redis.status !== 'ready' && redis.status !== 'connect') {
                     // console.warn('Redis not ready, bypassing rate limit check (failing open)');
                     throw new Error('Redis not ready');
                 }
-                return redisClient.call(...args);
+                return redis.call(...args);
             },
         });
     } catch (e) {
@@ -71,4 +56,4 @@ const authLimiter = rateLimit({
     store: createStore(),
 });
 
-module.exports = { limiter, authLimiter, redisClient };
+module.exports = { limiter, authLimiter };
