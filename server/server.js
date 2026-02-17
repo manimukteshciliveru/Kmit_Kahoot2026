@@ -19,6 +19,15 @@ const aiRoutes = require('./routes/ai');
 const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin'); // Import admin routes
 
+// --- 1. Environment Variables Check ---
+const requiredEnv = ['MONGODB_URI', 'JWT_SECRET', 'CLIENT_URL'];
+requiredEnv.forEach((key) => {
+    if (!process.env[key]) {
+        console.error(`❌ CRITICAL ERROR: Missing ${key} environment variable.`);
+        process.exit(1);
+    }
+});
+
 // Initialize express app
 const app = express();
 const server = http.createServer(app);
@@ -27,12 +36,27 @@ const server = http.createServer(app);
 const { createAdapter } = require('@socket.io/redis-adapter');
 const { createRedisClient, initRedis } = require('./config/redis');
 
-const ioConfig = {
-    cors: {
-        origin: process.env.CLIENT_URL || 'http://localhost:5173',
-        methods: ['GET', 'POST'],
-        credentials: true
+// --- 2. CORS Fix ---
+const allowedOrigins = [
+    process.env.CLIENT_URL, // e.g. https://kmit-kahoot.vercel.app
+    'http://localhost:5173', // Local development
+    'https://kmit-kahoot.vercel.app' // Explicit fallback
+];
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.warn(`Blocked CORS request from: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
     },
+    credentials: true
+};
+
+const ioConfig = {
+    cors: corsOptions,
     pingTimeout: 60000,
     pingInterval: 25000
 };
@@ -40,17 +64,12 @@ const ioConfig = {
 const io = new Server(server, ioConfig);
 
 // Configure Redis Adapter for Multi-Node Scaling
-// We need separate pub/sub clients for the adapter
 const pubClient = createRedisClient();
 const subClient = createRedisClient();
 
 if (pubClient && subClient) {
-    // ioredis connects automatically. We can just pass them to the adapter.
-    // The adapter will handle the rest.
     io.adapter(createAdapter(pubClient, subClient));
     console.log('✅ Socket.io Redis Adapter configured for horizontal scaling.');
-
-    // Also initialize the singleton client for other app usages (like caching/leaderboards)
     initRedis();
 } else {
     console.log('ℹ️ Running in Single-Node mode (Redis not configured). Horizontal scaling disabled.');
@@ -67,11 +86,8 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
-// CORS
-app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    credentials: true
-}));
+// CORS Middleware
+app.use(cors(corsOptions));
 
 // Rate limiting
 const { limiter: defaultLimiter, authLimiter } = require('./middleware/rateLimiter');
@@ -175,3 +191,18 @@ process.on('uncaughtException', (err) => {
 });
 
 module.exports = { app, server, io };
+
+// --- 6. Production Safety: Global Error Handlers ---
+process.on('unhandledRejection', (err) => {
+    console.error('❌ UNHANDLED REJECTION! 💥 Shutting down...');
+    console.error(err.name, err.message);
+    server.close(() => {
+        process.exit(1);
+    });
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('❌ UNCAUGHT EXCEPTION! 💥 Shutting down...');
+    console.error(err.name, err.message);
+    process.exit(1);
+});

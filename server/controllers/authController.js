@@ -88,61 +88,63 @@ const logger = require('../utils/logger');
 // @access  Public
 exports.login = async (req, res) => {
     const { email, password } = req.body;
-    logger.info(`[LOGIN ATTEMPT] Email/ID: ${email ? email.substring(0, 3) + '***' : 'MISSING'} | IP: ${req.ip}`);
+
+    // --- DEBUGGING LOGS ---
+    console.log('👉 [LOGIN START] Request Body:', { email, password: password ? '******' : 'MISSING' });
 
     try {
         // 2. Critical Environment Check
         if (!process.env.JWT_SECRET) {
-            logger.error('[CRITICAL CONFIG] JWT_SECRET is missing');
+            console.error('❌ [LOGIN CRASH] JWT_SECRET is missing!');
             return res.status(500).json({ success: false, message: 'Server configuration error. Please contact admin.' });
         }
 
         // 3. Input Validation
         if (!email || !password) {
-            logger.warn('[LOGIN FAILED] Missing credentials', { ip: req.ip });
+            console.warn('⚠️ [LOGIN] Missing credentials');
             return res.status(400).json({ success: false, message: 'Please provide email/roll number and password' });
         }
 
         // 4. Database User Lookup
-        // Find user by email OR roll number OR employeeID (case-insensitive)
         const normalizeInput = email.trim();
         const userQuery = {
             $or: [
                 { email: normalizeInput.toLowerCase() },
                 { rollNumber: normalizeInput.toUpperCase() },
                 { employeeId: normalizeInput.toUpperCase() },
-                { employeeId: normalizeInput } // Fallback
+                { employeeId: normalizeInput }
             ]
         };
 
-        logger.info(`[LOGIN DB LOOKUP] Query: ${normalizeInput}`);
+        console.log(`🔍 [LOGIN] Searching for user: ${normalizeInput}`);
         const user = await User.findOne(userQuery).select('+password');
 
         if (!user) {
-            logger.warn(`[LOGIN FAILED] User not found: ${normalizeInput}`);
+            console.warn(`⚠️ [LOGIN] User not found: ${normalizeInput}`);
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
-        logger.info(`[LOGIN USER FOUND] ID: ${user._id} | Role: ${user.role} | Active: ${user.isActive}`);
+        console.log(`✅ [LOGIN] User found: ID=${user._id}, Role=${user.role}`);
 
         // 5. Account Status Check
         if (!user.isActive) {
-            logger.warn(`[LOGIN BLOCKED] User ${user._id} inactive`);
+            console.warn(`⛔ [LOGIN] User inactive: ${user._id}`);
             return res.status(401).json({ success: false, message: 'Account has been deactivated. Please contact admin.' });
         }
 
         // 6. Password Comparison
-        // Wrap bcrypt in try-catch to catch hashing errors
+        console.log('🔐 [LOGIN] Verifying password...');
         let isMatch = false;
         try {
             isMatch = await user.comparePassword(password);
+            console.log(`🔐 [LOGIN] Password match result: ${isMatch}`);
         } catch (bcryptError) {
-            logger.error(`[LOGIN ERROR] Bcrypt failed for ${user._id}`, bcryptError);
+            console.error('❌ [LOGIN] Bcrypt Error:', bcryptError);
             return res.status(500).json({ success: false, message: 'Authentication service error' });
         }
 
         if (!isMatch) {
-            logger.warn(`[LOGIN FAILED] Password mismatch for: ${user._id}`);
+            console.warn('⚠️ [LOGIN] Password incorrect');
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 

@@ -30,6 +30,9 @@ const connectDB = async () => {
     });
 
     // Initial Connection
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is not defined!');
+    }
     const conn = await mongoose.connect(process.env.MONGODB_URI, options);
     console.log(`Host: ${conn.connection.host}`);
 
