@@ -65,11 +65,12 @@ const pubClient = createRedisClient();
 const subClient = createRedisClient();
 
 if (pubClient && subClient) {
+    // Only use adapter if BOTH clients connected successfully
     io.adapter(createAdapter(pubClient, subClient));
     console.log('✅ Socket.io Redis Adapter configured for horizontal scaling.');
     initRedis();
 } else {
-    console.log('ℹ️ Running in Single-Node mode (Redis not configured). Horizontal scaling disabled.');
+    console.log('ℹ️ Running in Single-Node mode (Redis not configured or failed). Horizontal scaling disabled.');
 }
 
 // Make io accessible to routes
@@ -156,16 +157,12 @@ server.listen(PORT, () => {
 
 // --- 5. Production Safety: Crash Handlers ---
 process.on('unhandledRejection', (err) => {
-    console.error('❌ UNHANDLED REJECTION! 💥 Shutting down...');
-    console.error(err.name, err.message);
-    server.close(() => {
-        process.exit(1);
-    });
+    console.error('⚠️ UNHANDLED REJECTION! (Logging only, not crashing)', err);
+    // Do NOT exit process here. Transient Redis errors should not kill the server.
 });
 
 process.on('uncaughtException', (err) => {
-    console.error('❌ UNCAUGHT EXCEPTION! 💥 Shutting down...');
-    console.error(err.name, err.message);
+    console.error('❌ UNCAUGHT EXCEPTION! 💥 Shutting down...', err);
     process.exit(1);
 });
 

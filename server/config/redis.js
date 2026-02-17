@@ -1,12 +1,10 @@
 const Redis = require('ioredis');
 
 let client = null;
-let subscriber = null; // Separate subscriber client for Pub/Sub
 
 const getRedisConfig = () => {
     // Check for Sentinel Configuration
     if (process.env.REDIS_SENTINELS) {
-        // ... (Sentinel logic kept same if needed, or remove if unused) ...
         const sentinels = process.env.REDIS_SENTINELS.split(',').map(s => {
             const [host, port] = s.split(':');
             return { host, port: parseInt(port) || 26379 };
@@ -16,19 +14,31 @@ const getRedisConfig = () => {
             sentinels,
             name: process.env.REDIS_MASTER_NAME || 'mymaster',
             password: process.env.REDIS_PASSWORD,
-            retryStrategy: (times) => Math.min(times * 50, 2000), // Retry delay
+            retryStrategy: (times) => Math.min(times * 100, 3000), // Slower retry strategy
+            maxRetriesPerRequest: null, // Allow unlimited retries to prevent crash
+            enableReadyCheck: false // Don't crash if not ready immediately
         };
     }
 
-    // Explicit check for REDIS_URL or REDIS_HOST
+    // Explicit check for REDIS_URL
     if (process.env.REDIS_URL) {
-        return process.env.REDIS_URL;
+        return {
+            path: process.env.REDIS_URL,
+            retryStrategy: (times) => Math.min(times * 100, 3000),
+            maxRetriesPerRequest: null,
+            enableReadyCheck: false
+        }
     }
 
-    // Safety Check: If REDIS_HOST is set to 'redis-master' (default in docker-compose), 
-    // but we are likely not in that docker network (e.g. on Render), ignore it to prevent crash.
+    // Safety Check: Avoid connecting to generic hostnames like 'redis-master' in Cloud environments
     if (process.env.REDIS_HOST && process.env.REDIS_HOST !== 'redis-master') {
-        return `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`;
+        return {
+            host: process.env.REDIS_HOST,
+            port: process.env.REDIS_PORT || 6379,
+            password: process.env.REDIS_PASSWORD,
+            retryStrategy: (times) => Math.min(times * 100, 3000),
+            maxRetriesPerRequest: null
+        };
     }
 
     return null;
@@ -40,37 +50,65 @@ const initRedis = () => {
     const config = getRedisConfig();
 
     if (!config) {
-        console.warn('⚠️ Redis not configured. Caching and Scaling features will be disabled.');
+        console.warn('⚠️ Redis not configured. App will run in Single-Node mode (No Scaling).');
         return null;
     }
 
     try {
         console.log('🔄 Initializing Redis Client...');
-        client = new Redis(config);
 
-        client.on('error', (err) => console.error('❌ Redis Client Error:', err));
+        // Handle URL string vs Object config
+        if (config.path) {
+            client = new Redis(config.path, {
+                retryStrategy: config.retryStrategy,
+                maxRetriesPerRequest: config.maxRetriesPerRequest
+            });
+        } else {
+            client = new Redis(config);
+        }
+
+        client.on('error', (err) => {
+            console.error('❌ Redis Client Error:', err.message);
+            // Prevent app crash by handling error here
+        });
+
         client.on('connect', () => console.log('✅ Redis Client Connected'));
-        client.on('ready', () => console.log('✅ Redis Client Ready'));
 
         return client;
     } catch (error) {
-        console.error('❌ Failed to initialize Redis:', error);
+        console.error('❌ Failed to initialize Redis:', error.message);
         return null;
     }
 };
 
 const getClient = () => {
-    if (!client) {
-        return initRedis();
-    }
+    if (!client) return initRedis();
     return client;
 };
 
-// Create a duplicate client (essential for Socket.io adapter which needs separate Pub and Sub connections)
 const createRedisClient = () => {
     const config = getRedisConfig();
     if (!config) return null;
-    return new Redis(config);
+
+    let newClient;
+    try {
+        if (config.path) {
+            newClient = new Redis(config.path, {
+                retryStrategy: config.retryStrategy,
+                maxRetriesPerRequest: config.maxRetriesPerRequest
+            });
+        } else {
+            newClient = new Redis(config);
+        }
+
+        newClient.on('error', (err) => {
+            console.error('❌ Redis Pub/Sub Client Error:', err.message);
+        });
+
+        return newClient;
+    } catch (err) {
+        return null;
+    }
 };
 
 module.exports = { initRedis, getClient, createRedisClient };
