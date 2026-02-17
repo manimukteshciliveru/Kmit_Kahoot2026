@@ -6,12 +6,11 @@ let subscriber = null; // Separate subscriber client for Pub/Sub
 const getRedisConfig = () => {
     // Check for Sentinel Configuration
     if (process.env.REDIS_SENTINELS) {
+        // ... (Sentinel logic kept same if needed, or remove if unused) ...
         const sentinels = process.env.REDIS_SENTINELS.split(',').map(s => {
             const [host, port] = s.split(':');
             return { host, port: parseInt(port) || 26379 };
         });
-
-        console.log(`⚙️ Configuring Redis with Sentinels: ${JSON.stringify(sentinels)}`);
 
         return {
             sentinels,
@@ -22,12 +21,13 @@ const getRedisConfig = () => {
     }
 
     // Explicit check for REDIS_URL or REDIS_HOST
-    // If these are not present, do NOT fallback to anything, return null immediately.
     if (process.env.REDIS_URL) {
         return process.env.REDIS_URL;
     }
-    
-    if (process.env.REDIS_HOST) {
+
+    // Safety Check: If REDIS_HOST is set to 'redis-master' (default in docker-compose), 
+    // but we are likely not in that docker network (e.g. on Render), ignore it to prevent crash.
+    if (process.env.REDIS_HOST && process.env.REDIS_HOST !== 'redis-master') {
         return `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`;
     }
 
