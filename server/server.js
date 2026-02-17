@@ -37,13 +37,51 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- 2. CORS Configuration (Strict Production Setup) ---
-// Using strict origin reflection to guarantee match
+// --- 2. CORS Configuration (Dynamic for All Environments) ---
+const getAllowedOrigins = () => {
+    const whitelistedOrigins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:5000",
+        "https://kmit-kahoot.vercel.app",
+        "https://kahoot-render.onrender.com",
+        "https://kahoot.onrender.com"
+    ];
+    
+    // Add custom origins from environment
+    if (process.env.CLIENT_URL) {
+        whitelistedOrigins.push(process.env.CLIENT_URL);
+    }
+    if (process.env.ALLOWED_ORIGINS) {
+        const customOrigins = process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+        whitelistedOrigins.push(...customOrigins);
+    }
+    
+    return whitelistedOrigins;
+};
+
 const corsOptions = {
-    origin: ["https://kmit-kahoot.vercel.app", "http://localhost:5173"],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    origin: (origin, callback) => {
+        const allowedOrigins = getAllowedOrigins();
+        
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) {
+            console.log('✅ [CORS] No origin header (possible mobile app or curl)');
+            return callback(null, true);
+        }
+        
+        if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+            console.log(`✅ [CORS] Allowed origin: ${origin}`);
+            callback(null, true);
+        } else {
+            console.warn(`⚠️ [CORS] Rejected origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    maxAge: 86400
 };
 
 // Apply CORS to Express

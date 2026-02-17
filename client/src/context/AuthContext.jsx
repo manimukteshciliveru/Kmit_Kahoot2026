@@ -40,24 +40,43 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password) => {
         try {
+            console.log('🔐 [AUTH] Attempting login with email:', email);
             const response = await authAPI.login({ email, password });
+            console.log('🔐 [AUTH] Login response received:', response.status);
 
             // Handle if the response comes from a cached promise (Idempotency) or fresh request
             const data = response.data?.data || response.data;
             const { user: userData, token: authToken } = data;
+
+            if (!authToken) {
+                console.error('❌ [AUTH] No token received from server');
+                return {
+                    success: false,
+                    message: 'Authentication failed - no token received'
+                };
+            }
 
             localStorage.setItem('token', authToken);
             localStorage.setItem('user', JSON.stringify(userData));
 
             setToken(authToken);
             setUser(userData);
+            
+            console.log('✅ [AUTH] Login successful for user:', userData?.email);
 
             return { success: true, user: userData };
         } catch (error) {
-            console.error('Login Error:', error);
+            console.error('❌ [AUTH] Login Error:', {
+                status: error.response?.status,
+                message: error.response?.data?.message,
+                error: error.message
+            });
+            
+            const errorMessage = error.response?.data?.message || error.message || 'Login failed. Please check your credentials.';
+            
             return {
                 success: false,
-                message: error.response?.data?.message || 'Login failed'
+                message: errorMessage
             };
         }
     };

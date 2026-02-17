@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: kahoot-api
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && node server.js
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: CLIENT_URL
+        value: https://kahoot-web.onrender.com
+      - key: ALLOWED_ORIGINS
+        value: https://kahoot-web.onrender.com
+      - key: GOOGLE_AI_API_KEY
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+
+  - type: web
+    name: kahoot-web
+    env: static
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        previewValue: http://localhost:5000/api
+        value: https://kahoot-api.onrender.com/api

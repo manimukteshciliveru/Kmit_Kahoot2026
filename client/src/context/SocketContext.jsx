@@ -20,7 +20,21 @@ export const SocketProvider = ({ children }) => {
 
     useEffect(() => {
         if (isAuthenticated && token) {
-            const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+            // Determine Socket URL based on environment
+            let socketUrl = import.meta.env.VITE_SOCKET_URL;
+            
+            if (!socketUrl) {
+                if (import.meta.env.PROD) {
+                    // In production, use current origin
+                    socketUrl = window.location.origin;
+                } else {
+                    // Development fallback
+                    socketUrl = 'http://localhost:5000';
+                }
+            }
+            
+            console.log('🔌 [SOCKET] Connecting to:', socketUrl);
+            
             const sessionId = Math.random().toString(36).substring(7) + Date.now();
 
             const newSocket = io(socketUrl, {
