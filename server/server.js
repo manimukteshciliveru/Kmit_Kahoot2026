@@ -31,17 +31,24 @@ requiredEnv.forEach((key) => {
 const app = express();
 const server = http.createServer(app);
 
-// --- 2. CORS Configuration (Strict Production Setup) ---
+// Request Logger (Debug 404s/CORS)
+app.use((req, res, next) => {
+    console.log(`📡 [REQUEST] ${req.method} ${req.url} | Origin: ${req.headers.origin || 'Unknown'}`);
+    next();
+});
+
+// --- 2. CORS Configuration (Fix for Vercel) ---
+// Using strict origin reflection to guarantee match
 const corsOptions = {
     origin: ["https://kmit-kahoot.vercel.app", "http://localhost:5173"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 };
 
 // Apply CORS to Express
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle Preflight
+app.options('*', cors(corsOptions)); // Handle Preflight explicitly
 
 // Security middleware
 app.use(helmet({
