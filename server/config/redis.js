@@ -21,11 +21,14 @@ const getRedisConfig = () => {
         };
     }
 
-    // Fallback to Standard/Single URL
-    const redisUrl = process.env.REDIS_URL || (process.env.REDIS_HOST ? `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}` : null);
-
-    if (redisUrl) {
-        return redisUrl;
+    // Explicit check for REDIS_URL or REDIS_HOST
+    // If these are not present, do NOT fallback to anything, return null immediately.
+    if (process.env.REDIS_URL) {
+        return process.env.REDIS_URL;
+    }
+    
+    if (process.env.REDIS_HOST) {
+        return `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`;
     }
 
     return null;
