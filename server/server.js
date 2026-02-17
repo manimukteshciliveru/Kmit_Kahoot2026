@@ -35,7 +35,35 @@ const server = http.createServer(app);
 const { createAdapter } = require('@socket.io/redis-adapter');
 const redis = require('./config/redis');
 
-// ... (CORS config is injected via separate step) ...
+// --- 2. CORS Configuration (Strict Production Setup) ---
+const corsOptions = {
+    origin: function (origin, callback) {
+        const allowedOrigins = [
+            "https://kmit-kahoot.vercel.app",
+            "http://localhost:5173"
+        ];
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.warn(`Blocked CORS request from: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
+};
+
+// Apply CORS to Express
+app.use(cors(corsOptions));
+// Handle Preflight Requests explicitly
+app.options('*', cors(corsOptions));
+
+const ioConfig = {
+    cors: corsOptions,
+    pingTimeout: 60000,
+    pingInterval: 25000
+};
 
 const io = new Server(server, ioConfig);
 
