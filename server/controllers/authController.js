@@ -183,15 +183,10 @@ exports.login = async (req, res) => {
         });
 
     } catch (error) {
-        logger.error('[LOGIN CRITICAL ERROR]', error);
-
-        // Differentiate between Mongoose/DB errors and generic server errors
-        const statusCode = error.name === 'ValidationError' ? 400 : 500;
-
-        res.status(statusCode).json({
+        console.error("LOGIN ERROR:", error);
+        return res.status(500).json({
             success: false,
-            message: 'Login failed due to server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: error.message,
         });
     }
 };

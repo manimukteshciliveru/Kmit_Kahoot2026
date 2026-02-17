@@ -175,6 +175,11 @@ server.listen(PORT, () => {
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
+// Test route to confirm backend works
+app.get("/test", (req, res) => {
+    res.json({ message: "Backend working" });
+});
+
 // --- 5. Production Safety: Crash Handlers ---
 process.on('unhandledRejection', (err) => {
     console.error('⚠️ UNHANDLED REJECTION! (Logging only, not crashing)', err);
