@@ -4,42 +4,42 @@ const logger = require('../utils/logger'); // Assuming logger exists, if not use
 const connectDB = async () => {
   try {
     const options = {
-      serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      maxPoolSize: 50, // Maintain up to 50 socket connections
-      minPoolSize: 5, // Maintain at least 5 socket connections
-      family: 4, // Use IPv4, skip IPv6
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 50,
+      minPoolSize: 5,
+      family: 4,
     };
 
-    // Connection Events
-    mongoose.connection.on('connected', () => {
-      console.log('✅ MongoDB Connected successfully');
-    });
+    mongoose.connection.on('connected', () => console.log('✅ MongoDB Connected successfully'));
+    mongoose.connection.on('error', (err) => console.error('❌ MongoDB Connection Error:', err.message));
+    mongoose.connection.on('disconnected', () => console.warn('⚠️ MongoDB Disconnected. Attempting to reconnect...'));
+    mongoose.connection.on('reconnected', () => console.log('✅ MongoDB Reconnected'));
 
-    mongoose.connection.on('error', (err) => {
-      console.error('❌ MongoDB Connection Error:', err);
-      // logger.error('MongoDB Connection Error', err);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️ MongoDB Disconnected. Attempting to reconnect...');
-    });
-
-    mongoose.connection.on('reconnected', () => {
-      console.log('✅ MongoDB Reconnected');
-    });
-
-    // Initial Connection
     if (!process.env.MONGODB_URI) {
       throw new Error('MONGODB_URI environment variable is not defined!');
     }
-    const conn = await mongoose.connect(process.env.MONGODB_URI, options);
-    console.log(`Host: ${conn.connection.host}`);
+
+    try {
+      const conn = await mongoose.connect(process.env.MONGODB_URI, options);
+      console.log(`Host: ${conn.connection.host}`);
+    } catch (primaryError) {
+      console.error(`❌ Failed to connect to primary MONGODB_URI: ${primaryError.message}`);
+
+      // Fallback for local development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Attempting fallback to local MongoDB (mongodb://127.0.0.1:27017/quizdb)...');
+        try {
+          const conn = await mongoose.connect('mongodb://127.0.0.1:27017/quizdb', options);
+          console.log(`✅ Connected to Local Fallback Host: ${conn.connection.host}`);
+        } catch (fallbackError) {
+          console.error(`❌ Fallback connection also failed: ${fallbackError.message}`);
+        }
+      }
+    }
 
   } catch (error) {
     console.error(`❌ Fatal MongoDB Connection Error: ${error.message}`);
-    console.error('Stack:', error.stack);
-    // Don't exit process, allow retry logic (built-in validation) or external restarts
   }
 };
 
