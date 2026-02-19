@@ -96,7 +96,8 @@ const corsOptions = {
 
 // Apply CORS to Express
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle Preflight explicitly
+// Use RegExp for wildcard to avoid path-to-regexp parsing errors
+app.options(/.*/, cors(corsOptions)); // Handle Preflight explicitly
 
 // Security middleware
 app.use(helmet({
