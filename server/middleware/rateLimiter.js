@@ -1,13 +1,9 @@
 const rateLimit = require('express-rate-limit');
 const RateLimitRedis = require('rate-limit-redis');
-// Robustly handle different export formats (CJS/ESM/Default)
-const rateLimit = require('express-rate-limit');
-const RateLimitRedis = require('rate-limit-redis');
-// Robustly handle different export formats (CJS/ESM/Default)
-const rateLimit = require('express-rate-limit');
-const RateLimitRedis = require('rate-limit-redis');
+
 // Robustly handle different export formats (CJS/ESM/Default)
 const RedisStore = RateLimitRedis.RedisStore || RateLimitRedis.default || RateLimitRedis;
+
 // Redis DISABLED temporarily for stability
 const redis = null;
 // const redis = require('../config/redis'); <--- Commented out

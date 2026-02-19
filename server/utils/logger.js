@@ -3,8 +3,12 @@ const path = require('path');
 
 // Ensure log directory exists
 const logDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
+try {
+    if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+    }
+} catch (err) {
+    console.warn('⚠️ [LOGGER] Failed to create log directory (likely read-only fs):', err.message);
 }
 
 const errorLogPath = path.join(logDir, 'error.log');
@@ -17,9 +21,13 @@ const logger = {
 
         console.error(`[${timestamp}] [ERROR] ${message}`, error); // Keep console logging
 
-        fs.appendFile(errorLogPath, logEntry, (err) => {
-            if (err) console.error('Failed to write to log file:', err);
-        });
+        try {
+            fs.appendFile(errorLogPath, logEntry, (err) => {
+                if (err) console.error('Failed to write to log file:', err.message);
+            });
+        } catch (e) {
+            // Ignore file write errors for read-only fs
+        }
     },
 
     warn: (message, meta) => {
@@ -29,9 +37,13 @@ const logger = {
 
         console.warn(`[${timestamp}] [WARN] ${message}`, meta);
 
-        fs.appendFile(errorLogPath, logEntry, (err) => {
-            if (err) console.error('Failed to write to log file:', err);
-        });
+        try {
+            fs.appendFile(errorLogPath, logEntry, (err) => {
+                if (err) console.error('Failed to write to log file:', err.message);
+            });
+        } catch (e) {
+            // Ignore file write errors for read-only fs
+        }
     },
 
     info: (message) => {
