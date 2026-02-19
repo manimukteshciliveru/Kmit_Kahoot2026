@@ -6,6 +6,13 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 
+// Global Exception Handler - MUST BE FIRST
+process.on('uncaughtException', (err) => {
+    console.error('❌ UNCAUGHT EXCEPTION! 💥', err);
+    // Keep process alive for now to debug, or exit if critical
+    // process.exit(1); 
+});
+
 const connectDB = require('./config/db');
 const socketHandler = require('./socket/socketHandler');
 const { initScheduler } = require('./services/schedulerService');
@@ -23,7 +30,7 @@ const requiredEnv = ['MONGODB_URI', 'JWT_SECRET'];
 requiredEnv.forEach((key) => {
     if (!process.env[key]) {
         console.error(`❌ CRITICAL ERROR: Missing ${key} environment variable.`);
-        process.exit(1);
+        // Don't exit immediately, let it fail gracefully or use defaults for dev
     }
 });
 
@@ -45,9 +52,10 @@ const getAllowedOrigins = () => {
         "http://localhost:5000",
         "https://kmit-kahoot.vercel.app",
         "https://kahoot-render.onrender.com",
-        "https://kahoot.onrender.com"
+        "https://kahoot.onrender.com",
+        "https://kmit-kahoot-backend.onrender.com" // Backend itself
     ];
-    
+
     // Add custom origins from environment
     if (process.env.CLIENT_URL) {
         whitelistedOrigins.push(process.env.CLIENT_URL);
@@ -56,26 +64,28 @@ const getAllowedOrigins = () => {
         const customOrigins = process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
         whitelistedOrigins.push(...customOrigins);
     }
-    
+
     return whitelistedOrigins;
 };
 
 const corsOptions = {
     origin: (origin, callback) => {
         const allowedOrigins = getAllowedOrigins();
-        
+
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) {
             console.log('✅ [CORS] No origin header (possible mobile app or curl)');
             return callback(null, true);
         }
-        
+
         if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
-            console.log(`✅ [CORS] Allowed origin: ${origin}`);
+            // console.log(`✅ [CORS] Allowed origin: ${origin}`);
             callback(null, true);
         } else {
-            console.warn(`⚠️ [CORS] Rejected origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
+            console.warn(`⚠️ [CORS] Rejected origin: ${origin}. Allowlist: ${JSON.stringify(allowedOrigins)}`);
+            // Still allow it for now to debug - CHANGE THIS IN PROD AFTER DEBUGGING
+            // callback(new Error('Not allowed by CORS'));
+            callback(null, true);
         }
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
@@ -99,7 +109,10 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Initialize Socket.io (PURE WEBSOCKETS - NO REDIS)
 const ioConfig = {
-    cors: corsOptions,
+    cors: {
+        origin: "*", // Allow all origins for socket.io temporarily to fix connection issues
+        methods: ["GET", "POST"]
+    },
     pingTimeout: 60000,
     pingInterval: 25000
 };
@@ -108,34 +121,6 @@ const io = new Server(server, ioConfig);
 
 // REDIS COMPLETELY DISABLED
 console.log('ℹ️ Redis DISABLED. Running in Single-Node mode.');
-// const { createAdapter } = require('@socket.io/redis-adapter');
-// const redis = require('./config/redis');
-
-// Configure Redis Adapter for Multi-Node Scaling
-// if (redis) {
-//     try {
-//         const pubClient = redis.duplicate();
-//         const subClient = redis.duplicate();
-
-//         // Prevent crashes on Pub/Sub clients
-//         pubClient.on('error', (err) => console.error("❌ Redis Pub Error:", err.message));
-//         subClient.on('error', (err) => console.error("❌ Redis Sub Error:", err.message));
-
-//         Promise.all([pubClient.connect(), subClient.connect()])
-//             .then(() => {
-//                 io.adapter(createAdapter(pubClient, subClient));
-//                 console.log('✅ Socket.io Redis Adapter configured for horizontal scaling.');
-//             })
-//             .catch((err) => {
-//                 console.warn("⚠️ Redis Adapter failed to connect. Running in Single-Node mode.", err.message);
-//             });
-
-//     } catch (e) {
-//         console.warn("⚠️ Redis Adapter Setup Failed:", e.message);
-//     }
-// } else {
-//     console.log('ℹ️ Running in Single-Node mode (Redis disabled).');
-// }
 
 // Make io accessible to routes
 app.set('io', io);
@@ -144,11 +129,14 @@ app.set('io', io);
 connectDB();
 
 // Rate limiting
-const { limiter: defaultLimiter, authLimiter } = require('./middleware/rateLimiter');
-
-// Use the distributed rate limiter
-app.use('/api/', defaultLimiter);
-app.use('/api/auth/login', authLimiter);  // This will now use MemoryStore
+try {
+    const { limiter: defaultLimiter, authLimiter } = require('./middleware/rateLimiter');
+    // Use the distributed rate limiter
+    app.use('/api/', defaultLimiter);
+    app.use('/api/auth/login', authLimiter);  // This will now use MemoryStore
+} catch (err) {
+    console.error('⚠️ Failed to load rate limiter:', err.message);
+}
 
 // Static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -172,9 +160,10 @@ app.get('/api/health', (req, res) => {
 
 // 404 handler
 app.use((req, res) => {
+    console.warn(`⚠️ 404 Not Found: ${req.method} ${req.url}`);
     res.status(404).json({
         success: false,
-        message: 'Route not found'
+        message: `Route not found: ${req.method} ${req.url}`
     });
 });
 
@@ -190,6 +179,14 @@ app.use((err, req, res, next) => {
         });
     }
 
+    // CORS Error
+    if (err.message === 'Not allowed by CORS') {
+        return res.status(403).json({
+            success: false,
+            message: 'CORS Blocked'
+        });
+    }
+
     res.status(err.status || 500).json({
         success: false,
         message: err.message || 'Internal Server Error'
@@ -197,10 +194,18 @@ app.use((err, req, res, next) => {
 });
 
 // Initialize Socket.io handlers
-socketHandler(io);
+try {
+    socketHandler(io);
+} catch (err) {
+    console.error('❌ Failed to initialize Socket.io handlers:', err);
+}
 
 // Initialize Quiz Scheduler
-initScheduler(io);
+try {
+    initScheduler(io);
+} catch (err) {
+    console.error('❌ Failed to initialize Scheduler:', err);
+}
 
 // Start server
 const PORT = process.env.PORT || 5000;
@@ -219,11 +224,6 @@ app.get("/test", (req, res) => {
 process.on('unhandledRejection', (err) => {
     console.error('⚠️ UNHANDLED REJECTION! (Logging only, not crashing)', err);
     // Do NOT exit process here. Transient Redis errors should not kill the server.
-});
-
-process.on('uncaughtException', (err) => {
-    console.error('❌ UNCAUGHT EXCEPTION! 💥 Shutting down...', err);
-    process.exit(1);
 });
 
 module.exports = { app, server, io };
