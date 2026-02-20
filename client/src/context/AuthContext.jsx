@@ -38,10 +38,10 @@ export const AuthProvider = ({ children }) => {
         initAuth();
     }, []);
 
-    const login = async (email, password) => {
+    const login = async (email, password, role) => {
         try {
             console.log('🔐 [AUTH] Attempting login with email:', email);
-            const response = await authAPI.login({ email, password });
+            const response = await authAPI.login({ email, password, role });
             console.log('🔐 [AUTH] Login response received:', response.status);
 
             // Handle if the response comes from a cached promise (Idempotency) or fresh request
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
 
             setToken(authToken);
             setUser(userData);
-            
+
             console.log('✅ [AUTH] Login successful for user:', userData?.email);
 
             return { success: true, user: userData };
@@ -71,9 +71,9 @@ export const AuthProvider = ({ children }) => {
                 message: error.response?.data?.message,
                 error: error.message
             });
-            
+
             const errorMessage = error.response?.data?.message || error.message || 'Login failed. Please check your credentials.';
-            
+
             return {
                 success: false,
                 message: errorMessage
@@ -81,9 +81,10 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const register = async (name, email, password, role = 'student') => {
+    const register = async (name, email, password, role = 'student', registrationData = {}) => {
         try {
-            const response = await authAPI.register({ name, email, password, role });
+            const signupData = { name, email, password, role, ...registrationData };
+            const response = await authAPI.register(signupData);
             const { user: userData, token: authToken } = response.data.data;
 
             localStorage.setItem('token', authToken);

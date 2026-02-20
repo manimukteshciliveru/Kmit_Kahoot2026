@@ -93,11 +93,20 @@ exports.optionalAuth = async (req, res, next) => {
     }
 };
 
-// Generate JWT Token
+// Generate JWT Access Token
 exports.generateToken = (userId) => {
     return jwt.sign(
         { id: userId },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '15m' } // Shorter expiry for security
+    );
+};
+
+// Generate JWT Refresh Token
+exports.generateRefreshToken = (userId) => {
+    return jwt.sign(
+        { id: userId },
+        process.env.JWT_REFRESH_SECRET || 'refresh_secret_default',
+        { expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d' }
     );
 };

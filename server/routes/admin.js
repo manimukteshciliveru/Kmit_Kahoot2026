@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { protect, authorize } = require('../middleware/auth');
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/temp/' }); // Temporary storage for restore
+const { documentUpload } = require('../utils/cloudinary');
 
 // All routes are protected and require 'admin' role
 router.use(protect);
@@ -19,7 +18,7 @@ router.get('/backup', adminController.createBackup);
 
 // @route   POST /api/admin/restore
 // @desc    Restore database from backup file
-router.post('/restore', upload.single('backupFile'), adminController.restoreBackup);
+router.post('/restore', documentUpload.single('backupFile'), adminController.restoreBackup);
 
 // User management (specific routes BEFORE parameter routes)
 // @route   POST /api/admin/users/auto-fix-roles

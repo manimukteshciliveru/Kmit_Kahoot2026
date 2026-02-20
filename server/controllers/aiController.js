@@ -1,67 +1,7 @@
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const aiGenerator = require('../services/aiGenerator');
 const Quiz = require('../models/Quiz');
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '..', 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + '-' + file.originalname);
-    }
-});
-
-const fileFilter = (req, file, cb) => {
-    const allowedTypes = [
-        'application/pdf',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-excel',
-        'text/csv',
-        'text/plain',
-        'audio/mpeg',
-        'audio/wav',
-        'audio/mp3',
-        'video/mp4',
-        'video/webm',
-        'application/json',
-        'text/javascript',
-        'text/x-python',
-        'text/x-java-source',
-        'text/x-c',
-        'text/x-c++',
-        'text/html',
-        'text/css'
-    ];
-
-    const allowedExtensions = [
-        '.pdf', '.xlsx', '.xls', '.csv', '.txt', '.mp3', '.wav', '.mp4', '.webm',
-        '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.c', '.cs', '.html', '.css', '.json', '.sql', '.go', '.rb', '.php'
-    ];
-    const ext = path.extname(file.originalname).toLowerCase();
-
-    // Check if extension is allowed (more reliable than mime type for code files)
-    if (allowedExtensions.includes(ext) || allowedTypes.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error(`File type not supported. Allowed: ${allowedExtensions.join(', ')}`), false);
-    }
-};
-
-exports.upload = multer({
-    storage,
-    fileFilter,
-    limits: {
-        fileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024 // 50MB default
-    }
-});
+const axios = require('axios');
+const path = require('path');
 
 // @desc    Generate questions from uploaded file
 // @route   POST /api/ai/generate-from-file
@@ -94,15 +34,18 @@ exports.generateFromFile = async (req, res) => {
             console.log('Processing file:', file.originalname, 'Extension:', ext);
 
             try {
+                // If using Cloudinary, file.path is the URL
+                const filePath = file.path;
+
                 switch (ext) {
                     case '.pdf':
-                        const pdfText = await aiGenerator.extractFromPDF(file.path);
+                        const pdfText = await aiGenerator.extractFromPDF(filePath);
                         combinedTextContent += `\n--- Content from ${file.originalname} (PDF) ---\n${pdfText}\n`;
                         break;
                     case '.xlsx':
                     case '.xls':
                     case '.csv':
-                        const excelText = await aiGenerator.extractFromExcel(file.path);
+                        const excelText = await aiGenerator.extractFromExcel(filePath);
                         combinedTextContent += `\n--- Content from ${file.originalname} (Excel/CSV) ---\n${excelText}\n`;
                         break;
                     case '.txt':
@@ -123,7 +66,8 @@ exports.generateFromFile = async (req, res) => {
                     case '.go':
                     case '.rb':
                     case '.php':
-                        const txtContent = fs.readFileSync(file.path, 'utf-8');
+                        const txtBuffer = await aiGenerator.getFileBuffer(filePath);
+                        const txtContent = txtBuffer.toString('utf-8');
                         combinedTextContent += `\n--- Content from ${file.originalname} (Code/Text) ---\n${txtContent}\n`;
                         break;
                     case '.mp3':
@@ -131,7 +75,8 @@ exports.generateFromFile = async (req, res) => {
                     case '.mp4':
                     case '.webm':
                         // For audio/video, add as a generative part
-                        parts.push(aiGenerator.fileToGenerativePart(file.path, file.mimetype));
+                        const mediaPart = await aiGenerator.fileToGenerativePart(filePath, file.mimetype);
+                        parts.push(mediaPart);
                         combinedTextContent += `\n(Includes media file: ${file.originalname})\n`;
                         break;
                     default:
@@ -159,7 +104,8 @@ exports.generateFromFile = async (req, res) => {
         }
 
         // Generate questions using Multimodal
-        const questions = await aiGenerator.generateFromMultimodal(parts, options);
+        // Generate questions using Multimodal
+        const questions = await aiGenerator.generateFromMultimodal(parts, options, req.user._id);
 
         // If quizId provided, add questions to existing quiz
         if (quizId) {
@@ -256,7 +202,7 @@ exports.generateFromText = async (req, res) => {
             topic: topic || ''
         };
 
-        const questions = await aiGenerator.generateFromText(text, options);
+        const questions = await aiGenerator.generateFromText(text, options, req.user._id);
 
         // If quizId provided, add questions to existing quiz
         if (quizId) {
@@ -320,7 +266,7 @@ exports.generateFromTranscript = async (req, res) => {
             topic: topic || 'lecture content'
         };
 
-        const questions = await aiGenerator.generateFromTranscript(transcript, options);
+        const questions = await aiGenerator.generateFromTranscript(transcript, options, req.user._id);
 
         // If quizId provided, add questions to existing quiz
         if (quizId) {
@@ -359,6 +305,35 @@ exports.generateFromTranscript = async (req, res) => {
         res.status(500).json({
             success: false,
             message: error.message || 'Failed to generate questions from transcript'
+        });
+    }
+};
+// @desc    Generate explanation for a question
+// @route   POST /api/ai/explain
+// @access  Private (Faculty/Student)
+exports.explainQuestion = async (req, res) => {
+    try {
+        const { question, userAnswer, correctAnswer } = req.body;
+
+        if (!question || !correctAnswer) {
+            return res.status(400).json({
+                success: false,
+                message: 'Question and correct answer are required'
+            });
+        }
+
+        const explanation = await aiGenerator.generateExplanation(question, userAnswer, correctAnswer, req.user._id);
+
+        res.status(200).json({
+            success: true,
+            message: 'Explanation generated successfully',
+            data: { explanation }
+        });
+    } catch (error) {
+        console.error('Explanation error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate explanation'
         });
     }
 };

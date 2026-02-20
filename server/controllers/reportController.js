@@ -329,8 +329,12 @@ exports.downloadReport = async (req, res) => {
         const totalScores = responses.map(r => r.percentage);
         const avgGlobalScore = totalScores.length ? (totalScores.reduce((a, b) => a + b, 0) / totalScores.length) : 0;
 
-        sheet5.addRow({ metric: 'Total Enrolled', value: enrolledStudents.length || responses.length }); // Fallback if public
+        const totalEnrolled = enrolledStudents.length || responses.length;
+        const participationRate = totalEnrolled > 0 ? (totalAttempts / totalEnrolled) * 100 : 0;
+
+        sheet5.addRow({ metric: 'Total Enrolled', value: totalEnrolled });
         sheet5.addRow({ metric: 'Total Attempted', value: totalAttempts });
+        sheet5.addRow({ metric: 'Participation Rate (%)', value: participationRate.toFixed(1) + '%' });
         sheet5.addRow({ metric: 'Total Completed', value: totalCompleted });
         sheet5.addRow({ metric: 'Average Score (%)', value: avgGlobalScore.toFixed(2) + '%' });
 

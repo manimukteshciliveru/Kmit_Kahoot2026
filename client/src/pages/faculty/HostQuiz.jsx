@@ -36,19 +36,32 @@ const HostQuiz = () => {
                 const data = response.data.data.quiz;
                 setQuiz(data);
                 setParticipants(Array.isArray(data.participants) ? data.participants : []);
-                setStatus(data.status === 'active' ? 'active' : (data.status === 'completed' || data.status === 'finished') ? 'completed' : 'ready');
+                setStatus(data.status === 'active' ? 'active'
+                    : (data.status === 'completed' || data.status === 'finished') ? 'completed'
+                        : (data.status === 'scheduled') ? 'scheduled'
+                            : 'ready');
                 if (data.currentQuestionIndex >= 0) {
                     setCurrentQuestionIndex(data.currentQuestionIndex);
                 }
 
-                if (data.status === 'active' && data.expiresAt) {
+                if (data.status === 'scheduled' && data.scheduledAt) {
+                    const scheduledTime = new Date(data.scheduledAt).getTime();
+                    const now = Date.now();
+                    const diff = Math.floor((scheduledTime - now) / 1000);
+                    setTimeLeft(Math.max(0, diff));
+                } else if (data.status === 'active' && data.expiresAt) {
                     const expires = new Date(data.expiresAt).getTime();
                     const now = Date.now();
                     setTimeLeft(Math.max(0, Math.floor((expires - now) / 1000)));
-                } else if (data.status === 'active' && data.settings?.quizTimer > 0 && data.startedAt) {
+                } else if (data.status === 'active' && data.startedAt) {
                     const start = new Date(data.startedAt).getTime();
-                    const elapsed = Math.floor((Date.now() - start) / 1000);
-                    setTimeLeft(Math.max(0, data.settings.quizTimer - elapsed));
+                    if (!isNaN(start)) {
+                        const elapsed = Math.floor((Date.now() - start) / 1000);
+                        const duration = parseInt(data.settings?.quizTimer) || 0;
+                        if (duration > 0) {
+                            setTimeLeft(Math.max(0, duration - elapsed));
+                        }
+                    }
                 }
             } catch (error) {
                 console.error("Fetch error:", error);
@@ -102,6 +115,15 @@ const HostQuiz = () => {
         const handleTabSwitch = (data) => {
             toast.error(`${data.participantName} switched tabs!`, { icon: '⚠️' });
             setCheatingAlerts(prev => [{ ...data, time: new Date() }, ...prev].slice(0, 5));
+
+            // IMMEDIATE FIX: Manually lower trust score locally for instant feedback
+            setParticipants(prev => prev.map(p => {
+                if (String(p.id || p._id) === String(data.participantId)) {
+                    const currentScore = p.trustScore !== undefined ? p.trustScore : 100;
+                    return { ...p, trustScore: Math.max(0, currentScore - 20) }; // Heavy penalty for visibility
+                }
+                return p;
+            }));
         };
 
         const handleQuizEnded = (data) => {
@@ -148,14 +170,24 @@ const HostQuiz = () => {
         };
     }, [socket, quizId]);
 
-    // Timer logic
+    // Timer logic & Auto-End
     useEffect(() => {
-        if (status !== 'active' || timeLeft <= 0) return;
+        if ((status !== 'active' && status !== 'scheduled') || timeLeft <= 0) return;
 
         const timer = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 1) {
                     clearInterval(timer);
+                    if (status === 'scheduled') {
+                        // Refresh to check if started
+                        window.location.reload();
+                        return 0;
+                    }
+                    if (status === 'active') {
+                        // Auto-end quiz
+                        handleEndQuiz();
+                        return 0;
+                    }
                     return 0;
                 }
                 return prev - 1;
@@ -165,7 +197,18 @@ const HostQuiz = () => {
         return () => clearInterval(timer);
     }, [status, timeLeft > 0]);
 
+    // Auto-navigate to results when completed
+    useEffect(() => {
+        if (status === 'completed') {
+            const timer = setTimeout(() => {
+                navigate(`/quiz/${quizId}/results`);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [status, navigate, quizId]);
+
     const formatTime = (seconds) => {
+        if (isNaN(seconds) || seconds < 0) return "0:00";
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -200,15 +243,18 @@ const HostQuiz = () => {
         if (!window.confirm("Are you sure you want to host this quiz again? This will clear all previous session data.")) return;
         try {
             await quizAPI.reset(quizId);
+            // Validate state update
             setStatus('ready');
+            setQuiz(prev => ({ ...prev, status: 'draft', startedAt: null, endedAt: null }));
+            setTimeLeft(0);
             setParticipants([]);
             setLeaderboard([]);
             setAnsweredParticipants([]);
             setCheatingAlerts([]);
             toast.success('Quiz reset! Ready to host.');
         } catch (error) {
-            console.error(error);
-            toast.error('Failed to reset quiz');
+            console.error('Reset functionality failed:', error);
+            toast.error('Failed to reset quiz. Please check server logs.');
         }
     };
 
@@ -222,7 +268,8 @@ const HostQuiz = () => {
     const totalQuestions = quiz.questions?.length || 0;
 
     // Lobby View
-    if (status === 'ready') {
+    if (status === 'ready' || status === 'scheduled') {
+        const isScheduled = status === 'scheduled';
         return (
             <div className="host-quiz-page">
                 <div className="host-lobby">
@@ -239,7 +286,7 @@ const HostQuiz = () => {
                     <div className="lobby-content">
                         <div className="lobby-status-bar">
                             <div className="player-count"><FiUsers /> <span>{participants.length} Players</span></div>
-                            <div className="status-indicator waiting">Waiting...</div>
+                            <div className={`status-indicator ${status}`}>{status === 'scheduled' ? 'Scheduled' : 'Waiting...'}</div>
                         </div>
                         <div className="participants-area">
                             <div className="participants-list">
@@ -254,7 +301,17 @@ const HostQuiz = () => {
                         </div>
                     </div>
                     <div className="lobby-actions">
-                        <button className="btn btn-primary btn-xl" onClick={handleStartQuiz}>Start Quiz</button>
+                        {isScheduled ? (
+                            <div className="scheduled-timer">
+                                {/* Timer hidden as per request */}
+                                {/* <h3>Quiz Starts In:</h3> */}
+                                {/* <div className="timer-display giant">{formatTime(timeLeft)}</div> */}
+                                <p className="scheduled-hint">This quiz is scheduled to start automatically.</p>
+                                <button className="btn btn-primary btn-xl" onClick={handleStartQuiz}>Start Now (Override)</button>
+                            </div>
+                        ) : (
+                            <button className="btn btn-primary btn-xl" onClick={handleStartQuiz}>Start Quiz</button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -316,8 +373,22 @@ const HostQuiz = () => {
                                         <p>Students Answered</p>
                                     </div>
                                     <div className="stat-card success">
-                                        <h3>{Math.round((answeredParticipants.length / (participants.length || 1)) * 100)}%</h3>
+                                        <h3>
+                                            {(() => {
+                                                // Calculate total eligible students
+                                                let totalEligible = participants.length;
+                                                if (quiz?.accessControl?.mode === 'SPECIFIC') {
+                                                    totalEligible = quiz.accessControl.allowedStudents?.length || participants.length;
+                                                }
+                                                // If we have total capacity (e.g. strict list), use that. Otherwise joined.
+                                                const rate = totalEligible > 0 ? Math.round((answeredParticipants.length / totalEligible) * 100) : 0;
+                                                return `${rate}%`;
+                                            })()}
+                                        </h3>
                                         <p>Participation Rate</p>
+                                        <small style={{ opacity: 0.7, fontSize: '0.7em' }}>
+                                            ({answeredParticipants.length} Answered / {quiz?.accessControl?.mode === 'SPECIFIC' ? (quiz.accessControl.allowedStudents?.length || 0) + ' Invited' : participants.length + ' Joined'})
+                                        </small>
                                     </div>
                                 </div>
                             </div>
@@ -341,21 +412,24 @@ const HostQuiz = () => {
                                             <th>Rank</th>
                                             <th>Roll Number</th>
                                             <th>Name</th>
-                                            <th>Branch</th>
-                                            <th>Section</th>
+                                            <th>Branch / Section</th>
                                             <th>Marks</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {(() => {
                                             let lastScore = -1;
+                                            let lastTime = -1;
                                             let currentRank = 0;
                                             return leaderboard.map((entry, i) => {
                                                 const score = entry.totalScore || entry.score || 0;
-                                                if (score !== lastScore) {
+                                                const time = entry.totalTimeTaken || 0;
+
+                                                if (score !== lastScore || time !== lastTime) {
                                                     currentRank = i + 1;
                                                 }
                                                 lastScore = score;
+                                                lastTime = time;
                                                 const rank = currentRank;
 
                                                 return (
@@ -370,8 +444,7 @@ const HostQuiz = () => {
                                                         </td>
                                                         <td className="roll-number">{entry.userId?.rollNumber || '-'}</td>
                                                         <td className="student-name-cell">{entry.userId?.name || entry.studentName}</td>
-                                                        <td>{entry.userId?.department || '-'}</td>
-                                                        <td>{entry.userId?.section || '-'}</td>
+                                                        <td>{entry.userId?.department || '-'} - {entry.userId?.section || '-'}</td>
                                                         <td className="score-cell-bold">{score} pts</td>
                                                     </tr>
                                                 );
@@ -442,6 +515,7 @@ const HostQuiz = () => {
                                         <tr>
                                             <th>Name</th>
                                             <th>Roll Number</th>
+                                            <th>Branch</th>
                                             <th>Section</th>
                                             <th>Trust Score</th>
                                             <th>Status</th>
@@ -452,7 +526,8 @@ const HostQuiz = () => {
                                             <tr key={i} className={answeredParticipants.includes(p.id || p._id) ? 'active-row' : ''}>
                                                 <td><div className="name-cell"><FiUsers /> {p.name}</div></td>
                                                 <td>{p.rollNumber || 'N/A'}</td>
-                                                <td>{p.department}-{p.section}</td>
+                                                <td>{p.department || 'N/A'}</td>
+                                                <td>{p.section || 'N/A'}</td>
                                                 <td>
                                                     <span className={`trust-badge ${(p.trustScore || 100) > 80 ? 'high' : 'low'}`}>
                                                         {p.trustScore || 100}%

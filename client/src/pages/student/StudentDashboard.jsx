@@ -150,7 +150,24 @@ const StudentDashboard = () => {
                                                 {quiz.status === 'active' ? (
                                                     <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>Live Now</span>
                                                 ) : (
-                                                    `Scheduled: ${quiz.scheduledAt ? new Date(quiz.scheduledAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Soon'}`
+                                                    // Helper specific to this view
+                                                    (() => {
+                                                        if (!quiz.scheduledAt) return 'Soon';
+                                                        const scheduled = new Date(quiz.scheduledAt);
+                                                        const now = new Date();
+                                                        const diff = scheduled - now;
+
+                                                        // If less than 24 hours, show countdown-like text
+                                                        if (diff > 0 && diff < 24 * 60 * 60 * 1000) {
+                                                            const hours = Math.floor(diff / (1000 * 60 * 60));
+                                                            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                                            return <span className="countdown-text" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
+                                                                Starts in {hours > 0 ? `${hours}h ` : ''}{minutes}m
+                                                            </span>;
+                                                        }
+
+                                                        return `Scheduled: ${scheduled.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`;
+                                                    })()
                                                 )}
                                             </span>
                                         </div>

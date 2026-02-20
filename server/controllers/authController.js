@@ -1,6 +1,44 @@
 const User = require('../models/User');
-const { generateToken } = require('../middleware/auth');
+const { generateToken, generateRefreshToken } = require('../middleware/auth');
 const validator = require('validator');
+const jwt = require('jsonwebtoken');
+
+// Helper to send tokens in response and cookie
+const sendTokenResponse = async (user, statusCode, res) => {
+    const accessToken = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    // Save refresh token to user
+    user.refreshTokens = user.refreshTokens || [];
+    user.refreshTokens.push(refreshToken);
+    // Keep only last 5 sessions to prevent document bloat
+    if (user.refreshTokens.length > 5) user.refreshTokens.shift();
+    await user.save({ validateBeforeSave: false });
+
+    const cookieOptions = {
+        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict'
+    };
+
+    res.status(statusCode)
+        .cookie('refreshToken', refreshToken, cookieOptions)
+        .json({
+            success: true,
+            data: {
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    avatar: user.avatar,
+                    stats: user.stats
+                },
+                token: accessToken // Access token returned for memory storage
+            }
+        });
+};
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -45,32 +83,25 @@ exports.register = async (req, res) => {
         const userRole = role && allowedRoles.includes(role) ? role : 'student';
 
         // Create user
-        const user = await User.create({
+        const userData = {
             name: name.trim(),
             email: email.toLowerCase().trim(),
             password,
             role: userRole,
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=7C3AED&color=fff&size=128`
-        });
+        };
 
-        // Generate token
-        const token = generateToken(user._id);
+        // Add additional fields for students
+        if (userRole === 'student') {
+            if (req.body.rollNumber) userData.rollNumber = req.body.rollNumber.toUpperCase();
+            if (req.body.department) userData.department = req.body.department;
+            if (req.body.section) userData.section = req.body.section;
+        }
 
-        res.status(201).json({
-            success: true,
-            message: 'Registration successful',
-            data: {
-                user: {
-                    id: user._id,
-                    name: user.name,
-                    email: user.email,
-                    role: user.role,
-                    avatar: user.avatar,
-                    stats: user.stats
-                },
-                token
-            }
-        });
+        const user = await User.create(userData);
+
+        // Send response with tokens
+        await sendTokenResponse(user, 201, res);
     } catch (error) {
         console.error('Register error:', error);
         res.status(500).json({
@@ -87,10 +118,10 @@ const logger = require('../utils/logger');
 // @route   POST /api/auth/login
 // @access  Public
 exports.login = async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     // --- DEBUGGING LOGS ---
-    console.log('👉 [LOGIN START] Request Body:', { email, password: password ? '******' : 'MISSING' });
+    console.log('👉 [LOGIN START] Request Body:', { email, role, password: password ? '******' : 'MISSING' });
 
     try {
         // 2. Critical Environment Check
@@ -103,6 +134,11 @@ exports.login = async (req, res) => {
         if (!email || !password) {
             console.warn('⚠️ [LOGIN] Missing credentials');
             return res.status(400).json({ success: false, message: 'Please provide email/roll number and password' });
+        }
+
+        if (!role) {
+            console.warn('⚠️ [LOGIN] Missing role');
+            return res.status(400).json({ success: false, message: 'Please select a role' });
         }
 
         // 4. Database User Lookup
@@ -124,7 +160,16 @@ exports.login = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
-        console.log(`✅ [LOGIN] User found: ID=${user._id}, Role=${user.role}`);
+        console.log(`✅ [LOGIN] User found: ID=${user._id}, Role=${user.role}, RequestedRole=${role}`);
+
+        // Role Validation
+        if (user.role !== role) {
+            console.warn(`⛔ [LOGIN] Role mismatch: User is ${user.role}, tried to login as ${role}`);
+            return res.status(401).json({
+                success: false,
+                message: `This account is registered as a ${user.role}. Please use the correct login tab.`
+            });
+        }
 
         // 5. Account Status Check
         if (!user.isActive) {
@@ -150,37 +195,8 @@ exports.login = async (req, res) => {
 
         logger.info(`[LOGIN SUCCESS] User: ${user._id}`);
 
-        // 7. Update Last Login (Non-blocking)
-        User.updateOne({ _id: user._id }, { lastLogin: new Date() }).catch(err =>
-            logger.error(`[LOGIN WARNING] Update lastLogin failed: ${user._id}`, err)
-        );
-
-        // 8. Generate Token
-        const token = generateToken(user._id);
-
-        if (!token) {
-            throw new Error('Token generation failed');
-        }
-
-        // 9. Send Response
-        res.status(200).json({
-            success: true,
-            message: 'Login successful',
-            data: {
-                user: {
-                    id: user._id,
-                    name: user.name,
-                    email: user.email,
-                    role: user.role,
-                    rollNumber: user.rollNumber,
-                    department: user.department,
-                    section: user.section,
-                    avatar: user.avatar,
-                    stats: user.stats
-                },
-                token
-            }
-        });
+        // Send tokens
+        await sendTokenResponse(user, 200, res);
 
     } catch (error) {
         console.error("LOGIN ERROR:", error);
@@ -232,7 +248,12 @@ exports.getMe = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
     try {
-        const { name, avatar } = req.body;
+        const { name } = req.body;
+        let { avatar } = req.body;
+
+        if (req.file) {
+            avatar = req.file.path;
+        }
 
         const updates = {};
         if (name) updates.name = name.trim();
@@ -316,5 +337,68 @@ exports.changePassword = async (req, res) => {
             message: 'Failed to change password',
             error: error.message
         });
+    }
+};
+
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh
+// @access  Public
+exports.refreshToken = async (req, res) => {
+    try {
+        const refreshToken = req.cookies.refreshToken;
+
+        if (!refreshToken) {
+            return res.status(401).json({ success: false, message: 'Refresh token not found' });
+        }
+
+        // Verify refresh token
+        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'refresh_secret_default');
+
+        // Find user and check if token is in their list
+        const user = await User.findById(decoded.id);
+        if (!user || !user.refreshTokens.includes(refreshToken)) {
+            return res.status(401).json({ success: false, message: 'Invalid refresh token' });
+        }
+
+        // Generate new access token
+        const accessToken = generateToken(user._id);
+
+        res.status(200).json({
+            success: true,
+            token: accessToken
+        });
+    } catch (error) {
+        logger.error('RefreshToken error:', error);
+        res.status(401).json({ success: false, message: 'Invalid refresh token session' });
+    }
+};
+
+// @desc    Logout user / Clear cookie
+// @route   POST /api/auth/logout
+// @access  Private
+exports.logout = async (req, res) => {
+    try {
+        const refreshToken = req.cookies.refreshToken;
+
+        // Remove the specific refresh token from user's list
+        if (refreshToken && req.user) {
+            await User.findByIdAndUpdate(req.user._id, {
+                $pull: { refreshTokens: refreshToken }
+            });
+        }
+
+        res.status(200)
+            .clearCookie('refreshToken', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict'
+            })
+            .json({
+                success: true,
+                message: 'Logged out successfully'
+            });
+    } catch (error) {
+        logger.error('Logout error:', error);
+        res.status(500).json({ success: false, message: 'Logout failed' });
     }
 };

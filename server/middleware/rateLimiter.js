@@ -47,7 +47,7 @@ const commonOptions = {
 const limiter = rateLimit({
     ...commonOptions,
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 2000,
+    max: 20000, // Increased to handle classrooms sharing an IP
     message: { success: false, message: 'Too many requests, please try again later.' },
     store: createStore(), // Will be MemoryStore if Redis is unreachable/unconfigured
 });

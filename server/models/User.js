@@ -96,7 +96,8 @@ const userSchema = new mongoose.Schema({
     lastLogin: {
         type: Date,
         default: null
-    }
+    },
+    refreshTokens: [String] // Array to support multi-device sessions
 }, {
     timestamps: true
 });

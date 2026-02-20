@@ -8,7 +8,18 @@ const excel = require('exceljs');
 // @access  Private (Faculty)
 exports.createQuiz = async (req, res) => {
     try {
-        const { title, subject, description, mode, settings, questions, scheduledAt } = req.body;
+        let { title, subject, description, mode, settings, questions, scheduledAt, accessControl } = req.body;
+
+        // If data is sent as form-data (e.g., when uploading an image), 
+        // stringified JSON fields need to be parsed
+        try {
+            if (typeof settings === 'string') settings = JSON.parse(settings);
+            if (typeof questions === 'string') questions = JSON.parse(questions);
+            if (typeof accessControl === 'string') accessControl = JSON.parse(accessControl);
+        } catch (e) {
+            console.error('Error parsing multipart form data:', e);
+        }
+
         console.log('Create Quiz Request Body:', JSON.stringify(req.body, null, 2));
 
         // Sanitize settings to ensure correct types
@@ -61,13 +72,30 @@ exports.createQuiz = async (req, res) => {
 
         console.log('Sanitized Questions:', JSON.stringify(sanitizedQuestions, null, 2));
 
+        // Sanitize accessControl
+        const sanitizedAccessControl = {
+            isPublic: accessControl?.isPublic !== false, // default true
+            allowedBranches: Array.isArray(accessControl?.allowedBranches)
+                ? accessControl.allowedBranches.map(b => ({
+                    name: String(b.name || ''),
+                    sections: Array.isArray(b.sections) ? b.sections.map(String) : []
+                }))
+                : [],
+            mode: accessControl?.mode === 'SPECIFIC' ? 'SPECIFIC' : 'ALL',
+            allowedStudents: Array.isArray(accessControl?.allowedStudents)
+                ? accessControl.allowedStudents
+                : []
+        };
+
         const quizData = {
             title: String(title || ''),
             subject: String(subject || 'General'),
             description: String(description || ''),
+            coverImage: req.file ? req.file.path : '',
             mode: ['mcq', 'msq', 'fill-blank', 'qa', 'mixed'].includes(mode) ? mode : 'mcq',
             settings: sanitizedSettings,
             questions: sanitizedQuestions,
+            accessControl: sanitizedAccessControl,
             createdBy: req.user._id,
             scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
             status: scheduledAt ? 'scheduled' : 'draft'
@@ -121,22 +149,35 @@ exports.getQuizzes = async (req, res) => {
         // Admin sees all quizzes
         // Students see active quizzes AND scheduled quizzes that apply to them
         if (req.user.role === 'student') {
-            query.status = status || { $in: ['active', 'scheduled'] };
+            // STRICT ACCESS CONTROL for Students
+            // 1. Must be active or scheduled
+            // 2. Must match Department AND Section OR be in allowedStudents list
+            // 3. 'isPublic' means open to ALL students of the college, unless branches are specified (which would be a contradiction in UI, but handled here).
+            //    If isPublic is true, it shows for everyone.
+            //    If isPublic is false, we check branches/students.
 
-            // Filter by student's branch and section if they exist
-            if (req.user.department || req.user.section) {
-                query.$or = [
-                    { 'accessControl.isPublic': true },
-                    {
-                        'accessControl.allowedBranches': {
-                            $elemMatch: {
-                                name: req.user.department,
-                                sections: { $in: [req.user.section, ''] } // Match section or all sections if empty
+            query.$and = [
+                { status: status || { $in: ['active', 'scheduled'] } },
+                {
+                    $or: [
+                        { 'accessControl.isPublic': true },
+                        {
+                            'accessControl.allowedBranches': {
+                                $elemMatch: {
+                                    name: req.user.department,
+                                    // Match student's section OR empty string (meaning all sections)
+                                    sections: { $in: [req.user.section, ''] }
+                                }
                             }
+                        },
+                        {
+                            'accessControl.allowedStudents': req.user._id
                         }
-                    }
-                ];
-            }
+                    ]
+                }
+            ];
+
+            // Explicitly exclude drafts/completed unless asked (already handled by status filter above)
         }
 
         if (status) query.status = status;
@@ -256,15 +297,43 @@ exports.updateQuiz = async (req, res) => {
             });
         }
 
-        const { title, description, mode, settings, questions, status } = req.body;
+        let { title, description, mode, settings, questions, status } = req.body;
+
+        // Handle multipart form data parsing
+        try {
+            if (typeof settings === 'string') settings = JSON.parse(settings);
+            if (typeof questions === 'string') questions = JSON.parse(questions);
+        } catch (e) {
+            console.error('Error parsing multipart form data in update:', e);
+        }
 
         const updates = {};
         if (title) updates.title = title;
         if (description !== undefined) updates.description = description;
+        if (req.file) updates.coverImage = req.file.path;
         if (mode) updates.mode = mode;
         if (settings) updates.settings = { ...quiz.settings, ...settings };
         if (questions) updates.questions = questions;
         if (status) updates.status = status;
+        if (req.body.accessControl !== undefined) {
+            let ac = req.body.accessControl;
+            if (typeof ac === 'string') {
+                try { ac = JSON.parse(ac); } catch (e) { }
+            }
+            updates.accessControl = {
+                isPublic: ac?.isPublic !== false,
+                allowedBranches: Array.isArray(ac?.allowedBranches)
+                    ? ac.allowedBranches.map(b => ({
+                        name: String(b.name || ''),
+                        sections: Array.isArray(b.sections) ? b.sections.map(String) : []
+                    }))
+                    : [],
+                mode: ac?.mode === 'SPECIFIC' ? 'SPECIFIC' : 'ALL',
+                allowedStudents: Array.isArray(ac?.allowedStudents)
+                    ? ac.allowedStudents
+                    : []
+            };
+        }
         if (req.body.scheduledAt !== undefined) {
             updates.scheduledAt = req.body.scheduledAt ? new Date(req.body.scheduledAt) : null;
             if (updates.scheduledAt && quiz.status === 'draft') {
@@ -350,7 +419,15 @@ exports.joinQuiz = async (req, res) => {
 
     try {
         console.log(`\n📍 [JOIN QUIZ] Starting join process for code: ${code}`);
-        console.log(`📍 [JOIN QUIZ] User ID: ${req.user._id}, Name: ${req.user.name}`);
+        console.log(`📍 [JOIN QUIZ] User ID: ${req.user._id}, Name: ${req.user.name}, Role: ${req.user.role}`);
+
+        // Faculty and admin should not join as participants
+        if (['faculty', 'admin'].includes(req.user.role)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Faculty and admin cannot join quizzes as participants. Use the Host view instead.'
+            });
+        }
 
         const quiz = await Quiz.findOne({ code })
             .populate('createdBy', 'name email avatar');
@@ -379,6 +456,47 @@ exports.joinQuiz = async (req, res) => {
                 success: false,
                 message: 'Quiz has already ended'
             });
+        }
+
+        // Access Control Check
+        if (req.user.role === 'student') {
+            const { isPublic, allowedBranches, mode, allowedStudents } = quiz.accessControl || {};
+
+            if (!isPublic) {
+                // If specific mode, user MUST be in allowedStudents list
+                if (mode === 'SPECIFIC') {
+                    const isAllowed = allowedStudents?.some(id => id.toString() === req.user._id.toString());
+                    if (!isAllowed) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'This quiz is restricted to specific students only.'
+                        });
+                    }
+                } else {
+                    // Check Branch & Section
+                    const userBranch = req.user.department; // assuming department stores branch name like 'CSE'
+                    const userSection = req.user.section;
+
+                    const branchConfig = allowedBranches?.find(b => b.name === userBranch);
+
+                    if (!branchConfig) {
+                        return res.status(403).json({
+                            success: false,
+                            message: `This quiz is not available for ${userBranch} department.`
+                        });
+                    }
+
+                    // If sections are specified, check section
+                    if (branchConfig.sections && branchConfig.sections.length > 0) {
+                        if (!branchConfig.sections.includes(userSection)) {
+                            return res.status(403).json({
+                                success: false,
+                                message: `This quiz is not available for Section ${userSection}.`
+                            });
+                        }
+                    }
+                }
+            }
         }
 
         // Check max participants
@@ -552,7 +670,9 @@ exports.startQuiz = async (req, res) => {
         }
 
         // Check ownership (owner or admin)
+        console.log(`[START QUIZ] User: ${req.user._id} (${req.user.name}, role=${req.user.role}), Quiz creator: ${quiz.createdBy}`);
         if (quiz.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            console.warn(`[START QUIZ] ❌ 403: User ${req.user._id} (role=${req.user.role}) tried to start quiz owned by ${quiz.createdBy}`);
             return res.status(403).json({
                 success: false,
                 message: 'Not authorized to start this quiz'
@@ -945,6 +1065,7 @@ exports.getQuizResults = async (req, res) => {
                     lowestScore,
                     avgScore: averageScore, // Frontend expects avgScore
                     avgTime: responses.length > 0 ? responses.reduce((acc, r) => acc + (r.totalTimeTaken || 0), 0) / responses.length : 0,
+                    participationRate: totalEligible > 0 ? Math.round((attemptedCount / totalEligible) * 100) : 0,
                     passRate: attemptedCount > 0 ? Math.round((passCount / attemptedCount) * 100) : 0,
                     passedCount: passCount,
                     failedCount: failCount,
@@ -1010,12 +1131,19 @@ exports.resetQuiz = async (req, res) => {
         quiz.participants = [];
         quiz.startedAt = null;
         quiz.endedAt = null;
+        quiz.expiresAt = null; // Important: Clear scheduled/expiration times
         quiz.currentQuestionIndex = 0;
         await quiz.save();
 
         // Delete all responses for this quiz (this wipes previous data)
         // If you want to archive, you'd need a Session model, but for now simple reset is requested.
         await Response.deleteMany({ quizId: quiz._id });
+
+        // Force cache invalidation if using Redis/Memory (optional)
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`quiz:${quiz._id}`).emit('quiz:reset');
+        }
 
         res.status(200).json({
             success: true,

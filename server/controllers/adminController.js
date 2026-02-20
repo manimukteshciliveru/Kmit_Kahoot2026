@@ -126,6 +126,9 @@ exports.createBackup = async (req, res) => {
 // @route   POST /api/admin/restore
 // @access  Private (Admin)
 exports.restoreBackup = async (req, res) => {
+    const axios = require('axios');
+    const fs = require('fs');
+
     try {
         if (!req.file && !req.body.data) {
             return res.status(400).json({
@@ -138,10 +141,19 @@ exports.restoreBackup = async (req, res) => {
 
         // Handle file upload (if using multer) or JSON body
         if (req.file) {
-            const fileContent = require('fs').readFileSync(req.file.path, 'utf-8');
-            backupData = JSON.parse(fileContent);
-            // Clean up
-            require('fs').unlinkSync(req.file.path);
+            const filePath = req.file.path;
+            let fileContent;
+
+            if (filePath.startsWith('http')) {
+                const response = await axios.get(filePath);
+                // Axios might parse it automatically if Content-Type is application/json
+                backupData = response.data;
+            } else {
+                fileContent = fs.readFileSync(filePath, 'utf-8');
+                backupData = JSON.parse(fileContent);
+                // Clean up local file
+                fs.unlinkSync(filePath);
+            }
         } else if (req.body.data) {
             backupData = req.body;
         } else {
@@ -330,7 +342,7 @@ exports.autoFixUserRoles = async (req, res) => {
             user.role = 'faculty';
             await user.save();
             console.log(`✅ Promoted ${user.name} to faculty (created ${user.stats.quizzesCreated} quiz(zes))`);
-            
+
             fixedUsers.push({
                 id: user._id,
                 name: user.name,

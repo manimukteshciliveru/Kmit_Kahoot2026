@@ -39,7 +39,7 @@ const Login = () => {
 
         setLoading(true);
         try {
-            const result = await login(userId, password);
+            const result = await login(userId, password, selectedRole);
             if (result.success) {
                 toast.success(`Welcome back!`);
                 navigate('/dashboard');

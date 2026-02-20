@@ -1,0 +1,126 @@
+﻿[dotenv@17.2.4] injecting env (15) from .env -- tip: ≡ƒöä add secrets lifecycle management: https://dotenvx.com/ops
+node : Γ¥î UNCAUGHT 
+EXCEPTION! ≡ƒÆÑ PathError 
+[TypeError]: Missing 
+parameter name at index 1: 
+*; visit https://git.new/pa
+thToRegexpError for info
+At line:1 char:1
++ node server.js 2>&1 | 
+Out-File -Encoding utf8 
+debug_crash.txt
++ ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (Γ¥î  
+   UNCAUGHT EX...pError    
+ for info:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+    at name (C:\Users\manim
+\OneDrive\Desktop\Kahoot!\s
+erver\node_modules\path-to-
+regexp\dist\index.js:96:19)
+    at parse (C:\Users\mani
+m\OneDrive\Desktop\Kahoot!\
+server\node_modules\path-to
+-regexp\dist\index.js:113:6
+8)
+    at pathToRegexp (C:\Use
+rs\manim\OneDrive\Desktop\K
+ahoot!\server\node_modules\
+path-to-regexp\dist\index.j
+s:267:58)
+    at Object.match (C:\Use
+rs\manim\OneDrive\Desktop\K
+ahoot!\server\node_modules\
+path-to-regexp\dist\index.j
+s:237:30)
+    at matcher (C:\Users\ma
+nim\OneDrive\Desktop\Kahoot
+!\server\node_modules\route
+r\lib\layer.js:86:23)
+    at new Layer (C:\Users\
+manim\OneDrive\Desktop\Kaho
+ot!\server\node_modules\rou
+ter\lib\layer.js:93:62)
+    at Function.route (C:\U
+sers\manim\OneDrive\Desktop
+\Kahoot!\server\node_module
+s\router\index.js:428:17)
+    at Function.route (C:\U
+sers\manim\OneDrive\Desktop
+\Kahoot!\server\node_module
+s\express\lib\application.j
+s:257:22)
+    at app.<computed> [as 
+options] (C:\Users\manim\On
+eDrive\Desktop\Kahoot!\serv
+er\node_modules\express\lib
+\application.js:478:22)
+    at Object.<anonymous> (
+C:\Users\manim\OneDrive\Des
+ktop\Kahoot!\server\server.
+js:99:5)
+    at Module._compile (nod
+e:internal/modules/cjs/load
+er:1688:14)
+    at Object..js (node:int
+ernal/modules/cjs/loader:18
+20:10)
+    at Module.load (node:in
+ternal/modules/cjs/loader:1
+423:32)
+    at Function._load (node
+:internal/modules/cjs/loade
+r:1246:12)
+    at 
+TracingChannel.traceSync (n
+ode:diagnostics_channel:322
+:14)
+    at wrapModuleLoad (node
+:internal/modules/cjs/loade
+r:235:24) {
+  originalPath: '*'
+}
+(node:56772) [MONGOOSE] 
+Warning: Duplicate schema 
+index on {"email":1} 
+found. This is often due 
+to declaring an index 
+using both "index: true" 
+and "schema.index()". 
+Please remove the 
+duplicate index definition.
+(Use `node 
+--trace-warnings ...` to 
+show where the warning was 
+created)
+(node:56772) [MONGOOSE] 
+Warning: Duplicate schema 
+index on {"rollNumber":1} 
+found. This is often due 
+to declaring an index 
+using both "index: true" 
+and "schema.index()". 
+Please remove the 
+duplicate index definition.
+(node:56772) [MONGOOSE] 
+Warning: Duplicate schema 
+index on {"code":1} found. 
+This is often due to 
+declaring an index using 
+both "index: true" and 
+"schema.index()". Please 
+remove the duplicate index 
+definition.
+(node:56772) [MONGOOSE] 
+Warning: Duplicate schema 
+index on {"createdBy":1} 
+found. This is often due 
+to declaring an index 
+using both "index: true" 
+and "schema.index()". 
+Please remove the 
+duplicate index definition.

@@ -1,22 +1,28 @@
 const Redis = require("ioredis");
+const logger = require("../utils/logger");
 
-let redis = null;
+const redisOptions = {
+    maxRetriesPerRequest: null, // Critical for BullMQ
+    enableReadyCheck: false,
+    reconnectOnError: (err) => {
+        const targetError = "READONLY";
+        if (err.message.includes(targetError)) {
+            return true;
+        }
+        return false;
+    },
+};
+
+let redisConfig = null;
 
 if (process.env.REDIS_URL) {
-    redis = new Redis(process.env.REDIS_URL, {
-        maxRetriesPerRequest: 3,
-        reconnectOnError: () => false,
-    });
-
-    redis.on("connect", () => {
-        console.log("✅ Connected to Upstash Redis");
-    });
-
-    redis.on("error", (err) => {
-        console.error("❌ Redis Error:", err.message);
-    });
+    redisConfig = process.env.REDIS_URL;
+    logger.info("ℹ️ Redis config detected from REDIS_URL");
 } else {
-    console.log("⚠️ REDIS_URL not found. Redis disabled.");
+    logger.warn("⚠️ REDIS_URL not found. Redis-based features will be disabled.");
 }
 
-module.exports = redis;
+module.exports = {
+    redisConfig,
+    redisOptions
+};

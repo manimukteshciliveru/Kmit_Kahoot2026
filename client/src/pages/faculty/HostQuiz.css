@@ -1032,3 +1032,38 @@
     background: var(--primary);
     color: white;
 }
+/* Scheduled Quiz Timer */
+.scheduled-timer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+    background: var(--bg-card);
+    padding: var(--space-xl);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    border: 2px solid var(--primary);
+    animation: fadeIn 0.5s ease-out;
+    margin-bottom: var(--space-lg);
+}
+
+.timer-display.giant {
+    font-size: 5rem;
+    font-weight: 900;
+    color: var(--primary);
+    font-family: var(--font-mono);
+    text-shadow: 0 4px 10px rgba(255, 127, 17, 0.3);
+    margin: var(--space-md) 0;
+}
+
+.scheduled-hint {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-bottom: var(--space-md);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+

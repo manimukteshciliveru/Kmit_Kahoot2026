@@ -6,14 +6,14 @@ const getApiUrl = () => {
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
-    
+
     // In production, use the current origin
     if (import.meta.env.PROD) {
         const protocol = window.location.protocol;
         const host = window.location.host;
         return `${protocol}//${host}/api`;
     }
-    
+
     // Fallback for development
     return 'http://localhost:5000/api';
 };
@@ -117,7 +117,8 @@ export const aiAPI = {
         headers: { 'Content-Type': 'multipart/form-data' }
     }),
     generateFromText: (data) => api.post('/ai/generate-from-text', data),
-    generateFromTranscript: (data) => api.post('/ai/generate-from-transcript', data)
+    generateFromTranscript: (data) => api.post('/ai/generate-from-transcript', data),
+    explainQuestion: (data) => api.post('/ai/explain', data)
 };
 
 // User/Admin API

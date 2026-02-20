@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { quizAPI, aiAPI, userAPI } from '../../services/api';
 import {
@@ -13,7 +13,12 @@ import {
     FiEdit3,
     FiEdit2,
     FiClock,
-    FiType
+    FiType,
+    FiUsers,
+    FiLock,
+    FiCheck,
+    FiSearch,
+    FiFilter
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './CreateQuiz.css';
@@ -74,27 +79,82 @@ const CreateQuiz = () => {
 
     const [availableStudents, setAvailableStudents] = useState([]);
     const [fetchingStudents, setFetchingStudents] = useState(false);
+    const [studentSearch, setStudentSearch] = useState('');
+    const [studentSectionFilter, setStudentSectionFilter] = useState('all');
 
+    // Fetch students whenever branches/sections change (regardless of mode)
     useEffect(() => {
         const fetchStudents = async () => {
             const access = quizData.accessControl;
-            if (access.mode === 'SPECIFIC' && access.allowedBranches.length > 0) {
+            if (!access.isPublic && access.allowedBranches.length > 0) {
                 setFetchingStudents(true);
                 try {
                     const res = await userAPI.searchStudents(access.allowedBranches);
                     setAvailableStudents(res.data.data || []);
                 } catch (error) {
                     console.error('Fetch students error:', error);
-                    // toast.error('Failed to fetch students for selection');
                 } finally {
                     setFetchingStudents(false);
                 }
+            } else {
+                setAvailableStudents([]);
             }
         };
 
         const timer = setTimeout(fetchStudents, 500);
         return () => clearTimeout(timer);
-    }, [quizData.accessControl.mode, quizData.accessControl.allowedBranches]);
+    }, [quizData.accessControl.isPublic, quizData.accessControl.allowedBranches]);
+
+    // Filtered students based on search and section filter
+    const filteredStudents = useMemo(() => {
+        let students = availableStudents;
+        if (studentSectionFilter !== 'all') {
+            students = students.filter(s => s.section === studentSectionFilter);
+        }
+        if (studentSearch.trim()) {
+            const q = studentSearch.toLowerCase().trim();
+            students = students.filter(s =>
+                (s.name && s.name.toLowerCase().includes(q)) ||
+                (s.rollNumber && s.rollNumber.toLowerCase().includes(q)) ||
+                (s.email && s.email.toLowerCase().includes(q))
+            );
+        }
+        return students;
+    }, [availableStudents, studentSearch, studentSectionFilter]);
+
+    // Get unique sections from available students for the filter dropdown
+    const availableSections = useMemo(() => {
+        const sections = new Set();
+        availableStudents.forEach(s => {
+            if (s.section) sections.add(s.section);
+        });
+        return Array.from(sections).sort();
+    }, [availableStudents]);
+
+    // Student selection handlers
+    const handleStudentToggle = (studentId) => {
+        const current = quizData.accessControl.allowedStudents || [];
+        const exists = current.includes(studentId);
+        const updated = exists
+            ? current.filter(id => id !== studentId)
+            : [...current, studentId];
+        handleAccessControlChange('allowedStudents', updated);
+    };
+
+    const handleSelectAllStudents = () => {
+        const allIds = filteredStudents.map(s => s._id);
+        const current = quizData.accessControl.allowedStudents || [];
+        const allSelected = allIds.every(id => current.includes(id));
+        if (allSelected) {
+            // Deselect filtered students, keep others
+            const updated = current.filter(id => !allIds.includes(id));
+            handleAccessControlChange('allowedStudents', updated);
+        } else {
+            // Select ALL filtered students, union with existing
+            const merged = [...new Set([...current, ...allIds])];
+            handleAccessControlChange('allowedStudents', merged);
+        }
+    };
 
     useEffect(() => {
         if (quizId) {
@@ -344,13 +404,13 @@ const CreateQuiz = () => {
         if (!quizData.accessControl.isPublic) {
             if (quizData.accessControl.allowedBranches.length === 0) {
                 toast.error('Please select at least one branch for restricted quiz');
-                setStep(3);
+                setStep(1);
                 return;
             }
             if (quizData.accessControl.mode === 'SPECIFIC' &&
                 (!quizData.accessControl.allowedStudents || quizData.accessControl.allowedStudents.length === 0)) {
                 toast.error('Please select at least one student for Specific mode');
-                setStep(3);
+                setStep(1);
                 return;
             }
         }
@@ -359,6 +419,10 @@ const CreateQuiz = () => {
         try {
             const payload = {
                 ...quizData,
+                settings: {
+                    ...quizData.settings,
+                    autoStart: Boolean(quizData.scheduledAt)
+                },
                 questions: questions.map(({ _id, ...q }) => q)
             };
 
@@ -476,6 +540,281 @@ const CreateQuiz = () => {
                                     </button>
                                 ))}
                             </div>
+                        </div>
+
+                        <div className="form-section-divider"></div>
+
+                        <div className="form-group">
+                            <label className="form-label">🔒 Quiz Audience</label>
+                            <div className="audience-selector">
+                                <button
+                                    type="button"
+                                    className={`audience-btn ${quizData.accessControl.isPublic ? 'active' : ''}`}
+                                    onClick={() => handleAccessControlChange('isPublic', true)}
+                                >
+                                    <FiUsers />
+                                    <div className="btn-content">
+                                        <span className="btn-title">Public</span>
+                                        <span className="btn-desc">Anyone with the code can join</span>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`audience-btn ${!quizData.accessControl.isPublic ? 'active' : ''}`}
+                                    onClick={() => handleAccessControlChange('isPublic', false)}
+                                >
+                                    <FiLock />
+                                    <div className="btn-content">
+                                        <span className="btn-title">Restricted</span>
+                                        <span className="btn-desc">Only selected branches/sections</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        {!quizData.accessControl.isPublic && (
+                            <div className="access-control-panel animate-fadeIn">
+                                {/* Step 1: Select Branch */}
+                                <p className="section-subtitle">📌 Step 1: Select Branch</p>
+
+                                {/* CSE Branch */}
+                                <div className="branch-group">
+                                    <div className="branch-header">
+                                        <input
+                                            type="checkbox"
+                                            id="branch-cse"
+                                            checked={quizData.accessControl.allowedBranches.some(b => b.name === 'CSE')}
+                                            onChange={() => handleBranchToggle('CSE')}
+                                        />
+                                        <label htmlFor="branch-cse">CSE (Computer Science & Engineering)</label>
+                                    </div>
+
+                                    {quizData.accessControl.allowedBranches.some(b => b.name === 'CSE') && (
+                                        <div className="section-grid">
+                                            {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].map(section => (
+                                                <label key={`cse-${section}`} className="section-checkbox">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={quizData.accessControl.allowedBranches.find(b => b.name === 'CSE')?.sections.includes(section) || false}
+                                                        onChange={() => handleSectionToggle('CSE', section)}
+                                                    />
+                                                    <span>Sec {section}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* CSM Branch */}
+                                <div className="branch-group" style={{ marginTop: '15px' }}>
+                                    <div className="branch-header">
+                                        <input
+                                            type="checkbox"
+                                            id="branch-csm"
+                                            checked={quizData.accessControl.allowedBranches.some(b => b.name === 'CSM')}
+                                            onChange={() => handleBranchToggle('CSM')}
+                                        />
+                                        <label htmlFor="branch-csm">CSM (CSE - AI & ML)</label>
+                                    </div>
+
+                                    {quizData.accessControl.allowedBranches.some(b => b.name === 'CSM') && (
+                                        <div className="section-grid">
+                                            {['A', 'B', 'C', 'D', 'E'].map(section => (
+                                                <label key={`csm-${section}`} className="section-checkbox">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={quizData.accessControl.allowedBranches.find(b => b.name === 'CSM')?.sections.includes(section) || false}
+                                                        onChange={() => handleSectionToggle('CSM', section)}
+                                                    />
+                                                    <span>Sec {section}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Step 2: Select Section (All or Specific) - shown hint */}
+                                {quizData.accessControl.allowedBranches.length > 0 && (
+                                    <div className="section-hint-msg">
+                                        <FiCheck size={14} />
+                                        <span>
+                                            {quizData.accessControl.allowedBranches.some(b => b.sections && b.sections.length > 0)
+                                                ? `Selected sections: ${quizData.accessControl.allowedBranches.map(b => `${b.name} (${b.sections.length > 0 ? b.sections.join(', ') : 'All'})`).join(' | ')}`
+                                                : 'All sections selected (no specific sections chosen)'
+                                            }
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Step 3: Select Students */}
+                                {quizData.accessControl.allowedBranches.length > 0 && (
+                                    <div className="student-selection-section animate-fadeIn">
+                                        <p className="section-subtitle">📌 Step 2: Select Students</p>
+
+                                        {/* Student Mode Toggle: ALL or SPECIFIC */}
+                                        <div className="student-mode-selector">
+                                            <button
+                                                type="button"
+                                                className={`student-mode-btn ${(quizData.accessControl.mode || 'ALL') === 'ALL' ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    handleAccessControlChange('mode', 'ALL');
+                                                    handleAccessControlChange('allowedStudents', []);
+                                                }}
+                                            >
+                                                <FiUsers size={18} />
+                                                <div>
+                                                    <span className="mode-label">All Students</span>
+                                                    <span className="mode-desc">Everyone in selected branches/sections</span>
+                                                </div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`student-mode-btn ${quizData.accessControl.mode === 'SPECIFIC' ? 'active' : ''}`}
+                                                onClick={() => handleAccessControlChange('mode', 'SPECIFIC')}
+                                            >
+                                                <FiFilter size={18} />
+                                                <div>
+                                                    <span className="mode-label">Specific Students</span>
+                                                    <span className="mode-desc">Hand-pick individual students</span>
+                                                </div>
+                                            </button>
+                                        </div>
+
+                                        {/* Student count info */}
+                                        {fetchingStudents && (
+                                            <div className="student-loading">
+                                                <span className="spinner spinner-sm"></span>
+                                                <span>Loading students...</span>
+                                            </div>
+                                        )}
+
+                                        {!fetchingStudents && availableStudents.length > 0 && (
+                                            <div className="student-count-badge">
+                                                <FiUsers size={14} />
+                                                <span>
+                                                    {quizData.accessControl.mode === 'SPECIFIC'
+                                                        ? `${(quizData.accessControl.allowedStudents || []).length} of ${availableStudents.length} students selected`
+                                                        : `${availableStudents.length} students will have access`
+                                                    }
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* SPECIFIC mode: show student list with checkboxes */}
+                                        {quizData.accessControl.mode === 'SPECIFIC' && !fetchingStudents && (
+                                            <div className="student-picker-panel animate-fadeIn">
+                                                {/* Search & Filters */}
+                                                <div className="student-picker-toolbar">
+                                                    <div className="student-search-box">
+                                                        <FiSearch size={16} />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search by name, roll number, or email..."
+                                                            value={studentSearch}
+                                                            onChange={(e) => setStudentSearch(e.target.value)}
+                                                        />
+                                                    </div>
+                                                    {availableSections.length > 1 && (
+                                                        <select
+                                                            className="student-section-filter"
+                                                            value={studentSectionFilter}
+                                                            onChange={(e) => setStudentSectionFilter(e.target.value)}
+                                                        >
+                                                            <option value="all">All Sections</option>
+                                                            {availableSections.map(sec => (
+                                                                <option key={sec} value={sec}>Section {sec}</option>
+                                                            ))}
+                                                        </select>
+                                                    )}
+                                                </div>
+
+                                                {/* Select All toggle */}
+                                                {filteredStudents.length > 0 && (
+                                                    <div className="student-select-all">
+                                                        <label className="student-select-all-label">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={filteredStudents.length > 0 && filteredStudents.every(s => (quizData.accessControl.allowedStudents || []).includes(s._id))}
+                                                                onChange={handleSelectAllStudents}
+                                                            />
+                                                            <span>
+                                                                Select All ({filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''})
+                                                            </span>
+                                                        </label>
+                                                    </div>
+                                                )}
+
+                                                {/* Student list */}
+                                                <div className="student-list">
+                                                    {filteredStudents.length === 0 ? (
+                                                        <div className="student-empty">
+                                                            <span>😕</span>
+                                                            <p>{studentSearch ? 'No students match your search' : 'No students found in selected branches/sections'}</p>
+                                                        </div>
+                                                    ) : (
+                                                        filteredStudents.map(student => {
+                                                            const isSelected = (quizData.accessControl.allowedStudents || []).includes(student._id);
+                                                            return (
+                                                                <label
+                                                                    key={student._id}
+                                                                    className={`student-item ${isSelected ? 'selected' : ''}`}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isSelected}
+                                                                        onChange={() => handleStudentToggle(student._id)}
+                                                                    />
+                                                                    <div className="student-avatar">
+                                                                        {student.name ? student.name.charAt(0).toUpperCase() : '?'}
+                                                                    </div>
+                                                                    <div className="student-info">
+                                                                        <span className="student-name">{student.name || 'Unknown'}</span>
+                                                                        <span className="student-detail">
+                                                                            {student.rollNumber || student.email} {student.department && student.section ? `• ${student.department}-${student.section}` : ''}
+                                                                        </span>
+                                                                    </div>
+                                                                    {isSelected && (
+                                                                        <div className="student-check-icon">
+                                                                            <FiCheck size={16} />
+                                                                        </div>
+                                                                    )}
+                                                                </label>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="form-section-divider"></div>
+
+                        <div className="form-group">
+                            <label className="form-label"><FiClock /> Scheduling</label>
+                            <label className="toggle-label" style={{ marginBottom: '10px' }}>
+                                <span>Schedule for later</span>
+                                <input
+                                    type="checkbox"
+                                    checked={!!quizData.scheduledAt}
+                                    onChange={(e) => handleQuizDataChange('scheduledAt', e.target.checked ? new Date(Date.now() + 3600000).toISOString().slice(0, 16) : null)}
+                                />
+                                <span className="toggle-switch"></span>
+                            </label>
+
+                            {quizData.scheduledAt && (
+                                <div className="schedule-picker animate-fadeIn">
+                                    <input
+                                        type="datetime-local"
+                                        className="form-input"
+                                        value={typeof quizData.scheduledAt === 'string' ? quizData.scheduledAt.slice(0, 16) : new Date(quizData.scheduledAt).toISOString().slice(0, 16)}
+                                        onChange={(e) => handleQuizDataChange('scheduledAt', e.target.value)}
+                                        min={new Date().toISOString().slice(0, 16)}
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <div className="step-actions">
@@ -929,20 +1268,37 @@ const CreateQuiz = () => {
                                                                 <span className="meta-item">{q.type.toUpperCase()}</span>
                                                                 <span className="meta-item">{q.points} pts</span>
                                                             </div>
-                                                            {q.type === 'mcq' && (
+                                                            {(q.type === 'mcq' || q.type === 'msq') && (
                                                                 <div className="preview-options" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '8px' }}>
-                                                                    {q.options.map((opt, i) => (
-                                                                        <div key={i} style={{
-                                                                            fontSize: '0.85rem',
-                                                                            padding: '4px 8px',
-                                                                            background: q.correctAnswer === opt ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-tertiary)',
-                                                                            border: q.correctAnswer === opt ? '1px solid var(--success)' : '1px solid transparent',
-                                                                            borderRadius: '4px',
-                                                                            color: 'var(--text-secondary)'
-                                                                        }}>
-                                                                            {String.fromCharCode(65 + i)}. {opt}
-                                                                        </div>
-                                                                    ))}
+                                                                    {q.options.map((opt, i) => {
+                                                                        let isCorrect = false;
+                                                                        if (q.type === 'mcq') {
+                                                                            isCorrect = q.correctAnswer === opt || (typeof q.correctAnswer === 'string' && q.correctAnswer.trim() === opt.trim());
+                                                                        } else {
+                                                                            // For MSQ, correctAnswer is comma-separated string
+                                                                            const correctArr = typeof q.correctAnswer === 'string' ? q.correctAnswer.split(',') : [];
+                                                                            isCorrect = correctArr.some(c => c.trim() === opt.trim());
+                                                                        }
+
+                                                                        return (
+                                                                            <div key={i} style={{
+                                                                                fontSize: '0.85rem',
+                                                                                padding: '6px 12px',
+                                                                                background: isCorrect ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-tertiary)',
+                                                                                border: isCorrect ? '1px solid var(--success)' : '1px solid transparent',
+                                                                                borderRadius: '4px',
+                                                                                color: isCorrect ? 'var(--success)' : 'var(--text-secondary)',
+                                                                                fontWeight: isCorrect ? '600' : 'normal',
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                gap: '8px'
+                                                                            }}>
+                                                                                <span style={{ opacity: 0.7 }}>{String.fromCharCode(65 + i)}.</span>
+                                                                                <span style={{ flex: 1 }}>{opt}</span>
+                                                                                {isCorrect && <FiCheck size={16} />}
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1029,6 +1385,34 @@ const CreateQuiz = () => {
 
                                 <div className="toggle-group">
                                     <label className="toggle-label">
+                                        <span>Allow Tab Switching (Open Book)</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={quizData.settings.allowTabSwitch}
+                                            onChange={(e) => handleQuizDataChange('settings.allowTabSwitch', e.target.checked)}
+                                        />
+                                        <span className="toggle-switch"></span>
+                                    </label>
+                                </div>
+
+                                {quizData.settings.allowTabSwitch && (
+                                    <div className="form-group animate-slideUp" style={{ paddingLeft: '1rem', borderLeft: '2px solid var(--primary)', marginBottom: '1.5rem' }}>
+                                        <label className="form-label" style={{ fontSize: '0.9rem' }}>Max Tab Switches Allowed</label>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            style={{ width: '120px' }}
+                                            min="0"
+                                            value={quizData.settings.maxTabSwitches}
+                                            onChange={(e) => handleQuizDataChange('settings.maxTabSwitches', parseInt(e.target.value) || 0)}
+                                            placeholder="0 = Unlimited"
+                                        />
+                                        <small className="form-hint">Set to 0 for unlimited switching.</small>
+                                    </div>
+                                )}
+
+                                <div className="toggle-group">
+                                    <label className="toggle-label">
                                         <span>Shuffle Options (MCQ)</span>
                                         <input
                                             type="checkbox"
@@ -1064,247 +1448,6 @@ const CreateQuiz = () => {
                                 </div>
                             </div>
 
-                            <div className="form-card">
-                                <h2>🔒 Access Control</h2>
-                                <div className="toggle-group">
-                                    <label className="toggle-label">
-                                        <span>Public Quiz (Anyone can join)</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={quizData.accessControl.isPublic}
-                                            onChange={(e) => handleAccessControlChange('isPublic', e.target.checked)}
-                                        />
-                                        <span className="toggle-switch"></span>
-                                    </label>
-                                </div>
-
-                                {!quizData.accessControl.isPublic && (
-                                    <div className="access-control-panel">
-                                        <p className="section-subtitle">Select Allowed Branches & Sections</p>
-
-                                        {/* CSE Branch */}
-                                        <div className="branch-group">
-                                            <div className="branch-header">
-                                                <input
-                                                    type="checkbox"
-                                                    id="branch-cse"
-                                                    checked={quizData.accessControl.allowedBranches.some(b => b.name === 'CSE')}
-                                                    onChange={() => handleBranchToggle('CSE')}
-                                                />
-                                                <label htmlFor="branch-cse">CSE (Computer Science & Engineering)</label>
-                                            </div>
-
-                                            {quizData.accessControl.allowedBranches.some(b => b.name === 'CSE') && (
-                                                <div className="section-grid">
-                                                    {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].map(section => (
-                                                        <label key={`cse-${section}`} className="section-checkbox">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={quizData.accessControl.allowedBranches.find(b => b.name === 'CSE')?.sections.includes(section) || false}
-                                                                onChange={() => handleSectionToggle('CSE', section)}
-                                                            />
-                                                            <span>Sec {section}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* CSM Branch */}
-                                        <div className="branch-group" style={{ marginTop: '15px' }}>
-                                            <div className="branch-header">
-                                                <input
-                                                    type="checkbox"
-                                                    id="branch-csm"
-                                                    checked={quizData.accessControl.allowedBranches.some(b => b.name === 'CSM')}
-                                                    onChange={() => handleBranchToggle('CSM')}
-                                                />
-                                                <label htmlFor="branch-csm">CSM (CSE - AI & ML)</label>
-                                            </div>
-
-                                            {quizData.accessControl.allowedBranches.some(b => b.name === 'CSM') && (
-                                                <div className="section-grid">
-                                                    {['A', 'B', 'C', 'D', 'E'].map(section => (
-                                                        <label key={`csm-${section}`} className="section-checkbox">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={quizData.accessControl.allowedBranches.find(b => b.name === 'CSM')?.sections.includes(section) || false}
-                                                                onChange={() => handleSectionToggle('CSM', section)}
-                                                            />
-                                                            <span>Sec {section}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="eligibility-mode-section" style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--border-color)' }}>
-                                            <p className="section-subtitle" style={{ marginBottom: '10px', display: 'block', fontWeight: '600' }}>Eligibility Mode</p>
-
-                                            <div className="toggle-group" style={{ marginBottom: '15px' }}>
-                                                <label className="radio-label" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: '20px' }}>
-                                                    <input
-                                                        type="radio"
-                                                        name="eligibility_mode"
-                                                        checked={quizData.accessControl.mode === 'ALL' || !quizData.accessControl.mode}
-                                                        onChange={() => handleAccessControlChange('mode', 'ALL')}
-                                                        style={{ marginRight: '8px' }}
-                                                    />
-                                                    <span>All Students in Selected Sections</span>
-                                                </label>
-
-                                                <label className="radio-label" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                                                    <input
-                                                        type="radio"
-                                                        name="eligibility_mode"
-                                                        checked={quizData.accessControl.mode === 'SPECIFIC'}
-                                                        onChange={() => handleAccessControlChange('mode', 'SPECIFIC')}
-                                                        style={{ marginRight: '8px' }}
-                                                    />
-                                                    <span>Specific Students Only</span>
-                                                </label>
-                                            </div>
-
-                                            {quizData.accessControl.mode === 'SPECIFIC' && (
-                                                <div className="student-selector-panel" style={{ background: 'var(--bg-tertiary)', padding: '15px', borderRadius: '8px' }}>
-                                                    <p style={{ fontSize: '0.9rem', marginBottom: '8px', fontWeight: '500' }}>
-                                                        Select Students ({quizData.accessControl.allowedStudents?.length || 0} selected)
-                                                    </p>
-
-                                                    {fetchingStudents ? (
-                                                        <div style={{ padding: '20px', textAlign: 'center' }}>
-                                                            <span className="spinner spinner-sm"></span> Loading students...
-                                                        </div>
-                                                    ) : (
-                                                        <div className="student-list" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                                                            {availableStudents.length === 0 ? (
-                                                                <p className="text-muted" style={{ padding: '10px', textAlign: 'center' }}>
-                                                                    No students found in the selected branches/sections.
-                                                                </p>
-                                                            ) : (
-                                                                availableStudents.map(student => (
-                                                                    <label key={student._id} className="student-checkbox-item" style={{
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        padding: '8px',
-                                                                        borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                                                        cursor: 'pointer'
-                                                                    }}>
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={(quizData.accessControl.allowedStudents || []).includes(student._id)}
-                                                                            onChange={(e) => {
-                                                                                const current = quizData.accessControl.allowedStudents || [];
-                                                                                let next;
-                                                                                if (e.target.checked) {
-                                                                                    next = [...current, student._id];
-                                                                                } else {
-                                                                                    next = current.filter(id => id !== student._id);
-                                                                                }
-                                                                                handleAccessControlChange('allowedStudents', next);
-                                                                            }}
-                                                                            style={{ marginRight: '10px' }}
-                                                                        />
-                                                                        <div>
-                                                                            <div style={{ fontWeight: '500', fontSize: '0.9rem' }}>{student.name} ({student.rollNumber})</div>
-                                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                                                {student.department} - Section {student.section}
-                                                                            </div>
-                                                                        </div>
-                                                                    </label>
-                                                                ))
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="form-card">
-                                <h2>🔒 Security</h2>
-
-                                <div className="toggle-group">
-                                    <label className="toggle-label">
-                                        <span>Allow Tab Switching</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={quizData.settings.allowTabSwitch}
-                                            onChange={(e) => handleQuizDataChange('settings.allowTabSwitch', e.target.checked)}
-                                        />
-                                        <span className="toggle-switch"></span>
-                                    </label>
-                                </div>
-
-                                {quizData.settings.allowTabSwitch && (
-                                    <div className="form-group">
-                                        <label className="form-label">Max Tab Switches (0 = unlimited)</label>
-                                        <input
-                                            type="number"
-                                            className="form-input"
-                                            min="0"
-                                            max="10"
-                                            value={quizData.settings.maxTabSwitches}
-                                            onChange={(e) => handleQuizDataChange('settings.maxTabSwitches', e.target.value === '' ? 0 : parseInt(e.target.value))}
-                                        />
-                                    </div>
-                                )}
-
-                                <div className="form-group">
-                                    <label className="form-label">Passing Score (%)</label>
-                                    <input
-                                        type="number"
-                                        className="form-input"
-                                        min="0"
-                                        max="100"
-                                        value={quizData.settings.passingScore}
-                                        onChange={(e) => handleQuizDataChange('settings.passingScore', e.target.value === '' ? 0 : parseInt(e.target.value))}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-card">
-                                <h2><FiClock /> Scheduling</h2>
-                                <div className="toggle-group">
-                                    <label className="toggle-label">
-                                        <span>Schedule for later</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={!!quizData.scheduledAt}
-                                            onChange={(e) => handleQuizDataChange('scheduledAt', e.target.checked ? new Date(Date.now() + 3600000).toISOString().slice(0, 16) : null)}
-                                        />
-                                        <span className="toggle-switch"></span>
-                                    </label>
-                                </div>
-
-                                {quizData.scheduledAt && (
-                                    <>
-                                        <div className="form-group">
-                                            <label className="form-label">Scheduled Date & Time</label>
-                                            <input
-                                                type="datetime-local"
-                                                className="form-input"
-                                                value={typeof quizData.scheduledAt === 'string' ? quizData.scheduledAt.slice(0, 16) : new Date(quizData.scheduledAt).toISOString().slice(0, 16)}
-                                                onChange={(e) => handleQuizDataChange('scheduledAt', e.target.value)}
-                                                min={new Date().toISOString().slice(0, 16)}
-                                            />
-                                        </div>
-                                        <div className="toggle-group">
-                                            <label className="toggle-label">
-                                                <span>Auto-start at scheduled time</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={quizData.settings.autoStart}
-                                                    onChange={(e) => handleQuizDataChange('settings.autoStart', e.target.checked)}
-                                                />
-                                                <span className="toggle-switch"></span>
-                                            </label>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
                         </div>
 
                         <div className="step-actions">

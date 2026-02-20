@@ -17,13 +17,37 @@ const {
 const strictLimiter = require('../middleware/strictRateLimiter');
 const { getDetailedAnalytics } = require('../controllers/analyticsController');
 
+const { upload } = require('../utils/cloudinary');
+const validate = require('../middleware/validate');
+const { createQuiz: createQuizSchema, updateQuiz: updateQuizSchema } = require('../validations/quiz.validation');
+
+// Helper middleware to parse stringified JSON fields from multipart form-data
+const parseMultipartJSON = (fields) => (req, res, next) => {
+    fields.forEach(field => {
+        if (req.body[field] && typeof req.body[field] === 'string') {
+            try {
+                req.body[field] = JSON.parse(req.body[field]);
+            } catch (err) {
+                // If it fails, let Joi catch the type mismatch
+            }
+        }
+    });
+    next();
+};
+
 // All routes require authentication
 router.use(protect);
 
 // Quiz CRUD
 router.route('/')
     .get(getQuizzes)
-    .post(authorize('faculty', 'admin'), createQuiz);
+    .post(
+        authorize('faculty', 'admin'),
+        upload.single('coverImage'),
+        parseMultipartJSON(['settings', 'questions', 'accessControl']),
+        validate(createQuizSchema),
+        createQuiz
+    );
 
 // Quiz actions - MUST come before /:id routes
 // Apply Strict Rate Limit to Join
@@ -36,7 +60,13 @@ router.post('/:id/reset', authorize('faculty', 'admin'), resetQuiz);
 // Specific quiz operations - these must come AFTER the specific routes above
 router.route('/:id')
     .get(getQuiz)
-    .put(authorize('faculty', 'admin'), updateQuiz)
+    .put(
+        authorize('faculty', 'admin'),
+        upload.single('coverImage'),
+        parseMultipartJSON(['settings', 'questions', 'accessControl']),
+        validate(updateQuizSchema),
+        updateQuiz
+    )
     .delete(authorize('faculty', 'admin'), deleteQuiz);
 
 // Quiz data & Analytics

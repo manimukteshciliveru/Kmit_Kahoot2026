@@ -102,14 +102,18 @@ exports.getUser = async (req, res) => {
 // @access  Private (Admin)
 exports.updateUser = async (req, res) => {
     try {
-        const { name, email, role, isActive } = req.body;
+        const {
+            name, email, role, isActive,
+            studentId, rollNumber, department, year, section, phone,
+            employeeId, designation, subjects
+        } = req.body;
 
         const user = await User.findById(req.params.id);
 
         if (!user) {
             return res.status(404).json({
                 success: false,
-                message: 'User not found'
+                message: 'User found'
             });
         }
 
@@ -122,14 +126,31 @@ exports.updateUser = async (req, res) => {
         }
 
         const updates = {};
-        if (name) updates.name = name;
-        if (email) updates.email = email;
+        if (name) updates.name = name.trim();
+        if (email) updates.email = email.toLowerCase().trim();
         if (role) updates.role = role;
         if (typeof isActive === 'boolean') updates.isActive = isActive;
 
+        // Role-specific updates
+        if (user.role === 'student' || role === 'student') {
+            if (studentId !== undefined) updates.studentId = studentId.trim();
+            if (rollNumber !== undefined) updates.rollNumber = rollNumber.toUpperCase().trim();
+            if (department !== undefined) updates.department = department;
+            if (year !== undefined) updates.year = year;
+            if (section !== undefined) updates.section = section;
+            if (phone !== undefined) updates.phone = phone.trim();
+        }
+
+        if (user.role === 'faculty' || role === 'faculty') {
+            if (employeeId !== undefined) updates.employeeId = employeeId.trim();
+            if (designation !== undefined) updates.designation = designation;
+            if (subjects !== undefined) updates.subjects = subjects;
+            if (phone !== undefined) updates.phone = phone.trim();
+        }
+
         const updatedUser = await User.findByIdAndUpdate(
             req.params.id,
-            updates,
+            { $set: updates },
             { new: true, runValidators: true }
         ).select('-password');
 
@@ -246,7 +267,7 @@ exports.createUser = async (req, res) => {
         const {
             name, email, password, role,
             // Student fields
-            studentId, department, year, section, phone,
+            studentId, rollNumber, department, year, section, phone,
             // Faculty fields
             employeeId, designation, subjects
         } = req.body;
@@ -282,6 +303,7 @@ exports.createUser = async (req, res) => {
         // Add student-specific fields
         if (role === 'student') {
             if (studentId) userData.studentId = studentId.trim();
+            if (rollNumber) userData.rollNumber = rollNumber.toUpperCase().trim();
             if (department) userData.department = department;
             if (year) userData.year = year;
             if (section) userData.section = section;
@@ -463,6 +485,7 @@ exports.bulkCreateUsers = async (req, res) => {
     const fs = require('fs');
     const xlsx = require('xlsx');
     const path = require('path');
+    const axios = require('axios');
 
     try {
         if (!req.file) {
@@ -476,11 +499,19 @@ exports.bulkCreateUsers = async (req, res) => {
         const filePath = req.file.path;
         const ext = path.extname(req.file.originalname).toLowerCase();
 
+        let dataBuffer;
+        if (filePath.startsWith('http')) {
+            const response = await axios.get(filePath, { responseType: 'arraybuffer' });
+            dataBuffer = Buffer.from(response.data);
+        } else {
+            dataBuffer = fs.readFileSync(filePath);
+        }
+
         let rows = [];
 
         // Parse file based on type
         if (ext === '.csv') {
-            const content = fs.readFileSync(filePath, 'utf-8');
+            const content = dataBuffer.toString('utf-8');
             const lines = content.split('\n').filter(line => line.trim());
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, ''));
 
@@ -494,7 +525,7 @@ exports.bulkCreateUsers = async (req, res) => {
             });
         } else {
             // Excel file
-            const workbook = xlsx.readFile(filePath);
+            const workbook = xlsx.read(dataBuffer, { type: 'buffer' });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = xlsx.utils.sheet_to_json(worksheet);
@@ -508,8 +539,10 @@ exports.bulkCreateUsers = async (req, res) => {
             });
         }
 
-        // Clean up file
-        fs.unlinkSync(filePath);
+        // Clean up file if local
+        if (!filePath.startsWith('http') && fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
 
         if (rows.length === 0) {
             return res.status(400).json({

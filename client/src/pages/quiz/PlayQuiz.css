@@ -12,10 +12,44 @@
 .play-quiz-game {
     min-height: 100vh;
     background: radial-gradient(circle at top right, #1a1a2e, #16213e);
-    color: #fff;
+    color: var(--text-primary);
     font-family: 'Outfit', 'Inter', sans-serif;
     padding: 2rem;
     overflow-x: hidden;
+    transition: background 0.3s, color 0.3s;
+}
+
+/* Day Mode Override for Immersive View */
+/* If root doesn't have data-theme="dark", we assume light/day mode */
+html:not([data-theme="dark"]) .play-quiz-game {
+    background: radial-gradient(circle at top right, #f0f9ff, #e0f2fe);
+    color: #1e293b;
+}
+
+html:not([data-theme="dark"]) .question-stage,
+html:not([data-theme="dark"]) .waiting-glass-card {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    color: #1e293b;
+}
+
+html:not([data-theme="dark"]) .main-question-text {
+    background: linear-gradient(to bottom, #1e293b, #475569);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+html:not([data-theme="dark"]) .modern-option-card {
+    background: #fff;
+    border-color: #cbd5e1;
+    color: #1e293b;
+}
+
+html:not([data-theme="dark"]) .modern-option-card:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: var(--primary);
 }
 
 /* Loading Modern */
@@ -371,6 +405,10 @@
     display: flex;
     justify-content: space-between;
     gap: 1.5rem;
+    position: relative;
+    z-index: 10;
+    /* Ensure clickable */
+    pointer-events: auto;
 }
 
 .ctrl-btn {
@@ -1188,4 +1226,99 @@
     .question-drawer {
         width: 85vw;
     }
+}
+
+/* AI Review Section Styles */
+.ai-review-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.btn-ai-review {
+    width: 100%;
+    padding: 0.85rem;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: white;
+    border: none;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-ai-review:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5);
+    filter: brightness(1.1);
+}
+
+.btn-ai-review:disabled {
+    background: #475569;
+    cursor: wait;
+    opacity: 0.8;
+}
+
+.ai-explanation-box {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.ai-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #a855f7;
+    margin-bottom: 0.75rem;
+    letter-spacing: 1px;
+}
+
+.ai-explanation-box p {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #e2e8f0;
+    margin: 0;
+}
+
+.spinner-sm {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Light Mode Overrides for AI Section */
+html:not([data-theme="dark"]) .ai-explanation-box {
+    background: rgba(124, 58, 237, 0.05);
+    border-color: rgba(124, 58, 237, 0.15);
+}
+
+html:not([data-theme="dark"]) .ai-explanation-box p {
+    color: #475569;
 }

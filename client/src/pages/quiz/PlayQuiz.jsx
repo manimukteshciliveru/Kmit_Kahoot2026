@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
-import { quizAPI, responseAPI } from '../../services/api';
+import { quizAPI, responseAPI, aiAPI } from '../../services/api';
 import {
     FiClock,
     FiCheckCircle,
@@ -12,7 +12,8 @@ import {
     FiTrendingUp,
     FiAlertTriangle,
     FiArrowLeft,
-    FiZap
+    FiZap,
+    FiCpu
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
@@ -105,6 +106,9 @@ const PlayQuiz = () => {
 
     // Question Panel State
     const [showQuestionPanel, setShowQuestionPanel] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [explainingQId, setExplainingQId] = useState(null);
+    const [explanations, setExplanations] = useState({}); // { questionId: explanation }
 
     const handleAnswerSubmit = useCallback(async (isTimeout = false, answerOverride = null) => {
         if (status !== 'active') return;
@@ -185,6 +189,8 @@ const PlayQuiz = () => {
     };
 
     const handleSubmitQuiz = useCallback(async (force = false) => {
+        if (isSubmitting) return;
+
         const answeredCount = Object.keys(savedAnswers).length;
         const total = questions.length;
 
@@ -201,19 +207,33 @@ const PlayQuiz = () => {
         }
 
         try {
-            if (completeQuiz) {
-                completeQuiz(quizId);
-            } else if (socket) {
-                socket.emit('quiz:complete', { quizId });
-            }
+            setIsSubmitting(true);
+            const promise = new Promise((resolve, reject) => {
+                if (completeQuiz) {
+                    completeQuiz(quizId);
+                    resolve();
+                } else if (socket) {
+                    socket.emit('quiz:complete', { quizId });
+                    resolve();
+                } else {
+                    reject(new Error("No connection to server"));
+                }
+            });
+
+            await toast.promise(promise, {
+                loading: 'Submitting quiz...',
+                success: 'Quiz submitted successfully!',
+                error: 'Submission in progress...' // Sometimes socket doesn't ack immediately, so we don't error hard
+            });
 
             setStatus('completed'); // Optimistic update
             localStorage.removeItem(`quiz_${quizId}_answers`);
         } catch (error) {
             console.error('Submit Quiz Error:', error);
             toast.error("Failed to submit quiz. Please try again.");
+            setIsSubmitting(false);
         }
-    }, [savedAnswers, questions, completeQuiz, socket, quizId]);
+    }, [savedAnswers, questions, completeQuiz, socket, quizId, isSubmitting]);
 
     // Persistence: Load from LocalStorage
     useEffect(() => {
@@ -236,11 +256,35 @@ const PlayQuiz = () => {
             const response = await responseAPI.getMyResponse(quizId);
             setReviewData(response.data.data.response);
             setReviewMode(true);
-            setLoading(false);
         } catch (error) {
             console.error('Failed to load review:', error);
             toast.error('Failed to load review');
+        } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAIExplain = async (q, userAnswer, correctAnswer) => {
+        if (!q || explanations[q._id]) return;
+
+        try {
+            setExplainingQId(q._id);
+            const response = await aiAPI.explainQuestion({
+                question: q.text,
+                userAnswer: userAnswer || 'Skipped',
+                correctAnswer: correctAnswer
+            });
+
+            setExplanations(prev => ({
+                ...prev,
+                [q._id]: response.data.data.explanation
+            }));
+            toast.success('AI Review generated!');
+        } catch (error) {
+            console.error('AI Explanation Error:', error);
+            toast.error('Failed to get AI review');
+        } finally {
+            setExplainingQId(null);
         }
     };
 
@@ -612,6 +656,27 @@ const PlayQuiz = () => {
                                                 <div className="value">{q.correctAnswer}</div>
                                             </div>
                                         </div>
+
+                                        <div className="ai-review-section">
+                                            {explanations[q._id] ? (
+                                                <div className="ai-explanation-box animate-fadeIn">
+                                                    <div className="ai-label"><FiCpu /> AI REVIEW</div>
+                                                    <p>{explanations[q._id]}</p>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    className="btn-ai-review"
+                                                    disabled={explainingQId === q._id}
+                                                    onClick={() => handleAIExplain(q, answer?.answer, q.correctAnswer)}
+                                                >
+                                                    {explainingQId === q._id ? (
+                                                        <><span className="spinner-sm"></span> ANALYZING...</>
+                                                    ) : (
+                                                        <><FiCpu /> GET AI REVIEW</>
+                                                    )}
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -774,13 +839,13 @@ const PlayQuiz = () => {
                                         ? selectedAnswer === option
                                         : selectedAnswer.split(',').filter(Boolean).includes(option);
 
-                                    const isCorrectOpt = isAnswered && (
+                                    const isCorrectOpt = isAnswered && feedback && (
                                         currentQuestion.type === 'mcq'
                                             ? feedback?.correctAnswer === option
                                             : feedback?.correctAnswer?.split(',').includes(option)
                                     );
 
-                                    const isWrongOpt = isAnswered && isSelected && !isCorrectOpt;
+                                    const isWrongOpt = isAnswered && feedback && isSelected && !isCorrectOpt;
 
                                     return (
                                         <button
@@ -830,8 +895,8 @@ const PlayQuiz = () => {
                             </div>
 
                             <div className="right-controls">
-                                <button className="ctrl-btn success" onClick={() => handleSubmitQuiz(false)}>
-                                    SUBMIT QUIZ
+                                <button className="ctrl-btn success" onClick={() => handleSubmitQuiz(false)} disabled={isSubmitting}>
+                                    {isSubmitting ? 'SUBMITTING...' : 'SUBMIT QUIZ'}
                                 </button>
                             </div>
                         </div>

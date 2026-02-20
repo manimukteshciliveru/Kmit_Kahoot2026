@@ -14,9 +14,10 @@ import {
     FiChevronDown,
     FiChevronUp,
     FiUserMinus,
-    FiFileText
+    FiFileText,
+    FiCpu
 } from 'react-icons/fi';
-import { quizAPI } from '../../services/api';
+import { quizAPI, aiAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import './QuizResults.css';
 
@@ -28,6 +29,8 @@ const QuizResults = () => {
     const [data, setData] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [expandedStudent, setExpandedStudent] = useState(null);
+    const [explainingQId, setExplainingQId] = useState(null);
+    const [explanations, setExplanations] = useState({}); // { questionId: explanation }
     const reportRef = useRef(null);
 
     useEffect(() => {
@@ -87,6 +90,31 @@ const QuizResults = () => {
             console.error('Download failed:', error);
             toast.dismiss();
             toast.error('Failed to download report. Please try again.');
+        }
+    };
+
+    const handleAIExplain = async (q) => {
+        const qId = q.questionId || q._id;
+        if (explanations[qId]) return;
+
+        try {
+            setExplainingQId(qId);
+            const response = await aiAPI.explainQuestion({
+                question: q.text || q.questionText,
+                userAnswer: "Provide a general academic review of this question.",
+                correctAnswer: q.correctAnswer
+            });
+
+            setExplanations(prev => ({
+                ...prev,
+                [qId]: response.data.data.explanation
+            }));
+            toast.success('AI Review generated!');
+        } catch (error) {
+            console.error('AI Explanation Error:', error);
+            toast.error('Failed to get AI review');
+        } finally {
+            setExplainingQId(null);
         }
     };
 
@@ -190,6 +218,13 @@ const QuizResults = () => {
                             <div className="stat-info">
                                 <span className="stat-value">{formatTime(analytics.avgTime)}</span>
                                 <span className="stat-label">Avg. Time</span>
+                            </div>
+                        </div>
+                        <div className="stat-card">
+                            <FiTrendingUp className="stat-icon secondary" />
+                            <div className="stat-info">
+                                <span className="stat-value">{analytics.participationRate || 0}%</span>
+                                <span className="stat-label">Participation Rate</span>
                             </div>
                         </div>
                     </div>
@@ -476,6 +511,26 @@ const QuizResults = () => {
                                     <div className="bar">
                                         <div className="fill" style={{ width: `${q.accuracy}%` }}></div>
                                     </div>
+                                </div>
+
+                                <div className="ai-review-section" style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                                    {explanations[q.questionId || q._id] ? (
+                                        <div className="ai-explanation-box" style={{ background: 'var(--bg-tertiary)', padding: '15px', borderRadius: '10px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '8px' }}>
+                                                <FiCpu /> AI ANALYSIS
+                                            </div>
+                                            <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.5 }}>{explanations[q.questionId || q._id]}</p>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            className="btn btn-sm btn-ghost"
+                                            style={{ color: 'var(--primary)', fontWeight: '600' }}
+                                            disabled={explainingQId === (q.questionId || q._id)}
+                                            onClick={() => handleAIExplain(q)}
+                                        >
+                                            {explainingQId === (q.questionId || q._id) ? 'Analyzing...' : <><FiCpu style={{ marginRight: '5px' }} /> AI Review</>}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}

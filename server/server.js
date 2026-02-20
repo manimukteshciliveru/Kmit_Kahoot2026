@@ -7,8 +7,11 @@ const helmet = require('helmet');
 const path = require('path');
 
 // Global Exception Handler - MUST BE FIRST
+// Global Exception Handler - MUST BE FIRST (Replaced with new Logger)
+const logger = require('./utils/logger');
 process.on('uncaughtException', (err) => {
-    console.error('❌ UNCAUGHT EXCEPTION! 💥', err);
+    logger.error('❌ UNCAUGHT EXCEPTION! 💥 ' + err.message);
+    logger.error(err.stack);
     // Keep process alive for now to debug, or exit if critical
     // process.exit(1); 
 });
@@ -16,14 +19,19 @@ process.on('uncaughtException', (err) => {
 const connectDB = require('./config/db');
 const socketHandler = require('./socket/socketHandler');
 const { initScheduler } = require('./services/schedulerService');
+const { initQueues } = require('./services/queueService');
 
 // Route imports
-const authRoutes = require('./routes/auth');
-const quizRoutes = require('./routes/quiz');
-const responseRoutes = require('./routes/response');
-const aiRoutes = require('./routes/ai');
-const userRoutes = require('./routes/user');
-const adminRoutes = require('./routes/admin');
+// Route imports (Legacy - to be moved to v1 index)
+// const authRoutes = require('./routes/auth');
+// const quizRoutes = require('./routes/quiz');
+// const responseRoutes = require('./routes/response');
+// const aiRoutes = require('./routes/ai');
+// const userRoutes = require('./routes/user');
+// const adminRoutes = require('./routes/admin');
+
+// Versioned Routes
+const v1Router = require('./routes/v1');
 
 // --- 1. Environment Variables Check ---
 const requiredEnv = ['MONGODB_URI', 'JWT_SECRET'];
@@ -105,8 +113,27 @@ app.use(helmet({
 }));
 
 // Body parsing (MUST BE BEFORE ROUTES)
+// Body parsing (MUST BE BEFORE ROUTES)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// --- Security Upgrades (Part 1 Audit) ---
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const hpp = require('hpp');
+const cookieParser = require('cookie-parser');
+
+// Parse cookies
+app.use(cookieParser());
+
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Data sanitization against XSS
+app.use(xss());
+
+// Prevent parameter pollution
+app.use(hpp());
 
 // Initialize Socket.io (PURE WEBSOCKETS - NO REDIS)
 const ioConfig = {
@@ -143,6 +170,26 @@ try {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Routes
+// API Routes - Version 1
+app.use('/api/v1', v1Router);
+
+// Aliases for backward compatibility (Optional, logs warning)
+app.use('/api', (req, res, next) => {
+    if (!req.path.startsWith('/v1')) {
+        logger.warn(`Deprecated API Access: ${req.method} ${req.url}. Please use /api/v1/...`);
+    }
+    next();
+});
+
+// For now, keep mounting legacy routes directly to /api as well to prevent client crash
+// In a real migration, we'd update client first.
+const authRoutes = require('./routes/auth');
+const quizRoutes = require('./routes/quiz');
+const responseRoutes = require('./routes/response');
+const aiRoutes = require('./routes/ai');
+const userRoutes = require('./routes/user');
+const adminRoutes = require('./routes/admin');
+
 app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/responses', responseRoutes);
@@ -154,7 +201,16 @@ app.use('/api/admin', adminRoutes);
 app.get('/api/health', (req, res) => {
     res.status(200).json({
         success: true,
-        message: 'QuizMaster API is running',
+        message: 'QuizMaster API is running (Legacy Endpoint)',
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/api/v1/health', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: 'QuizMaster API v1 is running',
+        version: 'v1',
         timestamp: new Date().toISOString()
     });
 });
@@ -169,30 +225,9 @@ app.use((req, res) => {
 });
 
 // --- 4. Global Error Handler ---
-app.use((err, req, res, next) => {
-    console.error('GLOBAL ERROR:', err);
-
-    // Multer file size error
-    if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({
-            success: false,
-            message: 'File too large. Maximum size is 50MB.'
-        });
-    }
-
-    // CORS Error
-    if (err.message === 'Not allowed by CORS') {
-        return res.status(403).json({
-            success: false,
-            message: 'CORS Blocked'
-        });
-    }
-
-    res.status(err.status || 500).json({
-        success: false,
-        message: err.message || 'Internal Server Error'
-    });
-});
+// --- 4. Global Error Handler (Centralized) ---
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // Initialize Socket.io handlers
 try {
@@ -206,6 +241,13 @@ try {
     initScheduler(io);
 } catch (err) {
     console.error('❌ Failed to initialize Scheduler:', err);
+}
+
+// Initialize Background Queues
+try {
+    initQueues();
+} catch (err) {
+    console.error('❌ Failed to initialize Background Queues:', err);
 }
 
 // Start server

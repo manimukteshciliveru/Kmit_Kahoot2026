@@ -64,6 +64,10 @@ const quizSchema = new mongoose.Schema({
         maxlength: [500, 'Description cannot exceed 500 characters'],
         default: ''
     },
+    coverImage: {
+        type: String,
+        default: ''
+    },
     code: {
         type: String,
         unique: true,

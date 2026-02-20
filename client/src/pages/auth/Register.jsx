@@ -13,6 +13,9 @@ const Register = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [role, setRole] = useState('student');
+    const [department, setDepartment] = useState('CSE');
+    const [section, setSection] = useState('A');
+    const [rollNumber, setRollNumber] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const { register } = useAuth();
@@ -27,6 +30,11 @@ const Register = () => {
             return;
         }
 
+        if (role === 'student' && !rollNumber) {
+            toast.error('Registration number is required');
+            return;
+        }
+
         if (password !== confirmPassword) {
             toast.error('Passwords do not match');
             return;
@@ -38,14 +46,27 @@ const Register = () => {
         }
 
         setLoading(true);
-        const result = await register(name, email, password, role);
-        setLoading(false);
-
-        if (result.success) {
-            toast.success('Account created successfully!');
-            navigate('/dashboard');
-        } else {
-            toast.error(result.message);
+        try {
+            const registrationData = {
+                name,
+                email,
+                password,
+                role,
+                department: role === 'student' ? department : undefined,
+                section: role === 'student' ? section : undefined,
+                rollNumber: role === 'student' ? rollNumber : undefined
+            };
+            const result = await register(name, email, password, role, registrationData);
+            if (result.success) {
+                toast.success('Account created successfully!');
+                navigate('/dashboard');
+            } else {
+                toast.error(result.message);
+            }
+        } catch (error) {
+            toast.error('Registration failed');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -58,12 +79,10 @@ const Register = () => {
                 <div className="bg-glow glow-2"></div>
             </div>
 
-            {/* Theme Toggle in top right corner */}
             <div className="theme-toggle-corner">
                 <button
                     onClick={toggleTheme}
                     className={`theme-selector-btn ${theme}`}
-                    title={theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}
                 >
                     <span className="theme-icon">
                         {theme === 'dark' ? <FiMoon /> : <FiSun />}
@@ -106,6 +125,7 @@ const Register = () => {
                                     placeholder="Enter your full name"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
+                                    required
                                 />
                             </div>
                         </div>
@@ -120,6 +140,7 @@ const Register = () => {
                                     placeholder="Enter your email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
+                                    required
                                 />
                             </div>
                         </div>
@@ -146,6 +167,53 @@ const Register = () => {
                             </div>
                         </div>
 
+                        {role === 'student' && (
+                            <div className="animate-fadeIn">
+                                <div className="form-group">
+                                    <label className="form-label">Roll Number</label>
+                                    <div className="input-wrapper">
+                                        <FiUser className="input-icon" />
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="e.g., 24BD1A058J"
+                                            value={rollNumber}
+                                            onChange={(e) => setRollNumber(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Branch</label>
+                                        <select
+                                            className="form-input"
+                                            value={department}
+                                            onChange={(e) => setDepartment(e.target.value)}
+                                        >
+                                            <option value="CSE">CSE</option>
+                                            <option value="CSM">CSM (AI & ML)</option>
+                                            <option value="CSD">CSD (Data Science)</option>
+                                            <option value="IT">IT</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Section</label>
+                                        <select
+                                            className="form-input"
+                                            value={section}
+                                            onChange={(e) => setSection(e.target.value)}
+                                        >
+                                            {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'].map(s => (
+                                                <option key={s} value={s}>{s}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="form-group">
                             <label className="form-label">Password</label>
                             <div className="input-wrapper">
@@ -156,6 +224,7 @@ const Register = () => {
                                     placeholder="Create a password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
+                                    required
                                 />
                                 <button
                                     type="button"
@@ -177,6 +246,7 @@ const Register = () => {
                                     placeholder="Confirm your password"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
+                                    required
                                 />
                             </div>
                         </div>
@@ -195,11 +265,6 @@ const Register = () => {
                                 </>
                             )}
                         </button>
-
-                        <p className="terms-text">
-                            By creating an account, you agree to our{' '}
-                            <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
-                        </p>
                     </form>
 
                     <div className="auth-footer">
@@ -213,5 +278,6 @@ const Register = () => {
         </div>
     );
 };
+
 
 export default Register;

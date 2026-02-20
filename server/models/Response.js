@@ -147,8 +147,8 @@ responseSchema.pre('save', async function () {
             this.wrongCount = this.answers.filter(a => !a.isCorrect && a.answer).length;
             this.unansweredCount = this.answers.filter(a => !a.answer).length;
 
-            this.totalScore = this.answers.reduce((sum, a) => sum + (a.pointsEarned || 0), 0);
-            this.totalTimeTaken = this.answers.reduce((sum, a) => sum + (a.timeTaken || 0), 0);
+            this.totalScore = this.answers.reduce((sum, a) => sum + (Number(a.pointsEarned) || 0), 0);
+            this.totalTimeTaken = this.answers.reduce((sum, a) => sum + (Number(a.timeTaken) || 0), 0);
 
             if (this.maxPossibleScore > 0) {
                 this.percentage = Math.round((this.totalScore / this.maxPossibleScore) * 100);
@@ -156,9 +156,11 @@ responseSchema.pre('save', async function () {
                 this.percentage = 0;
             }
 
-            const answeredQuestions = this.answers.filter(a => a.timeTaken > 0).length;
+            const answeredQuestions = this.answers.filter(a => (Number(a.timeTaken) || 0) > 0).length;
             if (answeredQuestions > 0) {
                 this.averageTimePerQuestion = Math.round(this.totalTimeTaken / answeredQuestions);
+            } else {
+                this.averageTimePerQuestion = 0;
             }
         }
 
