@@ -2,6 +2,7 @@ services:
   - type: web
     name: kahoot-backend
     env: node
+    plan: free
     rootDir: server
     buildCommand: npm install
     startCommand: node server.js
