@@ -122,7 +122,7 @@ exports.submitAnswer = async (req, res) => {
         const io = req.app.get('io');
         if (io) {
             // Update leaderboard
-            const leaderboard = await Response.getLeaderboard(quizId, 10);
+            const leaderboard = await Response.getLeaderboard(quizId, 200);
 
             io.to(`quiz:${quizId}`).emit('leaderboard:update', { leaderboard });
 
@@ -215,7 +215,7 @@ exports.getResponseById = async (req, res) => {
         const response = await Response.findById(req.params.id)
             .populate({
                 path: 'quizId',
-                select: 'title subject createdBy startedAt endedAt questions settings',
+                select: 'title subject code createdBy startedAt endedAt questions settings accessControl participants',
                 populate: {
                     path: 'createdBy',
                     select: 'name'
@@ -229,6 +229,34 @@ exports.getResponseById = async (req, res) => {
             });
         }
 
+        // Calculate basic attendance stats for student view
+        let totalEligible = 0;
+        const quiz = response.quizId;
+        const attempted = await Response.countDocuments({ quizId: quiz._id });
+
+        if (quiz.accessControl) {
+            if (quiz.accessControl.mode === 'SPECIFIC') {
+                totalEligible = quiz.accessControl.allowedStudents?.length || 0;
+            } else if (!quiz.accessControl.isPublic && quiz.accessControl.allowedBranches?.length > 0) {
+                const conditions = quiz.accessControl.allowedBranches.map(branch => {
+                    const cond = { department: branch.name, role: 'student', isActive: true };
+                    if (branch.sections?.length > 0) cond.section = { $in: branch.sections };
+                    return cond;
+                });
+                totalEligible = await User.countDocuments({ $or: conditions });
+            } else {
+                totalEligible = attempted; // Public
+            }
+        } else {
+            totalEligible = attempted;
+        }
+
+        const stats = {
+            totalEligible,
+            totalJoined: attempted,
+            participationRate: totalEligible > 0 ? Math.round((attempted / totalEligible) * 100) : 100
+        };
+
         // Authorization check
         if (response.userId.toString() !== req.user._id.toString() &&
             req.user.role !== 'admin' &&
@@ -241,7 +269,7 @@ exports.getResponseById = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            data: { response }
+            data: { response, stats }
         });
     } catch (error) {
         console.error('Get response by ID error:', error);
@@ -276,7 +304,7 @@ exports.getQuizResponses = async (req, res) => {
         }
 
         const responses = await Response.find({ quizId: req.params.quizId })
-            .populate('userId', 'name email avatar')
+            .populate('userId', 'name email avatar rollNumber department section')
             .sort({ rank: 1, totalScore: -1 });
 
         res.status(200).json({

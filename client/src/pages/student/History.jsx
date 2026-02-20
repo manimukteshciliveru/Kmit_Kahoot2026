@@ -51,53 +51,81 @@ const History = () => {
         });
     };
 
-    const downloadReportCard = (response) => {
+    const downloadReportCard = async (response) => {
         const quizTitle = response.quizId?.title || 'Quiz_Report';
+        toast.loading('Preparing report card...', { id: 'csv-download' });
 
-        const headers = ['Question', 'Your Answer', 'Correct Answer', 'Status', 'Points', 'Time Taken'];
-        const rows = response.answers.map(a => {
-            const qDetail = response.quizId?.questions?.find(q => q._id === a.questionId);
-            return [
-                `"${(qDetail?.text || 'Question deleted').replace(/"/g, '""')}"`,
-                `"${(a.answer || 'Skipped').replace(/"/g, '""')}"`,
-                `"${(qDetail?.correctAnswer || 'N/A').replace(/"/g, '""')}"`,
-                a.isCorrect ? 'Correct' : 'Incorrect',
-                `${a.pointsEarned}/${qDetail?.points || 0}`,
-                `${(a.timeTaken / 1000).toFixed(1)}s`
+        try {
+            // Fetch the full leaderboard to include in the CSV
+            let leaderboardRows = [];
+            try {
+                const lbRes = await quizAPI.getLeaderboard(response.quizId?._id);
+                const lbData = lbRes.data.data.leaderboard || [];
+                leaderboardRows = lbData.map(lb => [
+                    lb.rank || '-',
+                    lb.userId?.name || 'Unknown',
+                    lb.totalScore,
+                    lb.status
+                ]);
+            } catch (lbError) {
+                console.error('Failed to fetch leaderboard for CSV:', lbError);
+                leaderboardRows = [['Rankings hidden or unavailable']];
+            }
+
+            const headers = ['Question', 'Your Answer', 'Correct Answer', 'Status', 'Points', 'Time Taken'];
+            const rows = response.answers.map(a => {
+                const qDetail = response.quizId?.questions?.find(q => q._id === a.questionId);
+                return [
+                    `"${(qDetail?.text || 'Question deleted').replace(/"/g, '""')}"`,
+                    `"${(a.answer || 'Skipped').replace(/"/g, '""')}"`,
+                    `"${(qDetail?.correctAnswer || 'N/A').replace(/"/g, '""')}"`,
+                    a.isCorrect ? 'Correct' : 'Incorrect',
+                    `${a.pointsEarned}/${qDetail?.points || 0}`,
+                    `${(a.timeTaken / 1000).toFixed(1)}s`
+                ];
+            });
+
+            const summary = [
+                ['QUIZ PERFORMANCE REPORT CARD'],
+                ['Quiz Title', quizTitle],
+                ['Subject', response.quizId?.subject || 'General'],
+                ['Faculty', response.quizId?.createdBy?.name || 'N/A'],
+                ['Student Name', user.name],
+                ['Roll Number', user.rollNumber],
+                ['Final Score', `${response.percentage}%`],
+                ['Total Points', `${response.totalScore}/${response.maxPossibleScore}`],
+                ['Rank', response.rank || 'N/A'],
+                ['Participants', leaderboardRows.length],
+                ['Date', formatDate(response.quizId?.startedAt || response.completedAt)],
+                []
             ];
-        });
 
-        const summary = [
-            ['Quiz Summary Report'],
-            ['Quiz Title', quizTitle],
-            ['Subject', response.quizId?.subject || 'General'],
-            ['Conducted By', response.quizId?.createdBy?.name || 'N/A'],
-            ['Student Name', user.name],
-            ['Roll Number', user.rollNumber],
-            ['Final Score', `${response.percentage}%`],
-            ['Total Points', `${response.totalScore}/${response.maxPossibleScore}`],
-            ['Rank', response.rank || 'N/A'],
-            ['Conducted Date', formatDate(response.quizId?.startedAt || response.completedAt)],
-            ['Started Time', formatTime(response.quizId?.startedAt)],
-            ['Ended Time', formatTime(response.quizId?.endedAt)],
-            []
-        ];
+            const leaderboardHeader = [[], ['FINAL LEADERBOARD']];
+            const leaderboardCols = ['Rank', 'Student Name', 'Total Score', 'Status'];
 
-        const csvContent = [
-            ...summary,
-            headers,
-            ...rows
-        ].map(e => e.join(",")).join("\n");
+            const csvContent = [
+                ...summary,
+                ['DETAILED ANALYSIS'],
+                headers,
+                ...rows,
+                ...leaderboardHeader,
+                leaderboardCols,
+                ...leaderboardRows
+            ].map(e => e.join(",")).join("\n");
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `ReportCard_${quizTitle.replace(/\s+/g, '_')}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `ReportCard_${quizTitle.replace(/\s+/g, '_')}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success('Report card downloaded', { id: 'csv-download' });
+        } catch (error) {
+            toast.error('Failed to generate report card', { id: 'csv-download' });
+        }
     };
 
     return (

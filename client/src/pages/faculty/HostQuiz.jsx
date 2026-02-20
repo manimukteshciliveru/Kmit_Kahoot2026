@@ -324,7 +324,7 @@ const HostQuiz = () => {
                 <div className="active-header">
                     <div className="host-nav-tabs">
                         <button className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>Live Stats</button>
-                        <button className={`tab-btn ${activeTab === 'leaderboard' ? 'active' : ''}`} onClick={() => setActiveTab('leaderboard')}>Leaderboard</button>
+                        <button className={`tab-btn ${activeTab === 'leaderboard' ? 'active' : ''}`} onClick={() => setActiveTab('leaderboard')}>Live Dashboard</button>
                         <button className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>Attendance</button>
                         <button className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security 🛡️</button>
                     </div>
@@ -403,37 +403,61 @@ const HostQuiz = () => {
                     )}
 
                     {activeTab === 'leaderboard' && (
-                        <div className="leaderboard-view animate-fadeIn">
-                            <h2 className="section-title">🏆 Quiz Leaderboard</h2>
-                            <div className="attendance-table-container leaderboard-table-scroll">
+                        <div className="leaderboard-view animate-fadeIn live-dashboard-view">
+                            <div className="dashboard-head-section">
+                                <h2 className="section-title">⚡ Live Dashboard</h2>
+                                <div className="live-status-pills">
+                                    <span className="live-count-pill"><FiUsers /> {leaderboard.length} Participating</span>
+                                    <span className="live-count-pill success"><FiCheck /> {leaderboard.filter(e => e.status === 'completed').length} Completed</span>
+                                </div>
+                            </div>
+
+                            <div className="attendance-table-container leaderboard-table-scroll live-dashboard-table">
                                 <table className="attendance-table leaderboard-styled-table">
                                     <thead>
                                         <tr>
-                                            <th>Rank</th>
-                                            <th>Roll Number</th>
-                                            <th>Name</th>
-                                            <th>Branch / Section</th>
-                                            <th>Marks</th>
+                                            <th>RANK</th>
+                                            <th>STUDENT</th>
+                                            <th>BRANCH / SEC</th>
+                                            <th>TIMING</th>
+                                            <th>PROGRESS</th>
+                                            <th>STATS</th>
+                                            <th className="text-right">SCORE</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {(() => {
+                                            let currentRank = 0;
                                             let lastScore = -1;
                                             let lastTime = -1;
-                                            let currentRank = 0;
-                                            return leaderboard.map((entry, i) => {
-                                                const score = entry.totalScore || entry.score || 0;
-                                                const time = entry.totalTimeTaken || 0;
 
+                                            // Sort locally to ensure live rank updation
+                                            const sortedLeaderboard = [...leaderboard].sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken);
+
+                                            return sortedLeaderboard.map((entry, i) => {
+                                                const score = entry.totalScore || 0;
+                                                const time = entry.totalTimeTaken || 0;
                                                 if (score !== lastScore || time !== lastTime) {
                                                     currentRank = i + 1;
                                                 }
                                                 lastScore = score;
                                                 lastTime = time;
                                                 const rank = currentRank;
+                                                const s = entry.userId || {};
+
+                                                const totalQs = quiz.questions?.length || 1;
+                                                const attempted = entry.answers?.filter(a => a.answer)?.length || 0;
+                                                const corrected = entry.correctCount || 0;
+                                                const accuracy = attempted > 0 ? Math.round((corrected / attempted) * 100) : 0;
+                                                const avgSpeed = entry.averageTimePerQuestion ? (entry.averageTimePerQuestion / 1000).toFixed(1) : '0';
+
+                                                const joinTime = entry.startedAt ? new Date(entry.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---';
+                                                const endTime = entry.status === 'completed' && entry.completedAt ?
+                                                    new Date(entry.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
+                                                    <span className="status-pulse-text">Active...</span>;
 
                                                 return (
-                                                    <tr key={i} className={rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : rank === 3 ? 'rank-bronze' : ''}>
+                                                    <tr key={i} className={`live-row ${rank <= 3 ? `rank-${rank}-row` : ''} ${user._id === s._id ? 'self-row' : ''}`}>
                                                         <td>
                                                             <div className="rank-display">
                                                                 {rank === 1 ? <span className="medal">🥇</span> :
@@ -442,18 +466,58 @@ const HostQuiz = () => {
                                                                             <span className="rank-number">#{rank}</span>}
                                                             </div>
                                                         </td>
-                                                        <td className="roll-number">{entry.userId?.rollNumber || '-'}</td>
-                                                        <td className="student-name-cell">{entry.userId?.name || entry.studentName}</td>
-                                                        <td>{entry.userId?.department || '-'} - {entry.userId?.section || '-'}</td>
-                                                        <td className="score-cell-bold">{score} pts</td>
+                                                        <td>
+                                                            <div className="student-profile-info">
+                                                                <span className="name-bold">{s.name || entry.studentName}</span>
+                                                                <span className="roll-mono">{s.rollNumber || '-'}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="dept-sec-info">
+                                                                <span className="dept-tag">{s.department || 'N/A'}</span>
+                                                                <span className="sec-tag">Section {s.section || 'N/A'}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="timing-info">
+                                                                <div className="time-item"><FiClock className="icon" /> {joinTime} <span className="lbl">Joined</span></div>
+                                                                <div className="time-item"><FiStopCircle className="icon" /> {endTime}</div>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="progress-metrics">
+                                                                <div className="progress-mini-bar">
+                                                                    <div className="bar-fill" style={{ width: `${(attempted / totalQs) * 100}%` }}></div>
+                                                                </div>
+                                                                <span className="progress-txt">{attempted}/{totalQs} Completed</span>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="live-stats-metrics">
+                                                                <div className="stat-pill accuracy">
+                                                                    <FiCheck /> {accuracy}%
+                                                                </div>
+                                                                <div className="stat-pill speed">
+                                                                    <FiZap /> {avgSpeed}s
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="text-right">
+                                                            <div className="score-badge-live">
+                                                                {score} <span className="pts">pts</span>
+                                                            </div>
+                                                        </td>
                                                     </tr>
                                                 );
                                             });
                                         })()}
                                         {leaderboard.length === 0 && (
                                             <tr>
-                                                <td colSpan="6" className="empty-table-msg">
-                                                    No results available yet. Results appear as students complete the quiz.
+                                                <td colSpan="7" className="empty-table-msg">
+                                                    <div className="empty-state-lux">
+                                                        <FiBarChart2 className="empty-icon-giant" />
+                                                        <p>Waiting for participants to start answering...</p>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         )}

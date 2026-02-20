@@ -94,7 +94,7 @@ module.exports = (io) => {
         const timeout = setTimeout(async () => {
             try {
                 await Response.updateRanks(quizId);
-                const leaderboard = await Response.getLeaderboard(quizId, 10);
+                const leaderboard = await Response.getLeaderboard(quizId, 200);
                 io.to(`quiz:${quizId}`).emit('leaderboard:update', { leaderboard });
                 rankUpdateDebounces.delete(quizId);
             } catch (err) {
@@ -327,7 +327,7 @@ module.exports = (io) => {
                 // 4. Update Leaderboard for all (Debounced for DB mode, Fast for Redis mode)
                 const isRedisEnabled = !!(await LeaderboardService.getTop(quizId, 1)).length;
                 if (isRedisEnabled) {
-                    const lb = await LeaderboardService.getTop(quizId, 10);
+                    const lb = await LeaderboardService.getTop(quizId, 200);
                     io.to(`quiz:${quizId}`).emit('leaderboard:update', { leaderboard: lb });
                 } else {
                     debounceRankUpdate(quizId);
