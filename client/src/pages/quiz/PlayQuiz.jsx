@@ -567,17 +567,25 @@ const PlayQuiz = () => {
         };
     }, [status, quiz, reportTabSwitch, quizId, socket]);
 
-    const handleNextQuestion = () => {
+    const handleNextQuestion = useCallback(() => {
+        const currentQ = questions[currentIndex];
+        if (currentQ?.type === 'fill-blank' || currentQ?.type === 'qa') {
+            handleAnswerSubmit(false, textAnswer);
+        }
         if (currentIndex < questions.length - 1) {
             goToQuestion(currentIndex + 1);
         }
-    };
+    }, [currentIndex, questions, textAnswer, handleAnswerSubmit, goToQuestion]);
 
-    const handlePrevQuestion = () => {
+    const handlePrevQuestion = useCallback(() => {
+        const currentQ = questions[currentIndex];
+        if (currentQ?.type === 'fill-blank' || currentQ?.type === 'qa') {
+            handleAnswerSubmit(false, textAnswer);
+        }
         if (currentIndex > 0) {
             goToQuestion(currentIndex - 1);
         }
-    };
+    }, [currentIndex, textAnswer, handleAnswerSubmit, goToQuestion]);
 
     const formatTime = useCallback((seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -877,12 +885,41 @@ const PlayQuiz = () => {
                                     className="game-text-input"
                                     value={textAnswer}
                                     onChange={(e) => setTextAnswer(e.target.value)}
-                                    onBlur={() => handleAnswerSubmit(false, textAnswer)} // Auto-save on blur
+                                    onBlur={() => handleAnswerSubmit(false, textAnswer)}
                                     placeholder="TYPE YOUR RESPONSE HERE..."
                                     autoFocus
                                 />
+                                <button
+                                    className="save-answer-btn"
+                                    onClick={() => {
+                                        handleAnswerSubmit(false, textAnswer);
+                                        toast.success('Answer saved!', { id: 'save-toast' });
+                                    }}
+                                >
+                                    <FiCheckCircle /> SAVE ANSWER
+                                </button>
                             </div>
                         )}
+
+                        {/* Question Map - Easy Navigation Panel Board */}
+                        <div className="question-map-board">
+                            <div className="map-header">
+                                <span>Question Progress</span>
+                                <span className="stat">{Object.keys(savedAnswers).length}/{questions.length}</span>
+                            </div>
+                            <div className="map-grid">
+                                {questions.map((q, idx) => (
+                                    <div
+                                        key={idx}
+                                        className={`map-dot ${idx === currentIndex ? 'current' : ''} ${savedAnswers[q?._id] ? 'answered' : ''}`}
+                                        onClick={() => goToQuestion(idx)}
+                                        title={`Go to Question ${idx + 1}`}
+                                    >
+                                        {idx + 1}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
 
                         <div className="game-controls">
                             <div className="navigation-group">
