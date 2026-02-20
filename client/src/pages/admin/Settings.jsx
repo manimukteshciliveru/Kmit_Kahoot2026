@@ -145,7 +145,7 @@ const Settings = () => {
                         <div className="setting-item">
                             <div className="setting-info">
                                 <span className="setting-label">API URL</span>
-                                <span className="setting-value">{import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}</span>
+                                <span className="setting-value">{import.meta.env.VITE_API_URL || 'https://kmit-kahoot2026.onrender.com/api/v1'}</span>
                             </div>
                         </div>
                         <div className="setting-item">

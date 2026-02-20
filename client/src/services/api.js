@@ -15,7 +15,7 @@ const getApiUrl = () => {
     }
 
     // Fallback for development
-    return 'http://localhost:5000/api';
+    return 'https://kmit-kahoot2026.onrender.com/api/v1';
 };
 
 const API_URL = getApiUrl();

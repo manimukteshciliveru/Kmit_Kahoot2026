@@ -62,6 +62,7 @@ const getAllowedOrigins = () => {
         "https://kahoot-render.onrender.com",
         "https://kahoot.onrender.com",
         "https://kmit-kahoot-backend.onrender.com", // Backend itself
+        "https://kmit-kahoot2026.onrender.com", // Actual Render Backend URL
         "https://your-frontend.vercel.app" // Placeholder for Vercel deployment
     ];
 

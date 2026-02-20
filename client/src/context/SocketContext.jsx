@@ -22,19 +22,19 @@ export const SocketProvider = ({ children }) => {
         if (isAuthenticated && token) {
             // Determine Socket URL based on environment
             let socketUrl = import.meta.env.VITE_SOCKET_URL;
-            
+
             if (!socketUrl) {
                 if (import.meta.env.PROD) {
                     // In production, use current origin
                     socketUrl = window.location.origin;
                 } else {
                     // Development fallback
-                    socketUrl = 'http://localhost:5000';
+                    socketUrl = 'https://kmit-kahoot2026.onrender.com';
                 }
             }
-            
+
             console.log('🔌 [SOCKET] Connecting to:', socketUrl);
-            
+
             const sessionId = Math.random().toString(36).substring(7) + Date.now();
 
             const newSocket = io(socketUrl, {
