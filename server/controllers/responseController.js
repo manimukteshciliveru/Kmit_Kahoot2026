@@ -1,6 +1,7 @@
 const Response = require('../models/Response');
 const Quiz = require('../models/Quiz');
 const User = require('../models/User');
+const { calculateScore } = require('../utils/calculateScore');
 
 // @desc    Submit answer for a question
 // @route   POST /api/responses/answer
@@ -26,7 +27,8 @@ exports.submitAnswer = async (req, res) => {
             });
         }
 
-        if (quiz.status !== 'active') {
+        // Accept both legacy "active" and new state-machine "question_active"
+        if (!['active', 'question_active'].includes(quiz.status)) {
             return res.status(400).json({
                 success: false,
                 message: 'Quiz is not active'
@@ -66,9 +68,10 @@ exports.submitAnswer = async (req, res) => {
             });
         }
 
-        // Check if answer is correct
-        const isCorrect = checkAnswer(question, answer);
-        const pointsEarned = isCorrect ? question.points : 0;
+        // Check if answer is correct (Using Centralized Utility)
+        // `calculateScore` expects time in seconds; if client sends milliseconds, normalize.
+        const timeInSeconds = timeTaken && timeTaken > 100 ? timeTaken / 1000 : (timeTaken || 0);
+        const { isCorrect, pointsEarned } = calculateScore(question, answer, timeInSeconds, quiz.settings);
 
         // Atomic update of the specific answer
         // This prevents race conditions where multiple tabs might overwrite each other
@@ -176,9 +179,11 @@ exports.getMyResponse = async (req, res) => {
         }).populate('quizId', 'title code questions settings');
 
         if (!response) {
-            return res.status(404).json({
-                success: false,
-                message: 'Response not found'
+            // For production robustness: Return 200 with null instead of 404 to avoid console noise
+            // during race conditions or when faculty members preview the play page.
+            return res.status(200).json({
+                success: true,
+                data: { response: null }
             });
         }
 

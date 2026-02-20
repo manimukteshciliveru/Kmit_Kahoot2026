@@ -27,6 +27,7 @@ export const AuthProvider = ({ children }) => {
                 } catch (error) {
                     console.error('Auth init failed:', error);
                     localStorage.removeItem('token');
+                    localStorage.removeItem('refreshToken');
                     localStorage.removeItem('user');
                     setToken(null);
                     setUser(null);
@@ -46,7 +47,7 @@ export const AuthProvider = ({ children }) => {
 
             // Handle if the response comes from a cached promise (Idempotency) or fresh request
             const data = response.data?.data || response.data;
-            const { user: userData, token: authToken } = data;
+            const { user: userData, token: authToken, refreshToken } = data;
 
             if (!authToken) {
                 console.error('❌ [AUTH] No token received from server');
@@ -58,6 +59,11 @@ export const AuthProvider = ({ children }) => {
 
             localStorage.setItem('token', authToken);
             localStorage.setItem('user', JSON.stringify(userData));
+            
+            // Store refresh token if provided (for automatic token refresh)
+            if (refreshToken) {
+                localStorage.setItem('refreshToken', refreshToken);
+            }
 
             setToken(authToken);
             setUser(userData);
@@ -85,10 +91,15 @@ export const AuthProvider = ({ children }) => {
         try {
             const signupData = { name, email, password, role, ...registrationData };
             const response = await authAPI.register(signupData);
-            const { user: userData, token: authToken } = response.data.data;
+            const { user: userData, token: authToken, refreshToken } = response.data.data;
 
             localStorage.setItem('token', authToken);
             localStorage.setItem('user', JSON.stringify(userData));
+            
+            // Store refresh token if provided
+            if (refreshToken) {
+                localStorage.setItem('refreshToken', refreshToken);
+            }
 
             setToken(authToken);
             setUser(userData);
@@ -104,6 +115,7 @@ export const AuthProvider = ({ children }) => {
 
     const logout = () => {
         localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         setToken(null);
         setUser(null);
