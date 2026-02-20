@@ -79,25 +79,7 @@ const getAllowedOrigins = () => {
 };
 
 const corsOptions = {
-    origin: (origin, callback) => {
-        const allowedOrigins = getAllowedOrigins();
-
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) {
-            console.log('✅ [CORS] No origin header (possible mobile app or curl)');
-            return callback(null, true);
-        }
-
-        if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
-            // console.log(`✅ [CORS] Allowed origin: ${origin}`);
-            callback(null, true);
-        } else {
-            console.warn(`⚠️ [CORS] Rejected origin: ${origin}. Allowlist: ${JSON.stringify(allowedOrigins)}`);
-            // Still allow it for now to debug - CHANGE THIS IN PROD AFTER DEBUGGING
-            // callback(new Error('Not allowed by CORS'));
-            callback(null, true);
-        }
-    },
+    origin: true, // Reflect request origin to handle CORS for all whitelisted and dynamic origins
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
