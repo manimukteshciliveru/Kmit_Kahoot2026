@@ -29,7 +29,7 @@ export const SocketProvider = ({ children }) => {
                     socketUrl = window.location.origin;
                 } else {
                     // Development fallback
-                    socketUrl = 'https://kmit-kahoot2026.onrender.com';
+                    socketUrl = 'http://localhost:5000';
                 }
             }
 
