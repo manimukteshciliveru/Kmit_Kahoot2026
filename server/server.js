@@ -61,7 +61,8 @@ const getAllowedOrigins = () => {
         "https://kmit-kahoot.vercel.app",
         "https://kahoot-render.onrender.com",
         "https://kahoot.onrender.com",
-        "https://kmit-kahoot-backend.onrender.com" // Backend itself
+        "https://kmit-kahoot-backend.onrender.com", // Backend itself
+        "https://your-frontend.vercel.app" // Placeholder for Vercel deployment
     ];
 
     // Add custom origins from environment
