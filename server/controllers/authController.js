@@ -35,7 +35,8 @@ const sendTokenResponse = async (user, statusCode, res) => {
                     avatar: user.avatar,
                     stats: user.stats
                 },
-                token: accessToken // Access token returned for memory storage
+                token: accessToken, // Access token returned for memory storage
+                refreshToken: refreshToken // Also return in body for localStorage storage
             }
         });
 };
@@ -345,7 +346,18 @@ exports.changePassword = async (req, res) => {
 // @access  Public
 exports.refreshToken = async (req, res) => {
     try {
-        const refreshToken = req.cookies.refreshToken;
+        // Support both cookie and Authorization header for refresh token
+        let refreshToken = req.cookies.refreshToken;
+        
+        // If not in cookie, check Authorization header
+        if (!refreshToken && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+            refreshToken = req.headers.authorization.split(' ')[1];
+        }
+
+        // Also check body as fallback
+        if (!refreshToken && req.body.refreshToken) {
+            refreshToken = req.body.refreshToken;
+        }
 
         if (!refreshToken) {
             return res.status(401).json({ success: false, message: 'Refresh token not found' });
@@ -356,7 +368,7 @@ exports.refreshToken = async (req, res) => {
 
         // Find user and check if token is in their list
         const user = await User.findById(decoded.id);
-        if (!user || !user.refreshTokens.includes(refreshToken)) {
+        if (!user || !user.refreshTokens || !user.refreshTokens.includes(refreshToken)) {
             return res.status(401).json({ success: false, message: 'Invalid refresh token' });
         }
 
@@ -365,7 +377,17 @@ exports.refreshToken = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            token: accessToken
+            data: {
+                token: accessToken,
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    avatar: user.avatar,
+                    stats: user.stats
+                }
+            }
         });
     } catch (error) {
         logger.error('RefreshToken error:', error);

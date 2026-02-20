@@ -5,6 +5,8 @@ const pdfParse = require('pdf-parse');
 const xlsx = require('xlsx');
 const fs = require('fs');
 const path = require('path');
+const mammoth = require('mammoth');
+const officeparser = require('officeparser');
 const AILog = require('../models/AILog');
 const logger = require('../utils/logger'); // Use our new logger
 
@@ -87,6 +89,34 @@ class AIQuestionGenerator {
         }
     }
 
+    async extractFromWord(filePathOrUrl) {
+        try {
+            const dataBuffer = await this.getFileBuffer(filePathOrUrl);
+            const result = await mammoth.extractRawText({ buffer: dataBuffer });
+            return result.value;
+        } catch (error) {
+            logger.error('Word extraction error:', error);
+            throw new Error(`Word Error: ${error.message}`);
+        }
+    }
+
+    async extractFromPowerPoint(filePathOrUrl) {
+        try {
+            // officeparser works well with buffers or file paths
+            // If it's a URL, we must use the buffer
+            const dataBuffer = await this.getFileBuffer(filePathOrUrl);
+            return new Promise((resolve, reject) => {
+                officeparser.parseOffice(dataBuffer, (data, err) => {
+                    if (err) return reject(err);
+                    resolve(data);
+                });
+            });
+        } catch (error) {
+            logger.error('PowerPoint extraction error:', error);
+            throw new Error(`PowerPoint Error: ${error.message}`);
+        }
+    }
+
     async fileToGenerativePart(filePathOrUrl, mimeType) {
         const dataBuffer = await this.getFileBuffer(filePathOrUrl);
         return {
@@ -105,13 +135,16 @@ class AIQuestionGenerator {
 
         // 1. Construct the System Prompt
         const promptSystem = `
-        You are an expert academic quiz creator. Generate exactly ${count} ${difficulty} ${type === 'mcq' ? 'multiple choice' : 'Q&A'} questions.
+        You are an expert academic quiz creator. Generate exactly ${count} ${difficulty} level questions based on the provided content.
+        Question Type: ${type.toUpperCase()}
         
         STRICT FORMATTING RULES:
         1. Return ONLY valid JSON array. No markdown, no 'json' code blocks.
         2. Format: [{"text":"Question text here","options":["Option 1","Option 2","Option 3","Option 4"],"correctAnswer":"Option 1","explanation":"Explanation here"}]
-        3. CRITICAL: The 'correctAnswer' field MUST be the exact string text of the correct option. Do NOT use "A", "B", "1", "2" or indices.
-        4. Accuracy: 100% based on content.
+        3. For MCQ/MSQ: Provide 4 distinct options. 'correctAnswer' MUST be the exact text of the correct option.
+        4. For FILL-BLANK/QA: 'options' should be empty []. 'correctAnswer' should be the concise correct answer.
+        5. CRITICAL: The 'correctAnswer' field MUST be the exact string text. Do NOT use "A", "B", "1", "2" or indices.
+        6. Accuracy: 100% based on content.
         
         CONTENT:
         `;

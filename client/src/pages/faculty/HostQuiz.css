@@ -624,94 +624,105 @@
 
 /* Redesigned Leaderboard Table Styles */
 .leaderboard-table-scroll {
-    max-height: calc(100vh - 350px);
+    max-height: 600px;
     overflow-y: auto;
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-color);
     scrollbar-width: thin;
     scrollbar-color: var(--primary) transparent;
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
 }
 
 .leaderboard-table-scroll::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
+}
+
+.leaderboard-table-scroll::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .leaderboard-table-scroll::-webkit-scrollbar-thumb {
-    background-color: var(--primary);
-    border-radius: 10px;
+    background: linear-gradient(to bottom, var(--primary), var(--accent));
+    border-radius: 20px;
 }
 
 .leaderboard-styled-table thead th {
     position: sticky;
     top: 0;
     z-index: 10;
-    background: var(--bg-secondary);
-    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.1);
+    background: #1e1e30;
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
+    padding: 1.2rem 1rem;
+    border-bottom: 2px solid var(--border-color);
 }
 
-.leaderboard-styled-table tr {
-    transition: transform 0.2s, background-color 0.2s;
+.leaderboard-styled-table th:first-child,
+.leaderboard-styled-table th:nth-child(5),
+.leaderboard-styled-table th:nth-child(6) {
+    text-align: center;
+}
+
+.leaderboard-styled-table td:first-child,
+.leaderboard-styled-table td:nth-child(5),
+.leaderboard-styled-table td:nth-child(6) {
+    text-align: center;
+}
+
+.leaderboard-styled-table td:nth-child(5)>div,
+.leaderboard-styled-table td:nth-child(6)>div {
+    display: flex;
+    justify-content: center;
+}
+
+.leaderboard-styled-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
 }
 
 .leaderboard-styled-table tr:hover {
-    background-color: rgba(255, 127, 17, 0.08) !important;
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    transform: scale(1.002);
 }
 
 .rank-display {
     font-size: 1.1rem;
-    font-weight: 700;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.rank-number {
-    color: var(--text-muted);
-    font-size: 0.85rem;
-}
-
-.medal {
-    font-size: 1.4rem;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-}
-
-.student-name-cell {
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.roll-number {
-    font-family: var(--font-mono);
-    color: var(--primary);
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-
-.score-cell-bold {
     font-weight: 800;
-    color: var(--success);
-    font-size: 1rem;
 }
 
-/* Rank Highlights */
-.rank-gold {
-    background-color: rgba(255, 215, 0, 0.08) !important;
-    border-left: 4px solid #ffd700;
+.medal-shine {
+    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.4));
+    font-size: 1.8rem;
+    display: inline-block;
+    animation: bounce 2s infinite ease-in-out;
 }
 
-.rank-silver {
-    background-color: rgba(192, 192, 192, 0.08) !important;
-    border-left: 4px solid #c0c0c0;
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-3px);
+    }
 }
 
-.rank-bronze {
-    background-color: rgba(205, 127, 50, 0.08) !important;
-    border-left: 4px solid #cd7f32;
+/* Rank Highlights with Premium Glassmorphism */
+.rank-1-row {
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.05) 0%, transparent 100%) !important;
+}
+
+.rank-2-row {
+    background: linear-gradient(90deg, rgba(192, 192, 192, 0.05) 0%, transparent 100%) !important;
+}
+
+.rank-3-row {
+    background: linear-gradient(90deg, rgba(205, 127, 50, 0.05) 0%, transparent 100%) !important;
 }
 
 .empty-table-msg {
@@ -825,20 +836,63 @@
 }
 
 .status-pill {
-    padding: 4px 12px;
+    padding: 6px 12px;
     border-radius: var(--radius-full);
     font-size: 0.8rem;
     font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.status-pill.answered {
-    background: rgba(38, 137, 12, 0.1);
-    color: var(--success);
+.status-pill.present {
+    background: rgba(38, 137, 12, 0.15);
+    color: #48bb78;
+    border: 1px solid rgba(38, 137, 12, 0.2);
 }
 
-.status-pill.waiting {
+.status-pill.absent {
+    background: rgba(226, 27, 60, 0.15);
+    color: #e53e3e;
+    border: 1px solid rgba(226, 27, 60, 0.2);
+}
+
+.attendance-table tr.absent {
+    opacity: 0.7;
+    background: rgba(226, 27, 60, 0.02);
+}
+
+.section-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.attendance-stats {
+    display: flex;
+    gap: 15px;
+}
+
+.attendance-stats span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
     background: var(--bg-tertiary);
-    color: var(--text-muted);
+    border-radius: var(--radius-full);
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.stat-p {
+    color: var(--success);
+    border: 1px solid rgba(38, 137, 12, 0.2);
+}
+
+.stat-a {
+    color: var(--danger);
+    border: 1px solid rgba(226, 27, 60, 0.2);
 }
 
 .cheating-logs {
@@ -1286,17 +1340,130 @@
     margin-bottom: 20px;
 }
 
+/* Modern Live Dashboard Enhancements */
+.dashboard-head-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: var(--radius-lg);
+}
+
+.live-status-pills {
+    display: flex;
+    gap: 1rem;
+}
+
+.live-count-pill {
+    padding: 6px 16px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.live-count-pill.success {
+    color: var(--success);
+    background: rgba(38, 137, 12, 0.1);
+    border-color: rgba(38, 137, 12, 0.2);
+}
+
 .rank-1-row {
-    background: rgba(255, 215, 0, 0.05) !important;
-    border-left: 3px solid #ffd700;
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.08) 0%, transparent 100%) !important;
+    border-left: 4px solid #ffd700 !important;
 }
 
 .rank-2-row {
-    background: rgba(192, 192, 192, 0.05) !important;
-    border-left: 3px solid #c0c0c0;
+    background: linear-gradient(90deg, rgba(192, 192, 192, 0.08) 0%, transparent 100%) !important;
+    border-left: 4px solid #c0c0c0 !important;
 }
 
 .rank-3-row {
-    background: rgba(205, 127, 50, 0.05) !important;
-    border-left: 3px solid #cd7f32;
+    background: linear-gradient(90deg, rgba(205, 127, 50, 0.08) 0%, transparent 100%) !important;
+    border-left: 4px solid #cd7f32 !important;
+}
+
+.self-row {
+    background: rgba(255, 127, 17, 0.1) !important;
+    outline: 1px solid var(--primary);
+}
+
+/* Filter System Styles */
+.filter-system {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 25px;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 20px;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.filter-group label {
+    font-weight: 700;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 80px;
+}
+
+.filter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.pill {
+    padding: 6px 16px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pill:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.pill.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(255, 127, 17, 0.3);
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.animate-slideInRight {
+    animation: slideInRight 0.3s ease-out forwards;
 }

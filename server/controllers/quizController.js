@@ -686,14 +686,14 @@ exports.startQuiz = async (req, res) => {
             });
         }
 
-        quiz.status = 'active';
+        quiz.status = 'live';
         quiz.startedAt = new Date();
         quiz.currentQuestionIndex = 0;
 
         // Set expiration time if quiz timer is set
         // Adding a 5 second buffer for network latency
-        if (quiz.settings?.quizTimer > 0) {
-            quiz.expiresAt = new Date(quiz.startedAt.getTime() + (quiz.settings.quizTimer * 1000) + 5000);
+        if (quiz.settings?.questionTimer > 0) {
+            quiz.expiresAt = new Date(quiz.startedAt.getTime() + (quiz.settings.questionTimer * 1000));
             console.log(`[START QUIZ] Timer set. Expires at: ${quiz.expiresAt}`);
         } else {
             quiz.expiresAt = null;
@@ -710,18 +710,10 @@ exports.startQuiz = async (req, res) => {
         // Emit socket event
         const io = req.app.get('io');
         if (io) {
-            io.to(`quiz:${quiz._id}`).emit('quiz:started', {
-                quizId: quiz._id,
-                startedAt: quiz.startedAt,
-                expiresAt: quiz.expiresAt,
+            io.to(`quiz:${quiz._id}`).emit('quiz:state_changed', {
+                status: 'question_active',
                 currentQuestionIndex: 0,
-                totalQuestions: quiz.questions.length,
-                questions: quiz.questions.map(q => ({
-                    ...q.toObject(),
-                    correctAnswer: undefined, // Hide correct answer
-                    explanation: undefined
-                })),
-                settings: quiz.settings
+                expiresAt: quiz.expiresAt
             });
         }
 
@@ -764,59 +756,39 @@ exports.endQuiz = async (req, res) => {
 
         console.log(`[END QUIZ] Manually ending quiz: ${quiz._id}`);
 
-        quiz.status = 'completed';
+        quiz.status = 'done';
         quiz.endedAt = new Date();
+        quiz.expiresAt = null;
         await quiz.save();
 
-        // Find all in-progress responses and force complete them
-        // We do this individually to trigger calculation hooks
+        // Mark all active responses as completed
         const activeResponses = await Response.find({
             quizId: quiz._id,
-            status: { $in: ['in-progress', 'waiting'] }
+            status: 'in-progress'
         });
 
-        console.log(`[END QUIZ] Force completing ${activeResponses.length} active responses`);
-
-        const completionPromises = activeResponses.map(async (response) => {
+        await Promise.all(activeResponses.map(async (response) => {
             response.status = 'completed';
             response.completedAt = new Date();
-            response.terminationReason = 'manual'; // Marked as manually ended by host
-            // Hook will calculate final scores
             return response.save();
-        });
+        }));
 
-        await Promise.all(completionPromises);
-
-        // Update ranks after all scores are finalized
         await Response.updateRanks(quiz._id);
+        const leaderboard = await Response.getLeaderboard(quiz._id, 10);
 
-        // Get final leaderboard
-        const leaderboard = await Response.getLeaderboard(quiz._id);
-
-        // Emit socket event
         const io = req.app.get('io');
         if (io) {
-            console.log(`[END QUIZ] Emitting quiz:ended event`);
-            io.to(`quiz:${quiz._id}`).emit('quiz:ended', {
-                quizId: quiz._id,
-                endedAt: quiz.endedAt,
-                leaderboard,
-                autoEnded: false
-            });
+            io.to(`quiz:${quiz._id}`).emit('quiz:ended', { leaderboard });
+            io.to(`quiz:${quiz._id}`).emit('quiz:state_changed', { status: 'finished', leaderboard });
         }
 
         res.status(200).json({
             success: true,
-            message: 'Quiz ended successfully',
             data: { quiz, leaderboard }
         });
     } catch (error) {
         console.error('End quiz error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to end quiz',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Failed to end quiz' });
     }
 };
 
@@ -1098,6 +1070,94 @@ exports.getQuizResults = async (req, res) => {
     }
 };
 
+// @desc    Get live attendance for a quiz
+// @route   GET /api/quizzes/:id/attendance
+// @access  Private (Faculty owner or Admin)
+exports.getQuizAttendance = async (req, res) => {
+    try {
+        const quiz = await Quiz.findById(req.params.id)
+            .select('accessControl participants createdBy')
+            .populate('participants', '_id name rollNumber department section');
+
+        if (!quiz) {
+            return res.status(404).json({ success: false, message: 'Quiz not found' });
+        }
+
+        // Check ownership
+        if (quiz.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        const participantIds = new Set(quiz.participants.map(p => p._id.toString()));
+        let eligibleStudents = [];
+        const access = quiz.accessControl;
+
+        // Determination of eligible students pool
+        if (access && access.mode === 'SPECIFIC' && access.allowedStudents?.length > 0) {
+            eligibleStudents = await User.find({ _id: { $in: access.allowedStudents } })
+                .select('name rollNumber department section avatar')
+                .lean();
+        } else if (access && !access.isPublic && access.allowedBranches?.length > 0) {
+            const criteria = access.allowedBranches.map(b => ({
+                department: b.name,
+                role: 'student',
+                isActive: true,
+                ...(b.sections?.length > 0 ? { section: { $in: b.sections } } : {})
+            }));
+
+            if (criteria.length > 0) {
+                eligibleStudents = await User.find({ $or: criteria })
+                    .select('name rollNumber department section avatar')
+                    .lean();
+            }
+        } else {
+            // If public, all active students are "eligible" to join
+            eligibleStudents = await User.find({ role: 'student', isActive: true })
+                .select('name rollNumber department section avatar')
+                .lean();
+        }
+
+        // Merge eligible students with present status
+        const attendanceMap = new Map();
+
+        // 1. Initial Pass: Mark everything from eligible pool
+        eligibleStudents.forEach(s => {
+            attendanceMap.set(s._id.toString(), {
+                id: s._id,
+                name: s.name,
+                rollNumber: s.rollNumber || 'N/A',
+                department: s.department || 'N/A',
+                section: s.section || 'N/A',
+                status: participantIds.has(s._id.toString()) ? 'Present' : 'Absent'
+            });
+        });
+
+        // 2. Second Pass: Add anyone who is present but wasn't in the eligible list (e.g. joined via PIN)
+        quiz.participants.forEach(p => {
+            if (!attendanceMap.has(p._id.toString())) {
+                attendanceMap.set(p._id.toString(), {
+                    id: p._id,
+                    name: p.name,
+                    rollNumber: p.rollNumber || 'N/A',
+                    department: p.department || 'N/A',
+                    section: p.section || 'N/A',
+                    status: 'Present'
+                });
+            }
+        });
+
+        const attendanceList = Array.from(attendanceMap.values());
+
+        res.status(200).json({
+            success: true,
+            data: attendanceList
+        });
+    } catch (error) {
+        console.error('Attendance fetch error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // Helper function to shuffle array
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -1107,57 +1167,62 @@ function shuffleArray(array) {
     return array;
 }
 
-// @desc    Reset quiz (allow re-hosting)
-// @route   POST /api/quizzes/:id/reset
+// @desc    Re-host quiz (Create a new session from existing)
+// @route   POST /api/quizzes/:id/rehost
 // @access  Private (Faculty owner)
-exports.resetQuiz = async (req, res) => {
+exports.rehostQuiz = async (req, res) => {
     try {
-        const quiz = await Quiz.findById(req.params.id);
+        const originalQuiz = await Quiz.findById(req.params.id);
 
-        if (!quiz) {
+        if (!originalQuiz) {
             return res.status(404).json({
                 success: false,
-                message: 'Quiz not found'
+                message: 'Original quiz not found'
             });
         }
 
-        // Check ownership (owner or admin)
-        if (quiz.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-            return res.status(403).json({
+        // Check ownership
+        if (originalQuiz.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            const logMsg = `🔒 [AUTH] Ownership Mismatch for Re-host: User ${req.user._id} (${req.user.role}) attempted to re-host Quiz ${originalQuiz._id} owned by ${originalQuiz.createdBy}`;
+            console.warn(logMsg);
+            return res.status(401).json({
                 success: false,
-                message: 'Not authorized to reset this quiz'
+                message: 'Not authorized to re-host this quiz'
             });
         }
 
-        // Reset Quiz State
-        quiz.status = 'draft'; // Set to draft so it appears in list but not active yet
-        quiz.participants = [];
-        quiz.startedAt = null;
-        quiz.endedAt = null;
-        quiz.expiresAt = null; // Important: Clear scheduled/expiration times
-        quiz.currentQuestionIndex = 0;
-        await quiz.save();
+        // Create a new quiz based on the original one
+        const quizData = originalQuiz.toObject();
+        delete quizData._id;
+        delete quizData.id;
+        delete quizData.code; // Will be regenerated by pre-save hook
+        delete quizData.createdAt;
+        delete quizData.updatedAt;
 
-        // Delete all responses for this quiz (this wipes previous data)
-        // If you want to archive, you'd need a Session model, but for now simple reset is requested.
-        await Response.deleteMany({ quizId: quiz._id });
+        // Reset dynamic fields
+        quizData.participants = [];
+        quizData.status = 'waiting'; // Set to WAITING immediately
+        quizData.startedAt = null;
+        quizData.endedAt = null;
+        quizData.expiresAt = null;
+        quizData.currentQuestionIndex = 0;
 
-        // Force cache invalidation if using Redis/Memory (optional)
-        const io = req.app.get('io');
-        if (io) {
-            io.to(`quiz:${quiz._id}`).emit('quiz:reset');
-        }
+        const newQuiz = new Quiz(quizData);
+        await newQuiz.save();
 
-        res.status(200).json({
+        res.status(201).json({
             success: true,
-            message: 'Quiz reset successfully',
-            data: { quiz }
+            message: 'New quiz session created for re-hosting',
+            data: {
+                quizId: newQuiz._id,
+                code: newQuiz.code
+            }
         });
     } catch (error) {
-        console.error('Reset quiz error:', error);
+        console.error('Re-host quiz error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to reset quiz',
+            message: 'Failed to re-host quiz',
             error: error.message
         });
     }

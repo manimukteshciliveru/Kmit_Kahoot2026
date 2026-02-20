@@ -124,20 +124,22 @@ exports.submitAnswer = async (req, res) => {
         // Emit real-time update for faculty
         const io = req.app.get('io');
         if (io) {
-            // Update leaderboard
             const leaderboard = await Response.getLeaderboard(quizId, 200);
-
             io.to(`quiz:${quizId}`).emit('leaderboard:update', { leaderboard });
 
-            // Notify faculty of response
+            // Notify faculty of detailed response with mapped fields
             io.to(`quiz:${quizId}:faculty`).emit('response:received', {
                 participantId: req.user._id,
                 participantName: req.user.name,
+                rollNumber: req.user.rollNumber,
+                department: req.user.department,
+                section: req.user.section,
                 questionId,
                 isCorrect,
                 pointsEarned,
                 timeTaken,
-                currentScore: response.totalScore
+                score: response.totalScore, // Standardized field
+                totalScore: response.totalScore // Redundant for safety
             });
         }
 
@@ -411,12 +413,24 @@ exports.completeQuiz = async (req, res) => {
         }
 
         if (response.status === 'completed' || response.status === 'terminated') {
-            return res.status(400).json({
-                success: false,
-                message: 'Quiz already finished'
+            console.log(`ℹ️  [COMPLETE QUIZ] User ${req.user.name} already in ${response.status} state. Returning success.`);
+            return res.status(200).json({
+                success: true,
+                message: `Quiz already ${response.status}`,
+                data: {
+                    response: {
+                        totalScore: response.totalScore,
+                        percentage: response.percentage,
+                        correctCount: response.correctCount,
+                        wrongCount: response.wrongCount,
+                        rank: response.rank,
+                        totalTimeTaken: response.totalTimeTaken
+                    }
+                }
             });
         }
 
+        console.log(`🏁 [COMPLETE QUIZ] Marking ${req.user.name} as completed`);
         response.status = 'completed';
         response.completedAt = new Date();
         await response.save();

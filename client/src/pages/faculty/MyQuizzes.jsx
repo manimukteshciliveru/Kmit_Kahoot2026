@@ -52,6 +52,8 @@ const MyQuizzes = () => {
             draft: { class: 'status-draft', icon: <FiEdit2 />, label: 'Draft' },
             active: { class: 'status-active', icon: <FiPlay />, label: 'Live' },
             completed: { class: 'status-completed', icon: <FiCheckCircle />, label: 'Done' },
+            done: { class: 'status-completed', icon: <FiCheckCircle />, label: 'Done' },
+            live: { class: 'status-active', icon: <FiPlay />, label: 'Live' },
             scheduled: { class: 'status-scheduled', icon: <FiClock />, label: 'Scheduled' }
         };
         return info[status] || info.draft;
@@ -84,7 +86,7 @@ const MyQuizzes = () => {
 
             {/* Filter Tabs */}
             <div className="filter-tabs" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                {['all', 'active', 'draft', 'completed'].map(f => (
+                {['all', 'live', 'draft', 'done'].map(f => (
                     <button
                         key={f}
                         onClick={() => setFilter(f)}
@@ -105,9 +107,9 @@ const MyQuizzes = () => {
                             gap: '0.5rem'
                         }}
                     >
-                        {f === 'active' && <FiPlay />}
+                        {f === 'live' && <FiPlay />}
                         {f === 'draft' && <FiEdit2 />}
-                        {f === 'completed' && <FiCheckCircle />}
+                        {f === 'done' && <FiCheckCircle />}
                         {f === 'all' && <FiGrid />}
                         {f}
                     </button>
@@ -137,7 +139,7 @@ const MyQuizzes = () => {
                                     return (
                                         <tr
                                             key={quiz._id}
-                                            onClick={() => navigate(quiz.status === 'completed' ? `/quiz/${quiz._id}/results` : `/quiz/${quiz._id}/host`)}
+                                            onClick={() => navigate((quiz.status === 'completed' || quiz.status === 'done') ? `/quiz/${quiz._id}/results` : `/quiz/${quiz._id}/host`)}
                                             style={{ cursor: 'pointer' }}
                                         >
                                             <td className="cell-title"><span className="title-text">{quiz.title}</span></td>
@@ -148,8 +150,8 @@ const MyQuizzes = () => {
                                             <td><span className={`status-badge ${statusInfo.class}`}>{statusInfo.icon} {statusInfo.label}</span></td>
                                             <td className="cell-actions">
                                                 <div className="action-btns">
-                                                    <button className="action-btn view" onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${quiz._id}/${quiz.status === 'completed' ? 'results' : 'host'}`); }}>
-                                                        {quiz.status === 'completed' ? <FiBarChart2 /> : <FiEye />}
+                                                    <button className="action-btn view" onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${quiz._id}/${(quiz.status === 'completed' || quiz.status === 'done') ? 'results' : 'host'}`); }}>
+                                                        {(quiz.status === 'completed' || quiz.status === 'done') ? <FiBarChart2 /> : <FiEye />}
                                                     </button>
                                                     <button className="action-btn edit" onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${quiz._id}/edit`); }}>
                                                         <FiEdit2 />

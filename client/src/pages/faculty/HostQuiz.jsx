@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiCopy, FiUsers, FiPlay, FiStopCircle, FiChevronRight, FiAward, FiClock, FiCheck, FiBarChart2 } from 'react-icons/fi';
+import { FiCopy, FiUsers, FiPlay, FiStopCircle, FiChevronRight, FiAward, FiClock, FiCheck, FiBarChart2, FiZap } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { useSocket } from '../../context/SocketContext';
 import { quizAPI } from '../../services/api';
@@ -15,14 +15,31 @@ const HostQuiz = () => {
 
     const [quiz, setQuiz] = useState(null);
     const [participants, setParticipants] = useState([]);
-    const [status, setStatus] = useState('loading'); // loading, ready, active, completed
+    const [status, setStatus] = useState('loading'); // ready, active, completed, leaderboard
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answeredCount, setAnsweredCount] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
-    const [activeTab, setActiveTab] = useState('stats'); // stats, leaderboard, attendance
+    const [activeTab, setActiveTab] = useState('leaderboard'); // Default to leaderboard
     const [answeredParticipants, setAnsweredParticipants] = useState([]);
     const [cheatingAlerts, setCheatingAlerts] = useState([]);
     const [timeLeft, setTimeLeft] = useState(0);
+    const [attendance, setAttendance] = useState([]);
+    const [branchFilter, setBranchFilter] = useState('ALL');
+    const [sectionFilter, setSectionFilter] = useState('ALL');
+
+    const BRANCH_CONFIG = {
+        'CSE': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'],
+        'CSM': ['A', 'B', 'C', 'D', 'E']
+    };
+
+    // Map internal states to UI states
+    const mapStateToUI = (serverStatus) => {
+        if (['waiting', 'draft', 'scheduled'].includes(serverStatus)) return serverStatus === 'scheduled' ? 'scheduled' : 'ready';
+        if (serverStatus === 'question_active' || serverStatus === 'live') return 'active';
+        if (serverStatus === 'leaderboard') return 'active'; // Keep sidebar active
+        if (['finished', 'completed', 'done'].includes(serverStatus)) return 'completed';
+        return 'ready';
+    };
 
     useEffect(() => {
         if (user && user.role === 'student') {
@@ -32,229 +49,206 @@ const HostQuiz = () => {
 
         const fetchQuiz = async () => {
             try {
-                const response = await quizAPI.getById(quizId);
-                const data = response.data.data.quiz;
+                const [quizRes, lbRes] = await Promise.all([
+                    quizAPI.getById(quizId),
+                    quizAPI.getLeaderboard(quizId)
+                ]);
+
+                const data = quizRes.data.data.quiz;
                 setQuiz(data);
                 setParticipants(Array.isArray(data.participants) ? data.participants : []);
-                setStatus(data.status === 'active' ? 'active'
-                    : (data.status === 'completed' || data.status === 'finished') ? 'completed'
-                        : (data.status === 'scheduled') ? 'scheduled'
-                            : 'ready');
-                if (data.currentQuestionIndex >= 0) {
-                    setCurrentQuestionIndex(data.currentQuestionIndex);
-                }
+                setLeaderboard(lbRes.data.data.leaderboard || []);
+                setStatus(mapStateToUI(data.status));
+                setCurrentQuestionIndex(data.currentQuestionIndex || 0);
 
                 if (data.status === 'scheduled' && data.scheduledAt) {
-                    const scheduledTime = new Date(data.scheduledAt).getTime();
-                    const now = Date.now();
-                    const diff = Math.floor((scheduledTime - now) / 1000);
+                    const diff = Math.floor((new Date(data.scheduledAt).getTime() - Date.now()) / 1000);
                     setTimeLeft(Math.max(0, diff));
-                } else if (data.status === 'active' && data.expiresAt) {
-                    const expires = new Date(data.expiresAt).getTime();
-                    const now = Date.now();
-                    setTimeLeft(Math.max(0, Math.floor((expires - now) / 1000)));
-                } else if (data.status === 'active' && data.startedAt) {
-                    const start = new Date(data.startedAt).getTime();
-                    if (!isNaN(start)) {
-                        const elapsed = Math.floor((Date.now() - start) / 1000);
-                        const duration = parseInt(data.settings?.quizTimer) || 0;
-                        if (duration > 0) {
-                            setTimeLeft(Math.max(0, duration - elapsed));
-                        }
-                    }
                 }
             } catch (error) {
-                console.error("Fetch error:", error);
-                toast.error('Failed to load quiz');
+                console.error('❌ [HOST] Load Error:', error);
+                toast.error('Failed to load quiz arena');
                 navigate('/dashboard');
             }
         };
         fetchQuiz();
     }, [quizId, navigate, user]);
 
-    // Socket listener for events
     useEffect(() => {
         if (!socket || !quizId) return;
 
         socket.emit('quiz:join', { quizId });
 
-        const handleQuizJoined = (data) => {
-            setParticipants(data.participants || []);
-        };
+        socket.on('quiz:joined', (data) => setParticipants(data.participants || []));
 
-        const handleParticipantJoined = (data) => {
+        socket.on('participant:joined', (data) => {
             setParticipants(prev => {
                 const participant = data.participant;
                 if (prev.find(p => String(p.id || p._id) === String(participant.id))) return prev;
                 return [...prev, participant];
             });
             toast.success(`${data.participant?.name} joined!`);
-        };
+        });
 
-        const handleQuizStarted = (data) => {
-            setStatus('active');
-            setCurrentQuestionIndex(0);
-            setActiveTab('stats');
+        socket.on('quiz:state_changed', (data) => {
+            console.log('⚡ [STATE] Changed:', data.status);
+            setStatus(mapStateToUI(data.status));
+            if (data.currentQuestionIndex !== undefined) setCurrentQuestionIndex(data.currentQuestionIndex);
+            if (data.leaderboard) setLeaderboard(data.leaderboard);
             if (data.expiresAt) {
-                const expires = new Date(data.expiresAt).getTime();
-                setTimeLeft(Math.max(0, Math.floor((expires - Date.now()) / 1000)));
-            } else if (data.settings?.quizTimer) {
-                setTimeLeft(data.settings.quizTimer);
+                const diff = (new Date(data.expiresAt).getTime() - Date.now()) / 1000;
+                setTimeLeft(Math.max(0, Math.floor(diff)));
             }
-        };
+            if (data.status === 'leaderboard') setActiveTab('leaderboard');
+        });
 
-        const handleResponseReceived = (data) => {
-            setAnsweredCount(prev => prev + 1);
+        socket.on('response:received', (data) => {
+            console.log('📬 Live Response:', data.participantName, 'Score:', data.score);
             setAnsweredParticipants(prev => [...new Set([...prev, data.participantId])]);
-        };
+            setAnsweredCount(prev => prev + 1);
+        });
 
-        const handleLeaderboardUpdate = (data) => {
-            setLeaderboard(data.leaderboard || []);
-        };
+        socket.on('leaderboard:update', (data) => {
+            if (data.leaderboard) setLeaderboard(data.leaderboard);
+        });
 
-        const handleTabSwitch = (data) => {
+        socket.on('student:completed', (data) => {
+            toast.success(`${data.name} completed the quiz!`, { icon: '🏁' });
+        });
+
+        socket.on('participant:tabswitch', (data) => {
             toast.error(`${data.participantName} switched tabs!`, { icon: '⚠️' });
             setCheatingAlerts(prev => [{ ...data, time: new Date() }, ...prev].slice(0, 5));
+        });
 
-            // IMMEDIATE FIX: Manually lower trust score locally for instant feedback
-            setParticipants(prev => prev.map(p => {
-                if (String(p.id || p._id) === String(data.participantId)) {
-                    const currentScore = p.trustScore !== undefined ? p.trustScore : 100;
-                    return { ...p, trustScore: Math.max(0, currentScore - 20) }; // Heavy penalty for visibility
-                }
-                return p;
-            }));
-        };
-
-        const handleQuizEnded = (data) => {
+        socket.on('quiz:ended', (data) => {
             setStatus('completed');
             setLeaderboard(data.leaderboard || []);
-            setActiveTab('leaderboard');
-        };
-
-        const handleParticipantFlagged = (data) => {
-            toast.error(`Security Alert: ${data.participantName || 'Student'} flagged`, { icon: '🛡️' });
-            setCheatingAlerts(prev => [{
-                participantName: data.participantName,
-                reason: data.reason,
-                time: new Date()
-            }, ...prev].slice(0, 10));
-
-            // Update participant trust score locally
-            setParticipants(prev => prev.map(p => {
-                if (String(p.id || p._id) === String(data.participantId)) {
-                    return { ...p, trustScore: data.score };
-                }
-                return p;
-            }));
-        };
-
-        socket.on('quiz:joined', handleQuizJoined);
-        socket.on('participant:joined', handleParticipantJoined);
-        socket.on('quiz:started', handleQuizStarted);
-        socket.on('response:received', handleResponseReceived);
-        socket.on('leaderboard:update', handleLeaderboardUpdate);
-        socket.on('participant:tabswitch', handleTabSwitch);
-        socket.on('participant:flagged', handleParticipantFlagged);
-        socket.on('quiz:ended', handleQuizEnded);
+            toast.success('Quiz ended! Preparing report...');
+            setTimeout(() => navigate(`/quiz/${quizId}/results`), 2000);
+        });
 
         return () => {
-            socket.off('quiz:joined', handleQuizJoined);
-            socket.off('participant:joined', handleParticipantJoined);
-            socket.off('quiz:started', handleQuizStarted);
-            socket.off('response:received', handleResponseReceived);
-            socket.off('leaderboard:update', handleLeaderboardUpdate);
-            socket.off('participant:tabswitch', handleTabSwitch);
-            socket.off('participant:flagged', handleParticipantFlagged);
-            socket.off('quiz:ended', handleQuizEnded);
+            socket.off('quiz:joined');
+            socket.off('participant:joined');
+            socket.off('quiz:state_changed');
+            socket.off('response:received');
+            socket.off('leaderboard:update');
+            socket.off('student:completed');
+            socket.off('participant:tabswitch');
+            socket.off('quiz:ended');
         };
     }, [socket, quizId]);
 
-    // Timer logic & Auto-End
+    // Timer logic
     useEffect(() => {
         if ((status !== 'active' && status !== 'scheduled') || timeLeft <= 0) return;
-
-        const timer = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    if (status === 'scheduled') {
-                        // Refresh to check if started
-                        window.location.reload();
-                        return 0;
-                    }
-                    if (status === 'active') {
-                        // Auto-end quiz
-                        handleEndQuiz();
-                        return 0;
-                    }
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
+        const timer = setInterval(() => setTimeLeft(prev => Math.max(0, prev - 1)), 1000);
         return () => clearInterval(timer);
-    }, [status, timeLeft > 0]);
+    }, [status, timeLeft]);
 
-    // Auto-navigate to results when completed
+    // Attendance logic
     useEffect(() => {
-        if (status === 'completed') {
-            const timer = setTimeout(() => {
-                navigate(`/quiz/${quizId}/results`);
-            }, 3000);
-            return () => clearTimeout(timer);
+        if (activeTab === 'attendance') {
+            const fetchAttendance = async () => {
+                try {
+                    const res = await quizAPI.getAttendance(quizId);
+                    if (res.data.success) {
+                        setAttendance(res.data.data);
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch attendance:', err);
+                }
+            };
+            fetchAttendance();
         }
-    }, [status, navigate, quizId]);
+    }, [activeTab, quizId, participants]);
 
     const formatTime = (seconds) => {
-        if (isNaN(seconds) || seconds < 0) return "0:00";
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const handleStartQuiz = async () => {
-        if (participants.length === 0) {
-            if (!window.confirm("No students joined. Start anyway?")) return;
-        }
-        try {
-            await quizAPI.start(quizId);
-            setStatus('active');
-            toast.success('Quiz Started!');
-        } catch (error) {
-            toast.error('Failed to start quiz');
-        }
+    // Filter Logic
+    const getFilteredLeaderboard = () => {
+        return leaderboard.filter(entry => {
+            const student = entry.userId || {};
+            const branchMatch = branchFilter === 'ALL' || student.department === branchFilter;
+            const sectionMatch = sectionFilter === 'ALL' || student.section === sectionFilter;
+            return branchMatch && sectionMatch;
+        });
     };
 
-    const handleEndQuiz = async () => {
+    const getFilteredAttendance = () => {
+        return attendance.filter(entry => {
+            const branchMatch = branchFilter === 'ALL' || entry.department === branchFilter;
+            const sectionMatch = sectionFilter === 'ALL' || entry.section === sectionFilter;
+            return branchMatch && sectionMatch;
+        });
+    };
+
+    const FilterControls = () => (
+        <div className="filter-system animate-fadeIn">
+            <div className="filter-group">
+                <label>Branch:</label>
+                <div className="filter-pills">
+                    {['ALL', 'CSE', 'CSM'].map(b => (
+                        <button key={b} className={`pill ${branchFilter === b ? 'active' : ''}`} onClick={() => {
+                            setBranchFilter(b);
+                            setSectionFilter('ALL');
+                        }}>{b}</button>
+                    ))}
+                </div>
+            </div>
+            {branchFilter !== 'ALL' && (
+                <div className="filter-group animate-slideInRight">
+                    <label>Section:</label>
+                    <div className="filter-pills">
+                        <button className={`pill ${sectionFilter === 'ALL' ? 'active' : ''}`} onClick={() => setSectionFilter('ALL')}>ALL</button>
+                        {BRANCH_CONFIG[branchFilter].map(s => (
+                            <button key={s} className={`pill ${sectionFilter === s ? 'active' : ''}`} onClick={() => setSectionFilter(s)}>{s}</button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
+    const handleStartQuiz = () => {
+        socket.emit('quiz:start', { quizId });
+        toast.success('Quiz Started!');
+    };
+
+    const handleNextAction = () => {
+        socket.emit('quiz:next-question', { quizId });
+    };
+
+    const handleEndQuiz = () => {
         if (window.confirm("End quiz now?")) {
-            try {
-                await quizAPI.end(quizId);
-                setStatus('completed');
-                toast.success('Quiz Ended');
-            } catch (error) {
-                toast.error('Failed to end quiz');
-            }
+            socket.emit('quiz:end', { quizId });
         }
     };
 
-    const handleResetQuiz = async () => {
-        if (!window.confirm("Are you sure you want to host this quiz again? This will clear all previous session data.")) return;
+    const handleRehostQuiz = async () => {
+        if (!window.confirm("Host this quiz again? This will create a fresh session with a new PIN.")) return;
         try {
-            await quizAPI.reset(quizId);
-            // Validate state update
-            setStatus('ready');
-            setQuiz(prev => ({ ...prev, status: 'draft', startedAt: null, endedAt: null }));
-            setTimeLeft(0);
-            setParticipants([]);
-            setLeaderboard([]);
-            setAnsweredParticipants([]);
-            setCheatingAlerts([]);
-            toast.success('Quiz reset! Ready to host.');
+            const loadingToast = toast.loading('Creating new arena...');
+            const response = await quizAPI.rehost(quizId);
+
+            if (response.data.success) {
+                console.log('✅ [REHOST] Success. New Quiz ID:', response.data.data.quizId);
+                toast.dismiss(loadingToast);
+                toast.success('New session created!');
+                navigate(`/quiz/${response.data.data.quizId}/host`);
+            } else {
+                toast.dismiss(loadingToast);
+                toast.error('Failed to create new session.');
+            }
         } catch (error) {
-            console.error('Reset functionality failed:', error);
-            toast.error('Failed to reset quiz. Please check server logs.');
+            console.error('❌ [REHOST] API Error:', error);
+            toast.dismiss();
+            toast.error('Failed to re-host quiz.');
         }
     };
 
@@ -286,7 +280,7 @@ const HostQuiz = () => {
                     <div className="lobby-content">
                         <div className="lobby-status-bar">
                             <div className="player-count"><FiUsers /> <span>{participants.length} Players</span></div>
-                            <div className={`status-indicator ${status}`}>{status === 'scheduled' ? 'Scheduled' : 'Waiting...'}</div>
+                            <div className={`status-indicator ${status}`}>{isScheduled ? 'Scheduled' : 'Waiting...'}</div>
                         </div>
                         <div className="participants-area">
                             <div className="participants-list">
@@ -301,17 +295,7 @@ const HostQuiz = () => {
                         </div>
                     </div>
                     <div className="lobby-actions">
-                        {isScheduled ? (
-                            <div className="scheduled-timer">
-                                {/* Timer hidden as per request */}
-                                {/* <h3>Quiz Starts In:</h3> */}
-                                {/* <div className="timer-display giant">{formatTime(timeLeft)}</div> */}
-                                <p className="scheduled-hint">This quiz is scheduled to start automatically.</p>
-                                <button className="btn btn-primary btn-xl" onClick={handleStartQuiz}>Start Now (Override)</button>
-                            </div>
-                        ) : (
-                            <button className="btn btn-primary btn-xl" onClick={handleStartQuiz}>Start Quiz</button>
-                        )}
+                        <button className="btn btn-primary btn-xl" onClick={handleStartQuiz}>Start Quiz</button>
                     </div>
                 </div>
             </div>
@@ -323,7 +307,6 @@ const HostQuiz = () => {
             <div className="host-active">
                 <div className="active-header">
                     <div className="host-nav-tabs">
-                        <button className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>Live Stats</button>
                         <button className={`tab-btn ${activeTab === 'leaderboard' ? 'active' : ''}`} onClick={() => setActiveTab('leaderboard')}>Live Dashboard</button>
                         <button className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>Attendance</button>
                         <button className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security 🛡️</button>
@@ -338,10 +321,14 @@ const HostQuiz = () => {
                         <div className="live-badge"><span className="live-dot"></span> {status.toUpperCase()}</div>
                     </div>
                     <div className="host-actions">
-                        {status === 'active' && <button className="btn btn-danger btn-sm" onClick={handleEndQuiz}>End</button>}
+                        {status === 'active' && (
+                            <div className="action-group">
+                                <button className="btn btn-danger btn-sm" onClick={handleEndQuiz}>End</button>
+                            </div>
+                        )}
                         {status === 'completed' && (
                             <div className="action-group">
-                                <button className="btn btn-secondary btn-sm" onClick={handleResetQuiz}>Re-Host</button>
+                                <button className="btn btn-secondary btn-sm" onClick={handleRehostQuiz}>Re-Host</button>
                                 <button className="btn btn-primary btn-sm" onClick={() => navigate(`/quiz/${quizId}/results`)}>Report</button>
                             </div>
                         )}
@@ -349,177 +336,51 @@ const HostQuiz = () => {
                 </div>
 
                 <div className="tab-content-area">
-                    {activeTab === 'stats' && (
-                        <div className="stats-view animate-fadeIn">
-                            <div className="stats-grid">
-                                <div className="stat-card large">
-                                    <div className="stat-icon"><FiClock /></div>
-                                    <div className="stat-info">
-                                        <h3>Progress</h3>
-                                        <p>Global Session Status: {status.toUpperCase()}</p>
-                                        <div className="progress-bar-container">
-                                            <div className="progress-bar-fill" style={{ width: status === 'completed' ? '100%' : '50%' }}></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="stats-row-group">
-                                    <div className="stat-card">
-                                        <h3>{participants.length}</h3>
-                                        <p>Students Joined</p>
-                                    </div>
-                                    <div className="stat-card highlight">
-                                        <h3>{answeredParticipants.length}</h3>
-                                        <p>Students Answered</p>
-                                    </div>
-                                    <div className="stat-card success">
-                                        <h3>
-                                            {(() => {
-                                                // Calculate total eligible students
-                                                let totalEligible = participants.length;
-                                                if (quiz?.accessControl?.mode === 'SPECIFIC') {
-                                                    totalEligible = quiz.accessControl.allowedStudents?.length || participants.length;
-                                                }
-                                                // If we have total capacity (e.g. strict list), use that. Otherwise joined.
-                                                const rate = totalEligible > 0 ? Math.round((answeredParticipants.length / totalEligible) * 100) : 0;
-                                                return `${rate}%`;
-                                            })()}
-                                        </h3>
-                                        <p>Participation Rate</p>
-                                        <small style={{ opacity: 0.7, fontSize: '0.7em' }}>
-                                            ({answeredParticipants.length} Answered / {quiz?.accessControl?.mode === 'SPECIFIC' ? (quiz.accessControl.allowedStudents?.length || 0) + ' Invited' : participants.length + ' Joined'})
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {status === 'active' && (
-                                <div className="next-action" style={{ textAlign: 'center', marginTop: '3rem', padding: '2rem', background: 'rgba(255,127,17,0.05)', borderRadius: '20px', border: '1px dashed var(--primary)' }}>
-                                    <h2 style={{ color: 'var(--primary)', marginBottom: '1rem' }}>Independent Progression Active</h2>
-                                    <p style={{ color: 'var(--text-secondary)' }}>Students are currently navigating through the quiz questions at their own pace.</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
 
                     {activeTab === 'leaderboard' && (
-                        <div className="leaderboard-view animate-fadeIn live-dashboard-view">
+                        <div className="leaderboard-view animate-fadeIn">
                             <div className="dashboard-head-section">
                                 <h2 className="section-title">⚡ Live Dashboard</h2>
                                 <div className="live-status-pills">
-                                    <span className="live-count-pill"><FiUsers /> {leaderboard.length} Participating</span>
-                                    <span className="live-count-pill success"><FiCheck /> {leaderboard.filter(e => e.status === 'completed').length} Completed</span>
+                                    <span className="live-count-pill"><FiUsers /> {getFilteredLeaderboard().length} Ranked</span>
                                 </div>
                             </div>
 
-                            <div className="attendance-table-container leaderboard-table-scroll live-dashboard-table">
-                                <table className="attendance-table leaderboard-styled-table">
+                            <FilterControls />
+
+                            <div className="attendance-table-container">
+                                <table className="attendance-table">
                                     <thead>
                                         <tr>
-                                            <th>RANK</th>
-                                            <th>STUDENT</th>
-                                            <th>BRANCH / SEC</th>
-                                            <th>TIMING</th>
-                                            <th>PROGRESS</th>
-                                            <th>STATS</th>
-                                            <th className="text-right">SCORE</th>
+                                            <th>Rank</th>
+                                            <th>Student</th>
+                                            <th>Branch/Sec</th>
+                                            <th>Score</th>
+                                            <th>Progress</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {(() => {
-                                            let currentRank = 0;
-                                            let lastScore = -1;
-                                            let lastTime = -1;
-
-                                            // Sort locally to ensure live rank updation
-                                            const sortedLeaderboard = [...leaderboard].sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken);
-
-                                            return sortedLeaderboard.map((entry, i) => {
-                                                const score = entry.totalScore || 0;
-                                                const time = entry.totalTimeTaken || 0;
-                                                if (score !== lastScore || time !== lastTime) {
-                                                    currentRank = i + 1;
-                                                }
-                                                lastScore = score;
-                                                lastTime = time;
-                                                const rank = currentRank;
-                                                const s = entry.userId || {};
-
-                                                const totalQs = quiz.questions?.length || 1;
-                                                const attempted = entry.answers?.filter(a => a.answer)?.length || 0;
-                                                const corrected = entry.correctCount || 0;
-                                                const accuracy = attempted > 0 ? Math.round((corrected / attempted) * 100) : 0;
-                                                const avgSpeed = entry.averageTimePerQuestion ? (entry.averageTimePerQuestion / 1000).toFixed(1) : '0';
-
-                                                const joinTime = entry.startedAt ? new Date(entry.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---';
-                                                const endTime = entry.status === 'completed' && entry.completedAt ?
-                                                    new Date(entry.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
-                                                    <span className="status-pulse-text">Active...</span>;
-
-                                                return (
-                                                    <tr key={i} className={`live-row ${rank <= 3 ? `rank-${rank}-row` : ''} ${user._id === s._id ? 'self-row' : ''}`}>
-                                                        <td>
-                                                            <div className="rank-display">
-                                                                {rank === 1 ? <span className="medal">🥇</span> :
-                                                                    rank === 2 ? <span className="medal">🥈</span> :
-                                                                        rank === 3 ? <span className="medal">🥉</span> :
-                                                                            <span className="rank-number">#{rank}</span>}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div className="student-profile-info">
-                                                                <span className="name-bold">{s.name || entry.studentName}</span>
-                                                                <span className="roll-mono">{s.rollNumber || '-'}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div className="dept-sec-info">
-                                                                <span className="dept-tag">{s.department || 'N/A'}</span>
-                                                                <span className="sec-tag">Section {s.section || 'N/A'}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div className="timing-info">
-                                                                <div className="time-item"><FiClock className="icon" /> {joinTime} <span className="lbl">Joined</span></div>
-                                                                <div className="time-item"><FiStopCircle className="icon" /> {endTime}</div>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div className="progress-metrics">
-                                                                <div className="progress-mini-bar">
-                                                                    <div className="bar-fill" style={{ width: `${(attempted / totalQs) * 100}%` }}></div>
-                                                                </div>
-                                                                <span className="progress-txt">{attempted}/{totalQs} Completed</span>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div className="live-stats-metrics">
-                                                                <div className="stat-pill accuracy">
-                                                                    <FiCheck /> {accuracy}%
-                                                                </div>
-                                                                <div className="stat-pill speed">
-                                                                    <FiZap /> {avgSpeed}s
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="text-right">
-                                                            <div className="score-badge-live">
-                                                                {score} <span className="pts">pts</span>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            });
-                                        })()}
-                                        {leaderboard.length === 0 && (
-                                            <tr>
-                                                <td colSpan="7" className="empty-table-msg">
-                                                    <div className="empty-state-lux">
-                                                        <FiBarChart2 className="empty-icon-giant" />
-                                                        <p>Waiting for participants to start answering...</p>
+                                        {getFilteredLeaderboard().map((entry, i) => (
+                                            <tr key={entry._id || i} className="live-row">
+                                                <td><span className="rank-display">#{leaderboard.findIndex(le => le.userId?._id === entry.userId?._id) + 1}</span></td>
+                                                <td>
+                                                    <div className="student-profile-info">
+                                                        <span className="name-bold">{entry.userId?.name || entry.studentName}</span>
+                                                        <span className="roll-mono">{entry.userId?.rollNumber || 'N/A'}</span>
                                                     </div>
                                                 </td>
+                                                <td>
+                                                    <div className="dept-sec-info">
+                                                        <span className="dept-tag">{entry.userId?.department || 'N/A'}</span>
+                                                        <span className="sec-tag">{entry.userId?.section || 'N/A'}</span>
+                                                    </div>
+                                                </td>
+                                                <td><span className="score-badge-live">{entry.totalScore} <span className="pts">pts</span></span></td>
+                                                <td>{entry.answers?.filter(a => a.answer || a.answeredAt)?.length || 0} / {totalQuestions}</td>
                                             </tr>
+                                        ))}
+                                        {getFilteredLeaderboard().length === 0 && (
+                                            <tr><td colSpan="5" className="no-data">No results matching filters.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -530,78 +391,51 @@ const HostQuiz = () => {
                     {activeTab === 'security' && (
                         <div className="security-view animate-fadeIn">
                             <h2 className="section-title">🛡️ Anti-Cheat Monitor</h2>
-                            <div className="security-dashboard-grid">
-                                <div className="security-panel">
-                                    <h3>Trust Scores</h3>
-                                    <div className="trust-score-list">
-                                        {participants.sort((a, b) => (b.trustScore || 100) - (a.trustScore || 100)).map((p, i) => (
-                                            <div key={i} className={`trust-row ${(p.trustScore || 100) < 50 ? 'critical' : (p.trustScore || 100) < 80 ? 'warning' : 'good'}`}>
-                                                <div className="u-info">
-                                                    <span className="u-name">{p.name}</span>
-                                                    <span className="u-roll">{p.rollNumber}</span>
-                                                </div>
-                                                <div className="u-score">
-                                                    <div className="score-bar-bg">
-                                                        <div className="score-bar-fill" style={{ width: `${p.trustScore || 100}%` }}></div>
-                                                    </div>
-                                                    <span>{p.trustScore || 100}%</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="security-panel logs">
-                                    <h3>Recent Alerts</h3>
-                                    <div className="alert-feed">
-                                        {cheatingAlerts.length === 0 && <p className="no-alerts">No suspicious activity detected.</p>}
-                                        {cheatingAlerts.map((alert, idx) => (
-                                            <div key={idx} className="alert-card animate-slideIn">
-                                                <div className="alert-icon">⚠️</div>
-                                                <div className="alert-content">
-                                                    <strong>{alert.participantName || 'Unknown User'}</strong>
-                                                    <p>{alert.reason || 'Sispicious Activity'}</p>
-                                                    <span className="alert-time">{alert.time?.toLocaleTimeString()}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
+                            {cheatingAlerts.map((a, i) => (
+                                <div key={i} className="alert-card">⚠️ {a.participantName}: {a.reason}</div>
+                            ))}
+                            {cheatingAlerts.length === 0 && <p className="no-alerts">No alerts detected.</p>}
                         </div>
                     )}
 
                     {activeTab === 'attendance' && (
                         <div className="attendance-view animate-fadeIn">
-                            <h2 className="section-title">👥 Attendance Tracker</h2>
+                            <div className="section-header-flex">
+                                <h2 className="section-title">👥 Attendance Tracker</h2>
+                                <div className="attendance-stats">
+                                    <span className="stat-p"><FiCheck /> Present: {getFilteredAttendance().filter(a => a.status === 'Present').length}</span>
+                                    <span className="stat-a"><FiStopCircle /> Absent: {getFilteredAttendance().filter(a => a.status === 'Absent').length}</span>
+                                </div>
+                            </div>
+
+                            <FilterControls />
                             <div className="attendance-table-container">
                                 <table className="attendance-table">
                                     <thead>
                                         <tr>
-                                            <th>Name</th>
                                             <th>Roll Number</th>
-                                            <th>Branch</th>
-                                            <th>Section</th>
-                                            <th>Trust Score</th>
+                                            <th>Name</th>
+                                            <th>Branch/Section</th>
                                             <th>Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {participants.map((p, i) => (
-                                            <tr key={i} className={answeredParticipants.includes(p.id || p._id) ? 'active-row' : ''}>
-                                                <td><div className="name-cell"><FiUsers /> {p.name}</div></td>
-                                                <td>{p.rollNumber || 'N/A'}</td>
-                                                <td>{p.department || 'N/A'}</td>
-                                                <td>{p.section || 'N/A'}</td>
-                                                <td>
-                                                    <span className={`trust-badge ${(p.trustScore || 100) > 80 ? 'high' : 'low'}`}>
-                                                        {p.trustScore || 100}%
-                                                    </span>
-                                                </td>
-                                                <td><span className={`status-pill ${answeredParticipants.includes(p.id || p._id) ? 'active' : 'waiting'}`}>
-                                                    {answeredParticipants.includes(p.id || p._id) ? 'Active' : 'Joined'}
-                                                </span></td>
-                                            </tr>
-                                        ))}
+                                        {getFilteredAttendance().length > 0 ? (
+                                            getFilteredAttendance().map((entry, i) => (
+                                                <tr key={i} className={entry.status.toLowerCase()}>
+                                                    <td><strong>{entry.rollNumber}</strong></td>
+                                                    <td>{entry.name}</td>
+                                                    <td>{entry.department} - {entry.section}</td>
+                                                    <td>
+                                                        <span className={`status-pill ${entry.status.toLowerCase()}`}>
+                                                            {entry.status}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr><td colSpan="4" className="no-data">No students found matching current filters.</td></tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>

@@ -39,6 +39,7 @@ const CreateQuiz = () => {
         mode: 'mcq',
         settings: {
             quizTimer: 600, // Default 10 mins
+            questionTimer: 30, // Default 30 secs
             shuffleQuestions: true,
             shuffleOptions: true,
             showInstantFeedback: true,
@@ -423,7 +424,10 @@ const CreateQuiz = () => {
                     ...quizData.settings,
                     autoStart: Boolean(quizData.scheduledAt)
                 },
-                questions: questions.map(({ _id, ...q }) => q)
+                questions: questions.map((q) => {
+                    const { _id: _unused, ...rest } = q;
+                    return rest;
+                })
             };
 
             if (quizId) {
@@ -1079,13 +1083,13 @@ const CreateQuiz = () => {
                                                 type="file"
                                                 id="file-upload"
                                                 multiple
-                                                accept=".pdf,.xlsx,.xls,.csv,.txt,.mp3,.wav,.mp4,.webm,.md,.js,.jsx,.ts,.tsx,.py,.java,.cpp,.c,.cs,.html,.css,.json,.sql,.go,.rb,.php"
+                                                accept=".pdf,.xlsx,.xls,.csv,.txt,.mp3,.wav,.mp4,.webm,.doc,.docx,.ppt,.pptx,.md,.rtf,.js,.jsx,.ts,.tsx,.py,.java,.cpp,.c,.cs,.html,.css,.json,.sql,.go,.rb,.php"
                                                 onChange={(e) => setAiFiles(Array.from(e.target.files))}
                                             />
                                             <label htmlFor="file-upload" className="file-upload-label">
                                                 <FiUpload className="upload-icon" />
                                                 <span>{aiFiles.length > 0 ? `${aiFiles.length} files selected` : 'Click to select files'}</span>
-                                                <small>PDF, Excel, Audio, Video, Text, or Code</small>
+                                                <small>PDF, Word, PPT, Excel, Audio, Video, or Text</small>
                                             </label>
                                         </div>
 
@@ -1341,135 +1345,173 @@ const CreateQuiz = () => {
                             Continue to Settings
                         </button>
                     </div>
-                </div >
-            )
-            }
+                </div>
+            )}
 
             {/* Step 3: Settings */}
-            {
-                step === 3 && (
-                    <div className="step-content animate-slideUp">
-                        <div className="settings-grid">
-                            <div className="form-card">
-                                <h2><FiSettings /> Timer Settings</h2>
+            {step === 3 && (
+                <div className="step-content animate-slideUp">
+                    <div className="settings-grid">
+                        <div className="form-card">
+                            <h2><FiClock /> Timer Settings</h2>
 
-                                <div className="form-group">
-                                    <label className="form-label">Quiz Time Limit (minutes)</label>
+                            <div className="toggle-group">
+                                <label className="toggle-label">
+                                    <span>Quiz Timer</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={quizData.settings.quizTimer > 0}
+                                        onChange={(e) => handleQuizDataChange('settings.quizTimer', e.target.checked ? 600 : 0)}
+                                    />
+                                    <span className="toggle-switch"></span>
+                                </label>
+                            </div>
+
+                            {quizData.settings.quizTimer > 0 && (
+                                <div className="form-group animate-slideUp" style={{ paddingLeft: '1rem', borderLeft: '2px solid var(--primary)', marginBottom: '1.5rem' }}>
+                                    <label className="form-label" style={{ fontSize: '0.9rem' }}>Quiz Duration (minutes)</label>
                                     <input
                                         type="number"
                                         className="form-input"
-                                        min="0"
-                                        max="180"
-                                        placeholder="0 = No limit"
-                                        value={quizData.settings.quizTimer === 0 ? '' : quizData.settings.quizTimer / 60}
-                                        onChange={(e) => handleQuizDataChange('settings.quizTimer', e.target.value === '' ? 0 : parseInt(e.target.value) * 60)}
+                                        style={{ width: '120px' }}
+                                        min="1"
+                                        value={Math.floor(quizData.settings.quizTimer / 60)}
+                                        onChange={(e) => handleQuizDataChange('settings.quizTimer', (parseInt(e.target.value) || 1) * 60)}
+                                        placeholder="e.g., 10"
                                     />
-                                    <small className="form-hint">Set to 0 for no overall time limit</small>
+                                    <small className="form-hint">Set the total time allowed for the quiz.</small>
                                 </div>
+                            )}
+
+                            <div className="toggle-group">
+                                <label className="toggle-label">
+                                    <span>Timer Per Question</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={quizData.settings.questionTimer > 0}
+                                        onChange={(e) => handleQuizDataChange('settings.questionTimer', e.target.checked ? 30 : 0)}
+                                    />
+                                    <span className="toggle-switch"></span>
+                                </label>
                             </div>
 
-                            <div className="form-card">
-                                <h2><FiHelpCircle /> Quiz Behavior</h2>
-
-                                <div className="toggle-group">
-                                    <label className="toggle-label">
-                                        <span>Shuffle Questions</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={quizData.settings.shuffleQuestions}
-                                            onChange={(e) => handleQuizDataChange('settings.shuffleQuestions', e.target.checked)}
-                                        />
-                                        <span className="toggle-switch"></span>
-                                    </label>
+                            {quizData.settings.questionTimer > 0 && (
+                                <div className="form-group animate-slideUp" style={{ paddingLeft: '1rem', borderLeft: '2px solid var(--primary)', marginBottom: '1.5rem' }}>
+                                    <label className="form-label" style={{ fontSize: '0.9rem' }}>Time Per Question (seconds)</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        style={{ width: '120px' }}
+                                        min="5"
+                                        value={quizData.settings.questionTimer}
+                                        onChange={(e) => handleQuizDataChange('settings.questionTimer', parseInt(e.target.value) || 30)}
+                                        placeholder="e.g., 30"
+                                    />
+                                    <small className="form-hint">Time allowed for each question.</small>
                                 </div>
-
-                                <div className="toggle-group">
-                                    <label className="toggle-label">
-                                        <span>Allow Tab Switching (Open Book)</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={quizData.settings.allowTabSwitch}
-                                            onChange={(e) => handleQuizDataChange('settings.allowTabSwitch', e.target.checked)}
-                                        />
-                                        <span className="toggle-switch"></span>
-                                    </label>
-                                </div>
-
-                                {quizData.settings.allowTabSwitch && (
-                                    <div className="form-group animate-slideUp" style={{ paddingLeft: '1rem', borderLeft: '2px solid var(--primary)', marginBottom: '1.5rem' }}>
-                                        <label className="form-label" style={{ fontSize: '0.9rem' }}>Max Tab Switches Allowed</label>
-                                        <input
-                                            type="number"
-                                            className="form-input"
-                                            style={{ width: '120px' }}
-                                            min="0"
-                                            value={quizData.settings.maxTabSwitches}
-                                            onChange={(e) => handleQuizDataChange('settings.maxTabSwitches', parseInt(e.target.value) || 0)}
-                                            placeholder="0 = Unlimited"
-                                        />
-                                        <small className="form-hint">Set to 0 for unlimited switching.</small>
-                                    </div>
-                                )}
-
-                                <div className="toggle-group">
-                                    <label className="toggle-label">
-                                        <span>Shuffle Options (MCQ)</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={quizData.settings.shuffleOptions}
-                                            onChange={(e) => handleQuizDataChange('settings.shuffleOptions', e.target.checked)}
-                                        />
-                                        <span className="toggle-switch"></span>
-                                    </label>
-                                </div>
-
-                                <div className="toggle-group">
-                                    <label className="toggle-label">
-                                        <span>Show Instant Feedback</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={quizData.settings.showInstantFeedback}
-                                            onChange={(e) => handleQuizDataChange('settings.showInstantFeedback', e.target.checked)}
-                                        />
-                                        <span className="toggle-switch"></span>
-                                    </label>
-                                </div>
-
-                                <div className="toggle-group">
-                                    <label className="toggle-label">
-                                        <span>Show Live Leaderboard</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={quizData.settings.showLeaderboard}
-                                            onChange={(e) => handleQuizDataChange('settings.showLeaderboard', e.target.checked)}
-                                        />
-                                        <span className="toggle-switch"></span>
-                                    </label>
-                                </div>
-                            </div>
-
+                            )}
                         </div>
 
-                        <div className="step-actions">
-                            <button className="btn btn-secondary" onClick={() => setStep(2)}>
-                                Back
-                            </button>
-                            <button
-                                className="btn btn-primary btn-lg"
-                                onClick={handleSubmit}
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <><span className="spinner spinner-sm"></span> Creating...</>
-                                ) : (
-                                    <><FiSave /> Create Quiz</>
-                                )}
-                            </button>
+                        <div className="form-card">
+                            <h2><FiHelpCircle /> Quiz Behavior</h2>
+
+                            <div className="toggle-group">
+                                <label className="toggle-label">
+                                    <span>Shuffle Questions</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={quizData.settings.shuffleQuestions}
+                                        onChange={(e) => handleQuizDataChange('settings.shuffleQuestions', e.target.checked)}
+                                    />
+                                    <span className="toggle-switch"></span>
+                                </label>
+                            </div>
+
+                            <div className="toggle-group">
+                                <label className="toggle-label">
+                                    <span>Allow Tab Switching (Open Book)</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={quizData.settings.allowTabSwitch}
+                                        onChange={(e) => handleQuizDataChange('settings.allowTabSwitch', e.target.checked)}
+                                    />
+                                    <span className="toggle-switch"></span>
+                                </label>
+                            </div>
+
+                            {quizData.settings.allowTabSwitch && (
+                                <div className="form-group animate-slideUp" style={{ paddingLeft: '1rem', borderLeft: '2px solid var(--primary)', marginBottom: '1.5rem' }}>
+                                    <label className="form-label" style={{ fontSize: '0.9rem' }}>Max Tab Switches Allowed</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        style={{ width: '120px' }}
+                                        min="0"
+                                        value={quizData.settings.maxTabSwitches}
+                                        onChange={(e) => handleQuizDataChange('settings.maxTabSwitches', parseInt(e.target.value) || 0)}
+                                        placeholder="0 = Unlimited"
+                                    />
+                                    <small className="form-hint">Set to 0 for unlimited switching.</small>
+                                </div>
+                            )}
+
+                            <div className="toggle-group">
+                                <label className="toggle-label">
+                                    <span>Shuffle Options (MCQ)</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={quizData.settings.shuffleOptions}
+                                        onChange={(e) => handleQuizDataChange('settings.shuffleOptions', e.target.checked)}
+                                    />
+                                    <span className="toggle-switch"></span>
+                                </label>
+                            </div>
+
+                            <div className="toggle-group">
+                                <label className="toggle-label">
+                                    <span>Show Instant Feedback</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={quizData.settings.showInstantFeedback}
+                                        onChange={(e) => handleQuizDataChange('settings.showInstantFeedback', e.target.checked)}
+                                    />
+                                    <span className="toggle-switch"></span>
+                                </label>
+                            </div>
+
+                            <div className="toggle-group">
+                                <label className="toggle-label">
+                                    <span>Show Live Leaderboard</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={quizData.settings.showLeaderboard}
+                                        onChange={(e) => handleQuizDataChange('settings.showLeaderboard', e.target.checked)}
+                                    />
+                                    <span className="toggle-switch"></span>
+                                </label>
+                            </div>
                         </div>
                     </div>
-                )
-            }
-        </div >
+
+                    <div className="step-actions">
+                        <button className="btn btn-secondary" onClick={() => setStep(2)}>
+                            Back
+                        </button>
+                        <button
+                            className="btn btn-primary btn-lg"
+                            onClick={handleSubmit}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <><span className="spinner spinner-sm"></span> Creating...</>
+                            ) : (
+                                <><FiSave /> Create Quiz</>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 

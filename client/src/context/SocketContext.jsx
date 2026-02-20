@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const SocketContext = createContext(null);
@@ -16,64 +17,105 @@ export const useSocket = () => {
 export const SocketProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
     const [connected, setConnected] = useState(false);
-    const { token, isAuthenticated } = useAuth();
+    const [isReconnecting, setIsReconnecting] = useState(false);
+    const { token, isAuthenticated, logout } = useAuth();
+    const location = useLocation();
 
     useEffect(() => {
-        if (isAuthenticated && token) {
-            // Determine Socket URL based on environment
-            let socketUrl = import.meta.env.VITE_SOCKET_URL;
+        // 🛡️ 1. Production Rule: Connection Restrictions
+        const publicPages = ['/login', '/register', '/forgot-password', '/reset-password'];
+        const isPublicPage = publicPages.some(path => location.pathname.startsWith(path));
 
-            if (!socketUrl) {
-                if (import.meta.env.PROD) {
-                    // In production, use current origin
-                    socketUrl = window.location.origin;
-                } else {
-                    // Development fallback
-                    socketUrl = 'http://localhost:5000';
-                }
+        // Skip connection if user is on public pages or not logged in
+        if (!isAuthenticated || !token || isPublicPage) {
+            if (socket) {
+                console.log('🔌 [SOCKET] Disconnecting - path is restricted or user logged out.');
+                socket.disconnect();
+                setSocket(null);
+                setConnected(false);
             }
+            return;
+        }
 
-            console.log('🔌 [SOCKET] Connecting to:', socketUrl);
+        // 🚀 2. Initialize production-grade socket
+        let socketUrl = import.meta.env.VITE_SOCKET_URL;
+        if (!socketUrl) {
+            socketUrl = import.meta.env.PROD ? window.location.origin : 'http://localhost:5000';
+        }
 
-            const sessionId = Math.random().toString(36).substring(7) + Date.now();
+        console.log('🔌 [SOCKET] Opening live lane to:', socketUrl);
 
-            const newSocket = io(socketUrl, {
-                auth: { token, sessionId },
-                transports: ['websocket', 'polling'],
-                reconnection: true,
-                reconnectionAttempts: 5,
-                reconnectionDelay: 1000
-            });
+        const newSocket = io(socketUrl, {
+            auth: { token },
+            transports: ['websocket'], // Websockets only for reliability and rate-limit friendliness
+            reconnection: true,
+            reconnectionAttempts: 5,   // Prevent infinite spam loops
+            reconnectionDelay: 3000,   // Wait 3s before retry
+            autoConnect: true,
+            timeout: 10000
+        });
 
-            newSocket.on('connect', () => {
-                console.log('🔌 Socket connected');
-                setConnected(true);
-            });
+        // 🛑 3. Multi-Session & Security Handlers
+        newSocket.on('session:terminated', (data) => {
+            console.error('🚫 [SOCKET] SESSION REJECTED:', data.reason);
+            toast.error(data.message, { duration: 6000, position: 'top-center' });
 
-            newSocket.on('disconnect', () => {
-                console.log('🔌 Socket disconnected');
-                setConnected(false);
-            });
+            // Critical Fix: Hard disconnect and logout to kill the reconnect cycle
+            newSocket.disconnect();
+            logout();
+            setTimeout(() => {
+                window.location.href = '/login?error=session_conflict';
+            }, 1000);
+        });
 
-            newSocket.on('connect_error', (error) => {
-                console.error('Socket connection error:', error.message);
-                setConnected(false);
-            });
+        newSocket.on('connect', () => {
+            console.log('🔌 Socket connected successfully');
+            setConnected(true);
+            setIsReconnecting(false);
+        });
 
-            newSocket.on('error', (error) => {
-                console.error('Socket error:', error);
-                toast.error(error.message || 'Connection error');
-            });
+        newSocket.on('disconnect', (reason) => {
+            console.warn('🔌 Socket lost connection:', reason);
+            setConnected(false);
+            if (reason === 'io server disconnect') {
+                // If server forced us out, usually it's permanent until login change
+                // But we allow manual connect only if state allows
+            } else {
+                setIsReconnecting(true);
+            }
+        });
 
-            setSocket(newSocket);
+        newSocket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error.message);
+            setConnected(false);
+            if (error.message === 'TOKEN_EXPIRED') {
+                toast.error('Session expired. Please log in again.');
+                logout();
+            }
+        });
 
-            return () => {
+        newSocket.on('reconnect_attempt', (attempt) => {
+            console.log(`🔌 Reconnection attempt ${attempt}...`);
+            setIsReconnecting(true);
+        });
+
+        newSocket.on('reconnect_failed', () => {
+            setIsReconnecting(false);
+            toast.error('Live connection could not be restored.');
+        });
+
+        setSocket(newSocket);
+
+        return () => {
+            if (newSocket) {
                 newSocket.disconnect();
                 setSocket(null);
                 setConnected(false);
-            };
-        }
-    }, [isAuthenticated, token]);
+            }
+        };
+    }, [isAuthenticated, token, logout]); // Re-run if auth changes, NOT on path changes to preserve persistent connection
+
+    // --- Provided Methods ---
 
     const joinQuiz = useCallback((quizId) => {
         if (socket && connected) {
@@ -82,10 +124,10 @@ export const SocketProvider = ({ children }) => {
     }, [socket, connected]);
 
     const leaveQuiz = useCallback((quizId) => {
-        if (socket && connected) {
+        if (socket) {
             socket.emit('quiz:leave', { quizId });
         }
-    }, [socket, connected]);
+    }, [socket]);
 
     const startQuiz = useCallback((quizId) => {
         if (socket && connected) {
@@ -139,6 +181,7 @@ export const SocketProvider = ({ children }) => {
     const value = {
         socket,
         connected,
+        isReconnecting,
         joinQuiz,
         leaveQuiz,
         startQuiz,

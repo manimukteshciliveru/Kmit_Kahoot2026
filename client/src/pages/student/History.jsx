@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { responseAPI } from '../../services/api';
+import { responseAPI, quizAPI } from '../../services/api';
 import {
     FiClock, FiAward, FiDownload, FiChevronRight,
-    FiTrendingUp, FiX, FiActivity, FiUser, FiBook, FiCheckCircle, FiXCircle
+    FiTrendingUp, FiX, FiActivity, FiUser, FiBook, FiCheckCircle, FiXCircle, FiZap
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import '../common/Profile.css';
@@ -31,8 +31,6 @@ const History = () => {
         }
     };
 
-
-
     const formatTime = (date) => {
         if (!date) return 'N/A';
         return new Date(date).toLocaleTimeString('en-IN', {
@@ -56,7 +54,6 @@ const History = () => {
         toast.loading('Preparing report card...', { id: 'csv-download' });
 
         try {
-            // Fetch the full leaderboard to include in the CSV
             let leaderboardRows = [];
             try {
                 const lbRes = await quizAPI.getLeaderboard(response.quizId?._id);
@@ -100,17 +97,11 @@ const History = () => {
                 []
             ];
 
-            const leaderboardHeader = [[], ['FINAL LEADERBOARD']];
-            const leaderboardCols = ['Rank', 'Student Name', 'Total Score', 'Status'];
-
             const csvContent = [
                 ...summary,
                 ['DETAILED ANALYSIS'],
                 headers,
-                ...rows,
-                ...leaderboardHeader,
-                leaderboardCols,
-                ...leaderboardRows
+                ...rows
             ].map(e => e.join(",")).join("\n");
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -176,10 +167,12 @@ const History = () => {
                                             {resp.percentage}%
                                         </span>
                                         <span className="rank-mini">Rank #{resp.rank || 'N/A'}</span>
+                                        <div className="ai-badge-mini">
+                                            <FiZap /> AI Review Available
+                                        </div>
                                     </div>
                                     <div className="action-buttons-group">
                                         <button className="btn btn-sm btn-outline" onClick={() => {
-                                            console.log('Navigating to report for ID:', resp._id);
                                             navigate(`/history/report/${resp._id}`);
                                         }}>
                                             <FiActivity /> View Report
@@ -201,266 +194,31 @@ const History = () => {
             </main>
 
             <style>{`
-                .history-card.extended {
-                    display: grid;
-                    grid-template-columns: 1fr;
-                    gap: 1.5rem;
-                    padding: 2rem;
-                }
-                .history-details-main {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                    gap: 2rem;
-                }
-                .quiz-primary-info h4 {
-                    font-size: 1.25rem;
-                    margin-bottom: 0.5rem;
-                }
-                .faculty-subject {
-                    display: flex;
-                    gap: 1rem;
-                    color: var(--text-muted);
-                    font-size: 0.9rem;
-                    align-items: center;
-                }
-                .faculty-subject strong {
-                    color: var(--text-primary);
-                }
-                .divider {
-                    color: var(--border);
-                }
-                .quiz-time-info {
-                    display: flex;
-                    gap: 2rem;
-                }
-                .time-item {
-                    display: flex;
-                    flex-direction: column;
-                }
-                .time-item .label {
-                    font-size: 0.7rem;
-                    text-transform: uppercase;
-                    color: var(--text-muted);
-                    margin-bottom: 4px;
-                    letter-spacing: 0.5px;
-                }
-                .time-item .value {
-                    font-weight: 600;
-                    font-size: 0.9rem;
-                }
-                .history-actions-stats {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding-top: 1.5rem;
-                    border-top: 1px solid var(--border);
-                }
-                .stats-mini {
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                }
-                .score-badge {
-                    padding: 4px 10px;
-                    border-radius: 99px;
-                    font-weight: 700;
-                    font-size: 0.9rem;
-                    background: var(--bg-tertiary);
-                    color: var(--text-primary);
-                }
+                .history-card.extended { display: grid; grid-template-columns: 1fr; gap: 1.5rem; padding: 2rem; }
+                .history-details-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; }
+                .quiz-primary-info h4 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+                .faculty-subject { display: flex; gap: 1rem; color: var(--text-muted); font-size: 0.9rem; align-items: center; }
+                .faculty-subject strong { color: var(--text-primary); }
+                .divider { color: var(--border); }
+                .quiz-time-info { display: flex; gap: 2rem; }
+                .time-item { display: flex; flex-direction: column; }
+                .time-item .label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; letter-spacing: 0.5px; }
+                .time-item .value { font-weight: 600; font-size: 0.9rem; }
+                .history-actions-stats { display: flex; justify-content: space-between; align-items: center; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+                .stats-mini { display: flex; align-items: center; gap: 1rem; }
+                .score-badge { padding: 4px 10px; border-radius: 99px; font-weight: 700; font-size: 0.9rem; background: var(--bg-tertiary); color: var(--text-primary); }
                 .score-badge.high { background: rgba(16, 185, 129, 0.1); color: var(--success); }
                 .score-badge.mid { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
                 .score-badge.low { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-                
-                .rank-mini {
-                    font-weight: 700;
-                    color: var(--text-secondary);
-                    font-size: 0.95rem;
-                }
-                .action-buttons-group {
-                    display: flex;
-                    gap: 0.75rem;
-                }
-                .btn-outline {
-                    background: transparent;
-                    border: 1px solid var(--border);
-                    color: var(--text-primary);
-                }
-                .btn-outline:hover {
-                    border-color: var(--primary);
-                    color: var(--primary);
-                }
+                .rank-mini { font-weight: 700; color: var(--text-secondary); font-size: 0.95rem; }
+                .ai-badge-mini { display: flex; align-items: center; gap: 4px; background: rgba(var(--primary-rgb), 0.1); background-color: #EEF2FF; color: var(--primary); padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 700; border: 1px solid var(--primary-light); }
+                .ai-badge-mini svg { color: var(--primary); }
+                .action-buttons-group { display: flex; gap: 0.75rem; }
+                .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-primary); }
+                .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
 
-                /* Modal Overlay */
-                .quiz-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(0, 0, 0, 0.75);
-                    backdrop-filter: blur(4px);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 1000;
-                    padding: 1rem;
-                }
-                .quiz-detail-container {
-                    background: var(--bg-card);
-                    width: 100%;
-                    max-width: 900px;
-                    max-height: 90vh;
-                    border-radius: 16px;
-                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                    animation: slideUp 0.3s ease-out;
-                }
-                .detail-header {
-                    padding: 1.5rem 2rem;
-                    border-bottom: 1px solid var(--border);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                    background: var(--bg-tertiary);
-                }
-                .detail-body {
-                    padding: 2rem;
-                    overflow-y: auto;
-                    flex: 1;
-                }
-                
-                /* Report Grid Layout */
-                .report-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                    gap: 1.5rem;
-                    margin-bottom: 2rem;
-                }
-                .report-item {
-                    background: var(--bg-secondary);
-                    border: 1px solid var(--border);
-                    border-radius: 12px;
-                    padding: 1.5rem;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    text-align: center;
-                    transition: transform 0.2s;
-                }
-                .report-item:hover {
-                    transform: translateY(-2px);
-                    box-shadow: var(--shadow-sm);
-                }
-                .report-item .icon {
-                    font-size: 1.5rem;
-                    color: var(--primary);
-                    margin-bottom: 0.5rem;
-                }
-                .report-item .value {
-                    font-weight: 800;
-                    font-size: 1.8rem;
-                    color: var(--text-primary);
-                    line-height: 1.2;
-                }
-                .report-item .label {
-                    font-size: 0.8rem;
-                    text-transform: uppercase;
-                    color: var(--text-muted);
-                    margin-top: 0.25rem;
-                    letter-spacing: 0.5px;
-                }
-
-                /* Leaderboard Table Styles */
-                .mini-leaderboard {
-                    width: 100%;
-                    border-collapse: separate;
-                    border-spacing: 0;
-                }
-                .mini-leaderboard th {
-                    text-align: left;
-                    padding: 1rem;
-                    color: var(--text-muted);
-                    font-size: 0.75rem;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
-                    border-bottom: 1px solid var(--border);
-                    background: var(--bg-tertiary);
-                    position: sticky;
-                    top: 0;
-                }
-                .mini-leaderboard td {
-                    padding: 1rem;
-                    background: var(--bg-secondary);
-                    border-bottom: 1px solid var(--border);
-                    font-size: 0.95rem;
-                }
-                .mini-leaderboard tr:last-child td {
-                    border-bottom: none;
-                }
-                
-                /* Current User Highlight Row */
-                .mini-leaderboard tr.me-row td {
-                    background: rgba(var(--primary-rgb), 0.05); /* Fallback */
-                    background: color-mix(in srgb, var(--primary) 8%, var(--bg-secondary)); 
-                    border-top: 1px solid var(--primary);
-                    border-bottom: 1px solid var(--primary);
-                }
-                .mini-leaderboard tr.me-row td:first-child { 
-                    border-left: 4px solid var(--primary); 
-                    border-top-left-radius: 4px; 
-                    border-bottom-left-radius: 4px; 
-                }
-                .mini-leaderboard tr.me-row td:last-child { 
-                    border-right: 1px solid var(--primary); 
-                    border-top-right-radius: 4px; 
-                    border-bottom-right-radius: 4px; 
-                }
-                
-                /* Review Section */
-                .review-item {
-                    display: grid;
-                    gap: 1rem;
-                }
-
-                /* Responsive */
-                @media (max-width: 900px) {
-                    .history-details-main {
-                        flex-direction: column;
-                        gap: 1.25rem;
-                    }
-                    .quiz-time-info {
-                        width: 100%;
-                        justify-content: space-between;
-                        flex-wrap: wrap;
-                    }
-                }
-                @media (max-width: 600px) {
-                    .history-actions-stats {
-                        flex-direction: column;
-                        gap: 1.25rem;
-                        align-items: flex-start;
-                    }
-                    .action-buttons-group {
-                        width: 100%;
-                        flex-direction: column;
-                    }
-                    .detail-header {
-                        padding: 1rem;
-                        flex-direction: column;
-                        gap: 1rem;
-                    }
-                    .detail-body {
-                        padding: 1rem;
-                    }
-                    .report-grid {
-                        grid-template-columns: 1fr 1fr;
-                    }
-                }
+                @media (max-width: 900px) { .history-details-main { flex-direction: column; gap: 1.25rem; } .quiz-time-info { width: 100%; justify-content: space-between; flex-wrap: wrap; } }
+                @media (max-width: 600px) { .history-actions-stats { flex-direction: column; gap: 1.25rem; align-items: flex-start; } .action-buttons-group { width: 100%; flex-direction: column; } }
             `}</style>
         </div>
     );

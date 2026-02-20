@@ -16,8 +16,7 @@ const quizValidation = {
             showLeaderboard: Joi.boolean().default(true),
             allowTabSwitch: Joi.boolean().default(false),
             maxTabSwitches: Joi.number().min(0).default(3),
-            difficultyLevel: Joi.string().valid('easy', 'medium', 'hard', 'mixed').default('medium'),
-            passingScore: Joi.number().min(0).max(100).default(40),
+            difficultyLevel: Joi.string().valid('easy', 'medium', 'hard', 'mixed', 'advanced').default('medium'),
             passingScore: Joi.number().min(0).max(100).default(40),
             showCorrectAnswer: Joi.boolean().default(true),
             autoStart: Joi.boolean().default(false)
@@ -53,7 +52,7 @@ const quizValidation = {
         subject: Joi.string().max(50).allow(''),
         description: Joi.string().max(1000).allow(''),
         mode: Joi.string().valid('mcq', 'msq', 'fill-blank', 'qa', 'mixed'),
-        status: Joi.string().valid('draft', 'scheduled', 'active', 'completed'),
+        status: Joi.string().valid('draft', 'scheduled', 'waiting', 'started', 'active', 'question_active', 'leaderboard', 'finished', 'completed'),
         scheduledAt: Joi.date().allow(null, ''),
         settings: Joi.object({
             quizTimer: Joi.number().min(0),
@@ -64,8 +63,7 @@ const quizValidation = {
             showLeaderboard: Joi.boolean(),
             allowTabSwitch: Joi.boolean(),
             maxTabSwitches: Joi.number().min(0),
-            difficultyLevel: Joi.string().valid('easy', 'medium', 'hard', 'mixed'),
-            passingScore: Joi.number().min(0).max(100),
+            difficultyLevel: Joi.string().valid('easy', 'medium', 'hard', 'mixed', 'advanced'),
             passingScore: Joi.number().min(0).max(100),
             showCorrectAnswer: Joi.boolean(),
             autoStart: Joi.boolean()

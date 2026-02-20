@@ -45,17 +45,103 @@ api.interceptors.request.use(
     }
 );
 
-// Response interceptor to handle auth errors
+// Token refresh state to prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
+// Response interceptor to handle auth errors with automatic token refresh
 api.interceptors.response.use(
     (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
+    async (error) => {
+        const originalRequest = error.config;
+
+        // If error is 401 and we haven't tried to refresh yet
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            if (isRefreshing) {
+                // If already refreshing, queue this request
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                })
+                    .then(token => {
+                        originalRequest.headers.Authorization = `Bearer ${token}`;
+                        return api(originalRequest);
+                    })
+                    .catch(err => {
+                        return Promise.reject(err);
+                    });
+            }
+
+            originalRequest._retry = true;
+            isRefreshing = true;
+
+            // Try to refresh token using stored refresh token
+            const refreshToken = localStorage.getItem('refreshToken');
+
+            if (refreshToken) {
+                try {
+                    // Call refresh endpoint - send refreshToken in body
+                    const refreshResponse = await axios.post(
+                        `${API_URL}/auth/refresh`,
+                        { refreshToken },
+                        { headers: { 'Content-Type': 'application/json' } }
+                    );
+
+                    const { token: newToken, user } = refreshResponse.data.data || refreshResponse.data;
+
+                    if (newToken) {
+                        localStorage.setItem('token', newToken);
+                        if (user) {
+                            localStorage.setItem('user', JSON.stringify(user));
+                        }
+
+                        // Update the original request with new token
+                        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+
+                        // Process queued requests
+                        processQueue(null, newToken);
+                        isRefreshing = false;
+
+                        // Retry the original request
+                        return api(originalRequest);
+                    }
+                } catch (refreshError) {
+                    // Refresh failed, logout user
+                    processQueue(refreshError, null);
+                    isRefreshing = false;
+
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('refreshToken');
+                    localStorage.removeItem('user');
+
+                    if (window.location.pathname !== '/login') {
+                        window.location.href = '/login';
+                    }
+                    return Promise.reject(refreshError);
+                }
+            } else {
+                // No refresh token, logout
+                isRefreshing = false;
+                localStorage.removeItem('token');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('user');
+
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
             }
         }
+
         return Promise.reject(error);
     }
 );
@@ -79,6 +165,7 @@ export const authAPI = {
         LOGIN_REQUESTS.set(key, request);
         return request;
     },
+    refreshToken: (refreshToken) => api.post('/auth/refresh', { refreshToken }),
     getMe: () => api.get('/auth/me'),
     updateProfile: (data) => api.put('/auth/profile', data),
     changePassword: (data) => api.put('/auth/password', data)
@@ -94,9 +181,10 @@ export const quizAPI = {
     join: (code) => api.post(`/quizzes/join/${code}`),
     start: (id) => api.post(`/quizzes/${id}/start`),
     end: (id) => api.post(`/quizzes/${id}/end`),
-    reset: (id) => api.post(`/quizzes/${id}/reset`),
+    rehost: (id) => api.post(`/quizzes/${id}/rehost`),
     getLeaderboard: (id) => api.get(`/quizzes/${id}/leaderboard`),
     getResults: (id) => api.get(`/quizzes/${id}/results`),
+    getAttendance: (id) => api.get(`/quizzes/${id}/attendance`),
     downloadReport: (id) => api.get(`/quizzes/${id}/report`, { responseType: 'blob' })
 };
 
@@ -118,7 +206,8 @@ export const aiAPI = {
     }),
     generateFromText: (data) => api.post('/ai/generate-from-text', data),
     generateFromTranscript: (data) => api.post('/ai/generate-from-transcript', data),
-    explainQuestion: (data) => api.post('/ai/explain', data)
+    explainQuestion: (data) => api.post('/ai/explain', data),
+    getReview: (quizId) => api.get(`/ai/review/${quizId}`)
 };
 
 // User/Admin API

@@ -22,6 +22,7 @@ import {
     FiStopCircle
 } from 'react-icons/fi';
 import { quizAPI, aiAPI } from '../../services/api';
+import { useSocket } from '../../context/SocketContext';
 import toast from 'react-hot-toast';
 import './QuizResults.css';
 
@@ -35,7 +36,15 @@ const QuizResults = () => {
     const [expandedStudent, setExpandedStudent] = useState(null);
     const [explainingQId, setExplainingQId] = useState(null);
     const [explanations, setExplanations] = useState({}); // { questionId: explanation }
+    const [branchFilter, setBranchFilter] = useState('ALL');
+    const [sectionFilter, setSectionFilter] = useState('ALL');
     const reportRef = useRef(null);
+    const { socket } = useSocket();
+
+    const BRANCH_CONFIG = {
+        'CSE': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'],
+        'CSM': ['A', 'B', 'C', 'D', 'E']
+    };
 
     useEffect(() => {
         fetchResults();
@@ -54,6 +63,60 @@ const QuizResults = () => {
             setLoading(false);
         }
     };
+
+    // --- REAL-TIME UPDATES ---
+    useEffect(() => {
+        if (!socket || !quizId) return;
+
+        socket.emit('quiz:join', { quizId }); // Specifically join for faculty status
+
+        const handleNewResponse = (update) => {
+            setData(prev => {
+                if (!prev) return prev;
+                const newResponses = [...prev.responses];
+                const studentIdx = newResponses.findIndex(r => String(r.student?._id || r.userId) === String(update.participantId));
+
+                if (studentIdx > -1) {
+                    newResponses[studentIdx] = {
+                        ...newResponses[studentIdx],
+                        totalScore: update.score,
+                        correctCount: update.isCorrect ? (newResponses[studentIdx].correctCount || 0) + 1 : (newResponses[studentIdx].correctCount || 0)
+                    };
+                }
+
+                return {
+                    ...prev,
+                    responses: newResponses,
+                    analytics: {
+                        ...prev.analytics,
+                        totalParticipants: newResponses.length
+                    }
+                };
+            });
+        };
+
+        const handleParticipantJoin = (data) => {
+            // Option to refresh or update live list
+            console.log('New participant joined:', data.participant);
+        };
+
+        const handleLeaderboardUpdate = (lbData) => {
+            setData(prev => {
+                if (!prev) return prev;
+                return { ...prev, leaderboard: lbData.leaderboard };
+            });
+        };
+
+        socket.on('response:received', handleNewResponse);
+        socket.on('participant:joined', handleParticipantJoin);
+        socket.on('leaderboard:update', handleLeaderboardUpdate);
+
+        return () => {
+            socket.off('response:received', handleNewResponse);
+            socket.off('participant:joined', handleParticipantJoin);
+            socket.off('leaderboard:update', handleLeaderboardUpdate);
+        };
+    }, [socket, quizId]);
 
     const formatTime = (ms) => {
         if (!ms) return '0s';
@@ -121,6 +184,71 @@ const QuizResults = () => {
             setExplainingQId(null);
         }
     };
+
+    const getFilteredLeaderboard = () => {
+        if (!data || !data.leaderboard) return [];
+        return data.leaderboard.filter(entry => {
+            const s = entry.student || entry.userId || {};
+            const branchMatch = branchFilter === 'ALL' || s.department === branchFilter;
+            const sectionMatch = sectionFilter === 'ALL' || s.section === sectionFilter;
+            return branchMatch && sectionMatch;
+        });
+    };
+
+    const getFilteredResponses = () => {
+        if (!data || !data.responses) return [];
+        return data.responses.filter(entry => {
+            const s = entry.student || entry.userId || {};
+            const branchMatch = branchFilter === 'ALL' || s.department === branchFilter;
+            const sectionMatch = sectionFilter === 'ALL' || s.section === sectionFilter;
+            return branchMatch && sectionMatch;
+        });
+    };
+
+    const FilterControls = () => (
+        <div className="filter-system animate-slideInRight">
+            <div className="filter-group">
+                <label>Branch</label>
+                <div className="filter-pills">
+                    {['ALL', 'CSE', 'CSM'].map(b => (
+                        <button
+                            key={b}
+                            className={`pill ${branchFilter === b ? 'active' : ''}`}
+                            onClick={() => {
+                                setBranchFilter(b);
+                                setSectionFilter('ALL');
+                            }}
+                        >
+                            {b}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {branchFilter !== 'ALL' && (
+                <div className="filter-group animate-slideInRight">
+                    <label>Section</label>
+                    <div className="filter-pills">
+                        <button
+                            className={`pill ${sectionFilter === 'ALL' ? 'active' : ''}`}
+                            onClick={() => setSectionFilter('ALL')}
+                        >
+                            All Sections
+                        </button>
+                        {BRANCH_CONFIG[branchFilter].map(s => (
+                            <button
+                                key={s}
+                                className={`pill ${sectionFilter === s ? 'active' : ''}`}
+                                onClick={() => setSectionFilter(s)}
+                            >
+                                {s}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 
     if (loading) {
         return (
@@ -239,24 +367,24 @@ const QuizResults = () => {
                         </div>
                     </div>
 
-                    {/* Performance Feedback */}
-                    <div className="section-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                    {/* Performance Highlights */}
+                    <div className="performance-feedback-grid">
                         <div className="section-card">
                             <h3>Top Performers</h3>
                             <div className="performers-list">
                                 {[...responses].sort((a, b) => b.percentage - a.percentage).slice(0, 3).map((r, i) => {
                                     const s = r.student || {};
                                     return (
-                                        <div key={i} className="performer-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontWeight: '600' }}>{s.name || 'Unknown'}</span>
-                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                        <div key={i} className="performer-item">
+                                            <div className="perf-info">
+                                                <span className="perf-name">{s.name || 'Unknown'}</span>
+                                                <span className="perf-meta">
                                                     {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
                                                 </span>
                                             </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <span style={{ fontWeight: 'bold', color: 'var(--success)', display: 'block' }}>{r.percentage}%</span>
-                                                <span style={{ fontSize: '0.8rem', color: 'var(--success)' }}>Distinction</span>
+                                            <div className="perf-stats">
+                                                <span className="perf-val success">{r.percentage}%</span>
+                                                <span className="perf-lbl success">Distinction</span>
                                             </div>
                                         </div>
                                     );
@@ -269,16 +397,16 @@ const QuizResults = () => {
                                 {[...responses].sort((a, b) => a.percentage - b.percentage).slice(0, 3).filter(r => r.percentage < 60).map((r, i) => {
                                     const s = r.student || {};
                                     return (
-                                        <div key={i} className="performer-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontWeight: '600' }}>{s.name || 'Unknown'}</span>
-                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                        <div key={i} className="performer-item">
+                                            <div className="perf-info">
+                                                <span className="perf-name">{s.name || 'Unknown'}</span>
+                                                <span className="perf-meta">
                                                     {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
                                                 </span>
                                             </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <span style={{ fontWeight: 'bold', color: 'var(--danger)', display: 'block' }}>{r.percentage}%</span>
-                                                <span style={{ fontSize: '0.8rem', color: 'var(--danger)' }}>Review Needed</span>
+                                            <div className="perf-stats">
+                                                <span className="perf-val danger">{r.percentage}%</span>
+                                                <span className="perf-lbl danger">Review Needed</span>
                                             </div>
                                         </div>
                                     );
@@ -552,10 +680,11 @@ const QuizResults = () => {
             {activeTab === 'leaderboard' && (
                 <div className="tab-content">
                     <div className="leaderboard-v2">
+                        <FilterControls />
                         {/* Top 3 Featured Cards */}
                         <div className="featured-winners">
-                            {leaderboard.slice(0, 3).map((r, idx) => {
-                                const s = r.student || {};
+                            {getFilteredLeaderboard().slice(0, 3).map((r, idx) => {
+                                const s = r.student || r.userId || {};
                                 return (
                                     <div key={s.id || idx} className={`winner-card rank-${idx + 1}`}>
                                         <div className="winner-rank">
@@ -600,12 +729,14 @@ const QuizResults = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {leaderboard.map((r, idx) => {
-                                        const s = r.student || {};
+                                    {getFilteredLeaderboard().map((r, idx) => {
+                                        const s = r.student || r.userId || {};
+                                        // Find true rank from original leaderboard
+                                        const trueRank = leaderboard.findIndex(le => (le.student?._id || le.userId?._id) === (s._id || s.id)) + 1;
                                         return (
-                                            <tr key={s.id || idx} className={idx < 3 ? `top-rank rank-${idx + 1}` : ''}>
+                                            <tr key={s.id || idx} className={trueRank <= 3 ? `top-rank rank-${trueRank}` : ''}>
                                                 <td className="rank-col">
-                                                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                                                    {trueRank === 1 ? '🥇' : trueRank === 2 ? '🥈' : trueRank === 3 ? '🥉' : `#${trueRank}`}
                                                 </td>
                                                 <td className="student-col">
                                                     <div className="student-meta">
@@ -646,10 +777,12 @@ const QuizResults = () => {
                     <div className="dashboard-head-section">
                         <h2 className="section-title">⚡ Detailed Performance Board</h2>
                         <div className="live-status-pills">
-                            <span className="live-count-pill"><FiUsers /> {responses.length} Total</span>
-                            <span className="live-count-pill success"><FiCheckCircle /> {analytics.completedCount} Completed</span>
+                            <span className="live-count-pill"><FiUsers /> {getFilteredResponses().length} Results</span>
+                            <span className="live-count-pill success"><FiCheckCircle /> {getFilteredResponses().filter(r => r.status === 'completed').length} Completed</span>
                         </div>
                     </div>
+
+                    <FilterControls />
 
                     <div className="attendance-table-container leaderboard-table-scroll live-dashboard-table">
                         <table className="attendance-table leaderboard-styled-table">
@@ -665,9 +798,11 @@ const QuizResults = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {[...responses].sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken).map((r, i) => {
-                                    const s = r.student || {};
-                                    const rank = i + 1;
+                                {getFilteredResponses().sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken).map((r, i) => {
+                                    const s = r.student || r.userId || {};
+                                    // Global rank from full responses list
+                                    const sortedResponses = [...responses].sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken);
+                                    const rank = sortedResponses.findIndex(res => (res.student?._id || res.userId?._id) === (s._id || s.id)) + 1;
                                     const totalQs = quiz.totalQuestions || 1;
                                     const attempted = r.answers?.filter(a => a.answer || a.studentAnswer)?.length || 0;
                                     const accuracy = attempted > 0 ? Math.round((r.correctCount / attempted) * 100) : 0;

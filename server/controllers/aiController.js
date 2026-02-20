@@ -2,6 +2,7 @@ const aiGenerator = require('../services/aiGenerator');
 const Quiz = require('../models/Quiz');
 const axios = require('axios');
 const path = require('path');
+const fs = require('fs');
 
 // @desc    Generate questions from uploaded file
 // @route   POST /api/ai/generate-from-file
@@ -66,18 +67,29 @@ exports.generateFromFile = async (req, res) => {
                     case '.go':
                     case '.rb':
                     case '.php':
+                    case '.rtf':
                         const txtBuffer = await aiGenerator.getFileBuffer(filePath);
                         const txtContent = txtBuffer.toString('utf-8');
-                        combinedTextContent += `\n--- Content from ${file.originalname} (Code/Text) ---\n${txtContent}\n`;
+                        combinedTextContent += `\n--- Content from ${file.originalname} (Code/Text/RTF) ---\n${txtContent}\n`;
+                        break;
+                    case '.doc':
+                    case '.docx':
+                        const wordText = await aiGenerator.extractFromWord(filePath);
+                        combinedTextContent += `\n--- Content from ${file.originalname} (Word) ---\n${wordText}\n`;
+                        break;
+                    case '.ppt':
+                    case '.pptx':
+                        const pptText = await aiGenerator.extractFromPowerPoint(filePath);
+                        combinedTextContent += `\n--- Content from ${file.originalname} (PowerPoint) ---\n${pptText}\n`;
                         break;
                     case '.mp3':
                     case '.wav':
                     case '.mp4':
                     case '.webm':
-                        // For audio/video, add as a generative part
+                        // For audio, video, add as a generative part for Gemini
                         const mediaPart = await aiGenerator.fileToGenerativePart(filePath, file.mimetype);
                         parts.push(mediaPart);
-                        combinedTextContent += `\n(Includes media file: ${file.originalname})\n`;
+                        combinedTextContent += `\n(Includes complex file: ${file.originalname})\n`;
                         break;
                     default:
                         console.warn(`Unsupported file type: ${ext}`);
@@ -121,10 +133,11 @@ exports.generateFromFile = async (req, res) => {
             }
 
             if (quiz.createdBy.toString() !== req.user._id.toString()) {
+                console.warn(`🔒 [AUTH] Ownership Mismatch: User ${req.user._id} (${req.user.role}) attempted to modify Quiz ${quiz._id} owned by ${quiz.createdBy}`);
                 req.files.forEach(f => {
                     if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
                 });
-                return res.status(403).json({
+                return res.status(401).json({
                     success: false,
                     message: 'Not authorized to modify this quiz'
                 });
@@ -334,6 +347,58 @@ exports.explainQuestion = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to generate explanation'
+        });
+    }
+};
+// @desc    Generate personalized summary/review for a student's quiz performance
+// @route   POST /api/ai/review/:quizId
+// @access  Private (Student)
+exports.generateReview = async (req, res) => {
+    try {
+        const { quizId } = req.params;
+        const userId = req.user._id;
+
+        const aiAnalyticsService = require('../services/aiAnalyticsService');
+        const Response = require('../models/Response');
+
+        // Check if feedback already exists to save tokens
+        const existingResponse = await Response.findOne({ quizId, userId });
+        if (existingResponse && existingResponse.aiFeedback) {
+            try {
+                const feedback = JSON.parse(existingResponse.aiFeedback);
+                return res.status(200).json({
+                    success: true,
+                    data: { feedback }
+                });
+            } catch (e) {
+                // If parsing fails, regenerate
+            }
+        }
+
+        const feedback = await aiAnalyticsService.generateStudentSummary(quizId, userId);
+
+        if (!feedback) {
+            return res.status(404).json({
+                success: false,
+                message: 'Could not generate review. Ensure you have completed the quiz.'
+            });
+        }
+
+        // Save review to response for persistence
+        if (existingResponse) {
+            existingResponse.aiFeedback = JSON.stringify(feedback);
+            await existingResponse.save();
+        }
+
+        res.status(200).json({
+            success: true,
+            data: { feedback }
+        });
+    } catch (error) {
+        console.error('AI Review Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate AI review'
         });
     }
 };

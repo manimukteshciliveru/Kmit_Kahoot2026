@@ -25,8 +25,7 @@ const documentStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
         folder: 'quizmaster/documents',
-        resource_type: 'raw', // Support non-image files like PDF, XLSX
-        allowed_formats: ['pdf', 'xlsx', 'xls', 'csv', 'txt']
+        resource_type: 'auto', // Dynamic resource type detection
     },
 });
 

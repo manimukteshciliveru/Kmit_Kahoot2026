@@ -289,15 +289,26 @@
 }
 
 /* Active Quiz Banner */
+/* Active Quiz Banner - Premium Glassmorphic Design */
 .active-banner {
-    background: linear-gradient(135deg, var(--success), #1a6b0a);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: var(--radius-lg);
-    padding: var(--space-sm) var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
     margin-bottom: var(--space-lg);
     display: flex;
     align-items: center;
     gap: var(--space-md);
     flex-wrap: wrap;
+    box-shadow: 0 8px 32px rgba(16, 185, 129, 0.2);
+    animation: slideDown 0.5s ease-out;
+}
+
+[data-theme="dark"] .active-banner {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 78, 59, 0.3));
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.15);
 }
 
 .banner-info {
@@ -446,16 +457,21 @@
 }
 
 .data-table th {
-    padding: 10px 12px;
+    padding: 12px;
     text-align: left;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
     background: var(--bg-tertiary);
     border-bottom: 2px solid var(--border);
     white-space: nowrap;
+}
+
+.data-table th:nth-child(3),
+.data-table th:nth-child(4) {
+    text-align: center;
 }
 
 .data-table td {

@@ -147,7 +147,7 @@ const StudentDashboard = () => {
                                             </div>
                                             <span className="quiz-meta">
                                                 <FiClock />
-                                                {quiz.status === 'active' ? (
+                                                {(quiz.status === 'active' || quiz.status === 'live') ? (
                                                     <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>Live Now</span>
                                                 ) : (
                                                     // Helper specific to this view
@@ -172,16 +172,16 @@ const StudentDashboard = () => {
                                             </span>
                                         </div>
                                         <div className="quiz-status" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                                            <div className={`status-badge ${quiz.status === 'active' ? 'active' : quiz.status === 'finished' ? 'finished' : 'scheduled'}`}>
-                                                {quiz.status === 'active' ? 'Live' : quiz.status === 'finished' ? 'Finished' : 'Upcoming'}
+                                            <div className={`status-badge ${(quiz.status === 'active' || quiz.status === 'live') ? 'active' : (quiz.status === 'finished' || quiz.status === 'done') ? 'finished' : 'scheduled'}`}>
+                                                {(quiz.status === 'active' || quiz.status === 'live') ? 'Live' : (quiz.status === 'finished' || quiz.status === 'done') ? 'Finished' : 'Upcoming'}
                                             </div>
                                             <button
-                                                className={`btn btn-sm ${quiz.status === 'active' ? 'btn-primary' : 'btn-ghost'}`}
-                                                onClick={() => quiz.status !== 'finished' && navigate(`/quiz/${quiz._id}/play`)}
+                                                className={`btn btn-sm ${(quiz.status === 'active' || quiz.status === 'live') ? 'btn-primary' : 'btn-ghost'}`}
+                                                onClick={() => (quiz.status !== 'finished' && quiz.status !== 'done') && navigate(`/quiz/${quiz._id}/play`)}
                                                 style={{ fontSize: '0.75rem', padding: '4px 12px' }}
-                                                disabled={quiz.status === 'finished'}
+                                                disabled={quiz.status === 'finished' || quiz.status === 'done'}
                                             >
-                                                {quiz.status === 'active' ? 'Join Now' : quiz.status === 'finished' ? 'Ended' : 'Enter Lobby'}
+                                                {(quiz.status === 'active' || quiz.status === 'live') ? 'Join Now' : (quiz.status === 'finished' || quiz.status === 'done') ? 'Ended' : 'Enter Lobby'}
                                             </button>
                                         </div>
                                     </div>

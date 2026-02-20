@@ -10,9 +10,10 @@ const {
     joinQuiz,
     startQuiz,
     endQuiz,
-    resetQuiz,
+    rehostQuiz,
     getLeaderboard,
-    getQuizResults
+    getQuizResults,
+    getQuizAttendance
 } = require('../controllers/quizController');
 const strictLimiter = require('../middleware/strictRateLimiter');
 const { getDetailedAnalytics } = require('../controllers/analyticsController');
@@ -55,7 +56,7 @@ router.post('/join/:code', strictLimiter, joinQuiz);
 
 router.post('/:id/start', authorize('faculty', 'admin'), startQuiz);
 router.post('/:id/end', authorize('faculty', 'admin'), endQuiz);
-router.post('/:id/reset', authorize('faculty', 'admin'), resetQuiz);
+router.post('/:id/rehost', authorize('faculty', 'admin'), rehostQuiz);
 
 // Specific quiz operations - these must come AFTER the specific routes above
 router.route('/:id')
@@ -72,6 +73,7 @@ router.route('/:id')
 // Quiz data & Analytics
 router.get('/:id/leaderboard', getLeaderboard);
 router.get('/:id/results', authorize('faculty', 'admin'), getQuizResults);
+router.get('/:id/attendance', authorize('faculty', 'admin'), getQuizAttendance);
 router.get('/:id/report', authorize('faculty', 'admin'), require('../controllers/reportController').downloadReport);
 
 // Advanced Analytics (Enterprise Feature)

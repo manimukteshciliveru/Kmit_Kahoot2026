@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const logger = require('../utils/logger');
 
 // Protect routes - verify JWT token
 exports.protect = async (req, res, next) => {
@@ -37,6 +38,7 @@ exports.protect = async (req, res, next) => {
             }
 
             req.user = user;
+            logger.info(`👤 [AUTH] Authenticated User: ${user.name} | Role: ${user.role} | ID: ${user._id}`);
             next();
         } catch (err) {
             return res.status(401).json({
@@ -45,7 +47,7 @@ exports.protect = async (req, res, next) => {
             });
         }
     } catch (error) {
-        console.error('Auth middleware error:', error);
+        logger.error('Auth middleware error:', error);
         return res.status(500).json({
             success: false,
             message: 'Server error'
@@ -56,11 +58,16 @@ exports.protect = async (req, res, next) => {
 // Role-based access control
 exports.authorize = (...roles) => {
     return (req, res, next) => {
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({
-                success: false,
-                message: `Role '${req.user.role}' is not authorized to access this route`
-            });
+        const userRole = (req.user.role || '').toLowerCase();
+        const allowedRoles = roles.map(r => r.toLowerCase());
+
+        if (!allowedRoles.includes(userRole)) {
+            const errorMsg = `Role '${req.user.role}' is not authorized to access this route`;
+            logger.warn(`🔒 [AUTH] Access Denied: ${errorMsg} | Path: ${req.originalUrl}`);
+
+            const err = new Error(errorMsg);
+            err.status = 403;
+            return next(err);
         }
         next();
     };
@@ -98,7 +105,7 @@ exports.generateToken = (userId) => {
     return jwt.sign(
         { id: userId },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '15m' } // Shorter expiry for security
+        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' } // Extended to 24 hours for better UX
     );
 };
 

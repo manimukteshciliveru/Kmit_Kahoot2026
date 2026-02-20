@@ -4,7 +4,8 @@ const {
     generateFromFile,
     generateFromText,
     generateFromTranscript,
-    explainQuestion
+    explainQuestion,
+    generateReview
 } = require('../controllers/aiController');
 const { protect, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
@@ -20,6 +21,7 @@ router.use(protect);
 
 // Student capable routes
 router.post('/explain', authorize('faculty', 'student', 'admin'), explainQuestion);
+router.get('/review/:quizId', authorize('student', 'faculty', 'admin'), generateReview);
 
 // Faculty only routes
 router.use(authorize('faculty', 'admin'));
