@@ -32,6 +32,7 @@ const RATE_LIMIT_WINDOW = 60 * 1000;
 const MAX_JOINS_PER_MIN = 100;
 
 module.exports = (io) => {
+    logger.info('🔌 [SOCKET] Handler initialized');
 
     const getRemainingTime = (quiz) => {
         if (!quiz.expiresAt) return null;
@@ -46,9 +47,9 @@ module.exports = (io) => {
             try {
                 await Response.updateRanks(quizId);
                 const leaderboard = await Response.getLeaderboard(quizId, 500);
-                const roomName = `quiz_${quizId}`;
+                const roomName = String(quizId);
                 io.to(roomName).emit('leaderboard:update', { leaderboard });
-                logger.info(`📊 [LEADERBOARD] Updated & Emitted to room: ${roomName}`);
+                logger.info(`📊 [LEADERBOARD] Broadcast to room: ${roomName} | Count: ${leaderboard.length}`);
                 rankUpdateDebounces.delete(quizId);
             } catch (err) { logger.error('Debounce Rank Update Error:', err); }
         }, 3000);
@@ -56,9 +57,11 @@ module.exports = (io) => {
     };
 
     const forceEndQuiz = async (quizId) => {
+        const roomName = String(quizId);
         try {
+            logger.info(`⏹️ [FORCE END] Terminating quiz arena: ${quizId}`);
             const quiz = await Quiz.findById(quizId);
-            if (!quiz || quiz.status === STATES.FINISHED) return;
+            if (!quiz || quiz.status === STATES.DONE) return;
 
             quiz.status = STATES.DONE;
             quiz.endedAt = new Date();
@@ -72,12 +75,13 @@ module.exports = (io) => {
             await Response.updateRanks(quizId);
             const leaderboard = await Response.getLeaderboard(quizId, 500);
 
-            io.to(`quiz_${quizId}`).emit('quiz:ended', {
+            io.to(roomName).emit('quiz:ended', {
                 quizId,
                 status: STATES.DONE,
                 endedAt: quiz.endedAt,
                 leaderboard
             });
+            logger.info(`✅ [ARENA CLOSED] Broadcast ended signal to: ${roomName}`);
         } catch (error) { logger.error('Force End Error:', error); }
     };
 
@@ -85,15 +89,22 @@ module.exports = (io) => {
     io.use(async (socket, next) => {
         try {
             const token = socket.handshake.auth.token || socket.handshake.headers['authorization']?.split(' ')[1];
-            if (!token) return next(new Error('Authentication required'));
+            if (!token) {
+                logger.warn('🚫 [SOCKET] Connection rejected: No token');
+                return next(new Error('Authentication required'));
+            }
 
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             const user = await User.findById(decoded.id).select('name role avatar isActive department section rollNumber');
 
-            if (!user || !user.isActive) return next(new Error('User restricted or not found'));
+            if (!user || !user.isActive) {
+                logger.warn(`🚫 [SOCKET] Connection rejected: User invalid or inactive (${decoded.id})`);
+                return next(new Error('User restricted or not found'));
+            }
             socket.user = user;
             next();
         } catch (err) {
+            logger.error(`🚫 [SOCKET] Auth Logic Error: ${err.message}`);
             next(new Error(err.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'Authentication failed'));
         }
     });
@@ -103,35 +114,28 @@ module.exports = (io) => {
         const userRole = socket.user.role;
         const connectionKey = `${userIdStr}_${userRole}`;
 
-        // 🛡️ [SECURITY] Multi-tab prevention: Notify & Evict previous session for SAME role
+        // 🛡️ [SECURITY] Multi-tab notification (Inform but don't strictly evict to support multi-device)
         if (activeUserConnections.has(connectionKey)) {
-            const oldSocketId = activeUserConnections.get(connectionKey);
-            if (oldSocketId !== socket.id) {
-                const oldSocket = io.sockets.sockets.get(oldSocketId);
-                if (oldSocket) {
-                    oldSocket.emit('session:terminated', {
-                        reason: 'duplicate',
-                        message: 'Another session detected with this role. Disconnected.'
-                    });
-                    oldSocket.disconnect(true);
-                }
-            }
+            logger.info(`📱 [DUPLICATE] User ${socket.user.name} connected from another tab/device`);
         }
         activeUserConnections.set(connectionKey, socket.id);
 
-        logger.info(`🔌 [CONNECT] ${socket.user.name} (${userRole}) | ID: ${socket.id}`);
+        logger.info(`🔌 [CONNECT] ${socket.user.name} (${userRole}) | SocketID: ${socket.id}`);
         socket.join(`user:${userIdStr}`);
 
         // --- 1. QUIZ SYNC (GROUND TRUTH) ---
         socket.on('quiz:sync', async (data) => {
             const { quizId } = data;
-            const roomName = `quiz_${quizId}`;
+            const roomName = String(quizId);
             try {
                 const quiz = await Quiz.findById(quizId).lean();
                 if (!quiz) return socket.emit('error', { message: 'Quiz not found' });
 
                 socket.join(roomName);
-                if (userRole !== 'student') socket.join(`${roomName}:faculty`);
+                if (userRole !== 'student') {
+                    socket.join(`${roomName}:host`);
+                    logger.info(`👑 [HOST JOIN] ${socket.user.name} entered host room: ${roomName}:host`);
+                }
 
                 const response = await Response.findOne({ quizId, userId: socket.user._id }).lean();
                 const remaining = getRemainingTime(quiz);
@@ -145,9 +149,9 @@ module.exports = (io) => {
                     savedAnswers: response?.answers || [],
                     isTerminated: response?.status === 'terminated',
                     isCompleted: response?.status === 'completed',
-                    responseId: response?._id // For frontend navigation
+                    responseId: response?._id
                 });
-                logger.info(`🔄 [SYNC] Ground truth sent to ${socket.user.name} for room: ${roomName}`);
+                logger.info(`🔄 [SYNC] Ground truth sent to ${socket.user.name} for arena: ${roomName}`);
             } catch (err) { logger.error('Sync error:', err); }
         });
 
@@ -155,15 +159,21 @@ module.exports = (io) => {
         socket.on('quiz:join', async (data) => {
             const { quizId } = data;
             if (!quizId) return;
-            const roomName = `quiz_${quizId}`;
+            const roomName = String(quizId);
+
             socket.join(roomName);
-            if (userRole !== 'student') socket.join(`${roomName}:faculty`);
+            logger.info(`📥 [ROOM JOIN] User ${socket.user.name} joined room: ${roomName}`);
+
+            if (userRole !== 'student') {
+                socket.join(`${roomName}:host`);
+                logger.info(`👑 [HOST ROOM] Faculty ${socket.user.name} joined host sub-room: ${roomName}:host`);
+            }
 
             const quiz = await Quiz.findById(quizId).select('status code participants').lean();
             if (!quiz) return;
 
             if (userRole === 'student') {
-                io.to(`${roomName}:faculty`).emit('participant:joined', {
+                io.to(`${roomName}:host`).emit('participant:joined', {
                     participant: {
                         id: socket.user._id,
                         name: socket.user.name,
@@ -174,13 +184,13 @@ module.exports = (io) => {
                     }
                 });
 
-                // 📡 Broadcast updated count to everyone (especially students in lobby)
+                // 📡 Broadcast updated count to everyone
                 const updatedQuiz = await Quiz.findById(quizId).select('participants').lean();
                 io.to(roomName).emit('participant:count_update', {
                     count: updatedQuiz.participants?.length || 0
                 });
 
-                logger.info(`➕ [JOIN] Student ${socket.user.name} joined room: ${roomName}`);
+                logger.info(`➕ [PARTICIPANT] Student ${socket.user.name} joined arena: ${roomName}`);
             }
         });
 
@@ -188,13 +198,15 @@ module.exports = (io) => {
         socket.on('quiz:start', async (data) => {
             if (userRole === 'student') return;
             const { quizId } = data;
-            const roomName = `quiz_${quizId}`;
+            const roomName = String(quizId);
             try {
+                logger.info(`🚀 [LAUNCH] Faculty ${socket.user.name} starting quiz ${quizId}`);
                 const quiz = await Quiz.findById(quizId);
                 const allowedStartStates = [STATES.WAITING, STATES.DRAFT, STATES.SCHEDULED];
+
                 if (!quiz || !allowedStartStates.includes(quiz.status)) {
                     logger.warn(`⛔ [START REJECTED] Quiz ${quizId} status is ${quiz?.status}`);
-                    return socket.emit('error', { message: 'Invalid transition: Quiz must be in draft, waiting or scheduled state to start' });
+                    return socket.emit('error', { message: 'Invalid transition: Quiz is already active or finished' });
                 }
 
                 quiz.status = STATES.LIVE;
@@ -215,33 +227,43 @@ module.exports = (io) => {
                     currentQuestionIndex: 0,
                     expiresAt: quiz.expiresAt
                 });
-                logger.info(`🚀 [STARTED] Quiz ${quizId} is now active.`);
+                logger.info(`📢 [STARTED] Broadcast state change to room: ${roomName}`);
             } catch (err) { logger.error('Start Error:', err); }
+        });
+
+        socket.on('quiz:end', async (data) => {
+            if (userRole === 'student') return;
+            const { quizId } = data;
+            logger.info(`⏹️ [END REQUEST] Faculty ${socket.user.name} requested manual end for: ${quizId}`);
+            await forceEndQuiz(quizId);
         });
 
         socket.on('quiz:next-question', async (data) => {
             if (userRole === 'student') return;
             const { quizId } = data;
-            const roomName = `quiz_${quizId}`;
+            const roomName = String(quizId);
             try {
                 const quiz = await Quiz.findById(quizId);
                 if (!quiz) return;
 
-                if (quiz.status === STATES.LEADERBOARD) {
-                    const nextIdx = quiz.currentQuestionIndex + 1;
-                    if (nextIdx >= quiz.questions.length) {
+                if (quiz.status === STATES.LEADERBOARD || quiz.status === STATES.LIVE) {
+                    const nextIdx = (quiz.status === STATES.LIVE) ? 0 : quiz.currentQuestionIndex + 1;
+
+                    if (nextIdx >= quiz.questions.length && quiz.status !== STATES.LIVE) {
                         return await forceEndQuiz(quizId);
                     }
+
                     quiz.status = STATES.QUESTION_ACTIVE;
-                    quiz.currentQuestionIndex = nextIdx;
+                    quiz.currentQuestionIndex = (quiz.status === STATES.LIVE) ? 0 : nextIdx;
                     quiz.expiresAt = quiz.settings?.questionTimer > 0 ? new Date(Date.now() + quiz.settings.questionTimer * 1000) : null;
                     await quiz.save();
 
                     io.to(roomName).emit('quiz:state_changed', {
                         status: STATES.QUESTION_ACTIVE,
-                        currentQuestionIndex: nextIdx,
+                        currentQuestionIndex: quiz.currentQuestionIndex,
                         expiresAt: quiz.expiresAt
                     });
+                    logger.info(`⏭️ [NEXT QUESTION] Moved to Q${quiz.currentQuestionIndex + 1} in room: ${roomName}`);
                 } else if (quiz.status === STATES.QUESTION_ACTIVE) {
                     quiz.status = STATES.LEADERBOARD;
                     quiz.expiresAt = null;
@@ -252,6 +274,7 @@ module.exports = (io) => {
                         status: STATES.LEADERBOARD,
                         leaderboard
                     });
+                    logger.info(`📊 [LEADERBOARD MODE] Broadcast leaderboard to room: ${roomName}`);
                 }
             } catch (err) { logger.error('Next-Q Error:', err); }
         });
@@ -260,30 +283,22 @@ module.exports = (io) => {
         socket.on('answer:submit', async (data) => {
             if (userRole !== 'student') return;
             const { quizId, questionId, answer, timeTaken } = data;
-            const roomName = `quiz_${quizId}`;
+            const roomName = String(quizId);
             try {
-                logger.debug(`📩 [ANSWER RECEIVED] From ${socket.user.name} for Q: ${questionId}`);
-
                 const quiz = await Quiz.findById(quizId).select('status questions settings expiresAt currentQuestionIndex');
 
-                // 🛡️ REJECT if not in allowed state
-                const allowedStates = [STATES.ACTIVE, STATES.QUESTION_ACTIVE, STATES.DRAFT, STATES.WAITING, STATES.SCHEDULED];
+                const allowedStates = [STATES.ACTIVE, STATES.QUESTION_ACTIVE, STATES.LIVE];
                 if (!quiz || !allowedStates.includes(quiz.status)) {
-                    logger.warn(`⛔ [ANSWER REJECTED] Quiz status is ${quiz?.status}`);
                     return socket.emit('error', { message: 'Selection blocked: Question is inactive' });
                 }
 
                 const question = quiz.questions.id(questionId);
                 if (!question) return;
 
-                // Score Calculation
                 const { isCorrect, pointsEarned } = calculateScore(question, answer, timeTaken / 1000, quiz.settings);
-
                 const response = await Response.findOne({ quizId, userId: socket.user._id });
-                if (!response || response.status !== 'in-progress') {
-                    logger.warn(`⛔ [ANSWER REJECTED] Invalid response status: ${response?.status}`);
-                    return;
-                }
+
+                if (!response || response.status !== 'in-progress') return;
 
                 let answerObj = response.answers.find(a => a.questionId.toString() === questionId);
                 if (answerObj && answerObj.answeredAt) {
@@ -309,16 +324,11 @@ module.exports = (io) => {
                 response.totalScore = response.answers.reduce((s, a) => s + (a.pointsEarned || 0), 0);
                 await response.save();
 
-                logger.info(`✅ [ANSWER SAVED] ${socket.user.name} | Score: ${response.totalScore} | Correct: ${isCorrect}`);
-
                 // Acknowledge to student
-                socket.emit('answer:ack', { success: true, isCorrect, pointsEarned, totalScore: response.totalScore });
-
-                // Redundant/Legacy feedback support
                 socket.emit('answer:feedback', { isCorrect, pointsEarned, totalScore: response.totalScore });
 
-                // Notify faculty room
-                io.to(`${roomName}:faculty`).emit('response:received', {
+                // Notify host room
+                io.to(`${roomName}:host`).emit('response:received', {
                     participantId: userIdStr,
                     participantName: socket.user.name,
                     isCorrect,
@@ -326,15 +336,15 @@ module.exports = (io) => {
                     progress: response.answers.filter(a => a.answer).length
                 });
 
-                // Update Leaderboard broadly
                 debounceRankUpdate(quizId);
             } catch (err) { logger.error('Submit Answer Error:', err); }
         });
 
         // --- 5. QUIZ COMPLETION ---
         socket.on('quiz:complete', async (data) => {
+            if (userRole !== 'student') return;
             const { quizId } = data;
-            const roomName = `quiz_` + quizId;
+            const roomName = String(quizId);
             try {
                 const response = await Response.findOne({ quizId, userId: socket.user._id });
                 if (!response) return;
@@ -356,7 +366,11 @@ module.exports = (io) => {
                 };
 
                 socket.emit('quiz:completed', finalResults);
-                io.to(`${roomName}:faculty`).emit('student:completed', { studentId: userIdStr, name: socket.user.name });
+                io.to(`${roomName}:host`).emit('student:completed', {
+                    studentId: userIdStr,
+                    name: socket.user.name,
+                    score: response.totalScore
+                });
             } catch (err) { logger.error('Complete Quiz Error:', err); }
         });
 
@@ -364,7 +378,7 @@ module.exports = (io) => {
             if (activeUserConnections.get(connectionKey) === socket.id) {
                 activeUserConnections.delete(connectionKey);
             }
-            logger.info(`🔌 [DISCONNECT] ${socket.user.name} | Reason: ${reason}`);
+            logger.info(`🔌 [DISCONNECT] ${socket.user.name} | Reason: ${reason} | SocketID: ${socket.id}`);
         });
     });
 };

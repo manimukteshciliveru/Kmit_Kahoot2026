@@ -69,66 +69,82 @@ exports.submitAnswer = async (req, res) => {
         }
 
         // Check if answer is correct (Using Centralized Utility)
-        // `calculateScore` expects time in seconds; if client sends milliseconds, normalize.
         const timeInSeconds = timeTaken && timeTaken > 100 ? timeTaken / 1000 : (timeTaken || 0);
         const { isCorrect, pointsEarned } = calculateScore(question, answer, timeInSeconds, quiz.settings);
 
-        // Atomic update of the specific answer
-        // This prevents race conditions where multiple tabs might overwrite each other
-        const response = await Response.findOneAndUpdate(
-            {
-                quizId,
-                userId: req.user._id,
-                "answers.questionId": questionId,
-                status: { $in: ['waiting', 'in-progress'] }
-            },
-            {
-                $set: {
-                    "answers.$.answer": answer,
-                    "answers.$.isCorrect": isCorrect,
-                    "answers.$.pointsEarned": pointsEarned,
-                    "answers.$.timeTaken": timeTaken || 0,
-                    "answers.$.answeredAt": new Date(),
-                    lastActivityAt: new Date(),
-                    status: 'in-progress'
-                }
-            },
-            { new: true }
-        );
+        // --- DEBUG LOGS (Requested by User) ---
+        console.log(`[SCORE DEBUG] Student: ${req.user._id} (${req.user.name})`);
+        console.log(`[SCORE DEBUG] Quiz: ${quizId} | Question: ${questionId}`);
+        console.log(`[SCORE DEBUG] Selected: "${answer}" | Correct: "${question.correctAnswer}"`);
+        console.log(`[SCORE DEBUG] Result: ${isCorrect ? '✅ CORRECT' : '❌ WRONG'} | Score: ${pointsEarned}`);
+
+        // Find existing response to update
+        const response = await Response.findOne({
+            quizId,
+            userId: req.user._id,
+            status: { $in: ['waiting', 'in-progress'] }
+        });
 
         if (!response) {
             return res.status(400).json({
                 success: false,
-                message: 'Failed to submit answer or quiz already finished'
+                message: 'No active response found for this quiz'
             });
         }
 
-        // Trigger stats recalculation
-        // Using findById to get a fully hydrated document to ensure pre-save hooks work correctly
-        const updatedResponse = await Response.findById(response._id);
-        if (updatedResponse) {
-            // Explicitly update the answer in the array in memory if needed, 
-            // but findOneAndUpdate should have done it in DB. 
-            // We need to trigger the pre-save hook which iterates over `this.answers`
+        // Find the index of the answer in the array
+        const answerIndex = response.answers.findIndex(a => a.questionId.toString() === questionId.toString());
 
-            // IMPORTANT: The pre-save hook relies on `this.answers`.
-            // `updatedResponse` has the updated answers from DB.
-            // Calling .save() will trigger the hook.
-
-            await updatedResponse.save();
-
-            // Update variable for response to user
-            response.totalScore = updatedResponse.totalScore;
+        if (answerIndex > -1 && response.answers[answerIndex].answer) {
+            // Answer already exists. 
+            // Logic: Usually for live quizzes, we don't allow re-submission.
+            // If we want to allow it, we would just proceed. 
+            // Let's add a log and allow it for now but ensure we aren't creating duplicates.
+            console.log(`[SUBMIT] Student ${req.user.name} is re-submitting for question ${questionId}`);
         }
 
-        // Emit real-time update for faculty
+        if (answerIndex === -1) {
+            // This could happen if the response was created without this question placeholder
+            // In a production-grade app, we should add it
+            response.answers.push({
+                questionId,
+                questionIndex: quiz.questions.findIndex(q => q._id.toString() === questionId.toString()),
+                answer,
+                isCorrect,
+                pointsEarned,
+                timeTaken: timeTaken || 0,
+                answeredAt: new Date()
+            });
+        } else {
+            // Update existing placeholder
+            response.answers[answerIndex].answer = answer;
+            response.answers[answerIndex].isCorrect = isCorrect;
+            response.answers[answerIndex].pointsEarned = pointsEarned;
+            response.answers[answerIndex].timeTaken = timeTaken || 0;
+            response.answers[answerIndex].answeredAt = new Date();
+        }
+
+        response.status = 'in-progress';
+        response.lastActivityAt = new Date();
+
+        // Save the document - this triggers the pre-save hook in Response.js
+        // which recalculates totalScore, correctCount, percentage, etc.
+        await response.save();
+
+        // Emit real-time update for faculty and leaderboard
         const io = req.app.get('io');
         if (io) {
+            // Get freshly updated leaderboard
             const leaderboard = await Response.getLeaderboard(quizId, 200);
-            io.to(`quiz:${quizId}`).emit('leaderboard:update', { leaderboard });
+
+            // 1. Standard Leaderboard update
+            io.to(String(quizId)).emit('leaderboard:update', { leaderboard });
+
+            // 2. Requested event name for compatibility if needed
+            io.to(String(quizId)).emit('leaderboardUpdate', { leaderboard });
 
             // Notify faculty of detailed response with mapped fields
-            io.to(`quiz:${quizId}:faculty`).emit('response:received', {
+            io.to(`${quizId}:host`).emit('response:received', {
                 participantId: req.user._id,
                 participantName: req.user.name,
                 rollNumber: req.user.rollNumber,
@@ -138,8 +154,8 @@ exports.submitAnswer = async (req, res) => {
                 isCorrect,
                 pointsEarned,
                 timeTaken,
-                score: response.totalScore, // Standardized field
-                totalScore: response.totalScore // Redundant for safety
+                score: response.totalScore,
+                totalScore: response.totalScore
             });
         }
 
@@ -274,9 +290,28 @@ exports.getResponseById = async (req, res) => {
             });
         }
 
+        // Map question details into answers for detailed review
+        const detailedAnswers = response.answers.map(a => {
+            const question = quiz.questions.id(a.questionId);
+            return {
+                ...a.toObject(),
+                questionText: question ? question.text : 'Question not found',
+                correctAnswer: question ? question.correctAnswer : 'N/A',
+                options: question ? question.options : [],
+                points: question ? question.points : 0,
+                explanation: question ? question.explanation : ''
+            };
+        });
+
+        const finalResponse = response.toObject();
+        finalResponse.answers = detailedAnswers;
+
         res.status(200).json({
             success: true,
-            data: { response, stats }
+            data: {
+                response: finalResponse,
+                stats
+            }
         });
     } catch (error) {
         console.error('Get response by ID error:', error);
@@ -369,7 +404,7 @@ exports.reportTabSwitch = async (req, res) => {
         // Notify faculty
         const io = req.app.get('io');
         if (io) {
-            io.to(`quiz:${quizId}:faculty`).emit('participant:tabswitch', {
+            io.to(`${quizId}:host`).emit('participant:tabswitch', {
                 participantId: req.user._id,
                 participantName: req.user.name,
                 tabSwitchCount: response.tabSwitchCount,
@@ -458,7 +493,7 @@ exports.completeQuiz = async (req, res) => {
         const io = req.app.get('io');
         if (io) {
             const leaderboard = await Response.getLeaderboard(quizId);
-            io.to(`quiz:${quizId}`).emit('leaderboard:update', { leaderboard });
+            io.to(String(quizId)).emit('leaderboard:update', { leaderboard });
         }
 
         res.status(200).json({

@@ -11,7 +11,7 @@ const adminRoutes = require('../admin');
 
 // Mount routes
 router.use('/auth', authRoutes);
-router.use('/quizzes', quizRoutes);
+router.use('/quiz', quizRoutes);
 router.use('/responses', responseRoutes);
 router.use('/ai', aiRoutes);
 router.use('/users', userRoutes);

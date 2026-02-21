@@ -36,7 +36,7 @@ const checkScheduledQuizzes = async (io) => {
 
             // Emit socket event if io is provided
             if (io) {
-                io.to(`quiz:${quiz._id}`).emit('quiz:started', {
+                io.to(String(quiz._id)).emit('quiz:started', {
                     quizId: quiz._id,
                     startedAt: quiz.startedAt,
                     expiresAt: quiz.expiresAt,
@@ -104,7 +104,7 @@ const checkExpiredQuizzes = async (io) => {
 
             // Emit socket event
             if (io) {
-                io.to(`quiz:${quiz._id}`).emit('quiz:ended', {
+                io.to(String(quiz._id)).emit('quiz:ended', {
                     quizId: quiz._id,
                     endedAt: quiz.endedAt,
                     leaderboard,

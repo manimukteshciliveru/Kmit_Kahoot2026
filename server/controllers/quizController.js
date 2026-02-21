@@ -348,10 +348,10 @@ exports.updateQuiz = async (req, res) => {
         );
 
         // Emit socket event for real-time updates if quiz is active
-        if (quiz.status === 'active') {
+        if (quiz.status === 'active' || quiz.status === 'live') {
             const io = req.app.get('io');
             if (io) {
-                io.to(`quiz:${quiz._id}`).emit('quiz:updated', { quiz });
+                io.to(String(quiz._id)).emit('quiz:updated', { quiz });
             }
         }
 
@@ -593,7 +593,7 @@ exports.joinQuiz = async (req, res) => {
         const io = req.app.get('io');
         if (io) {
             console.log(`📡 [JOIN QUIZ] Emitting participant:joined event`);
-            io.to(`quiz:${quiz._id}`).emit('participant:joined', {
+            io.to(String(quiz._id)).emit('participant:joined', {
                 participant: {
                     id: req.user._id,
                     name: req.user.name,
@@ -710,8 +710,8 @@ exports.startQuiz = async (req, res) => {
         // Emit socket event
         const io = req.app.get('io');
         if (io) {
-            io.to(`quiz:${quiz._id}`).emit('quiz:state_changed', {
-                status: 'question_active',
+            io.to(String(quiz._id)).emit('quiz:state_changed', {
+                status: 'live',
                 currentQuestionIndex: 0,
                 expiresAt: quiz.expiresAt
             });
@@ -778,8 +778,8 @@ exports.endQuiz = async (req, res) => {
 
         const io = req.app.get('io');
         if (io) {
-            io.to(`quiz:${quiz._id}`).emit('quiz:ended', { leaderboard });
-            io.to(`quiz:${quiz._id}`).emit('quiz:state_changed', { status: 'finished', leaderboard });
+            io.to(String(quiz._id)).emit('quiz:ended', { leaderboard });
+            io.to(String(quiz._id)).emit('quiz:state_changed', { status: 'done', leaderboard });
         }
 
         res.status(200).json({
@@ -864,48 +864,86 @@ exports.getQuizResults = async (req, res) => {
             });
         }
 
-        const responses = await Response.find({ quizId: quiz._id })
-            .populate('userId', 'name email avatar department section rollNumber')
-            .sort({ rank: 1, totalScore: -1, totalTimeTaken: 1 })
-            .lean();
+        // --- Aggregation Pipeline (Requested by User) ---
+        // Recalculates all stats from the answers array to ensure 100% accuracy
+        const aggregatedResponses = await Response.aggregate([
+            { $match: { quizId: quiz._id } },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "userId",
+                    foreignField: "_id",
+                    as: "studentInfo"
+                }
+            },
+            { $unwind: { path: "$studentInfo", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    rank: 1,
+                    status: 1,
+                    startedAt: 1,
+                    completedAt: 1,
+                    totalTimeTaken: 1,
+                    totalScore: { $sum: "$answers.pointsEarned" }, // DB Level Summation
+                    maxPossibleScore: 1,
+                    percentage: 1,
+                    tabSwitchCount: 1,
+                    answers: 1,
+                    correctCount: {
+                        $size: {
+                            $filter: {
+                                input: "$answers",
+                                as: "a",
+                                cond: { $eq: ["$$a.isCorrect", true] }
+                            }
+                        }
+                    },
+                    wrongCount: {
+                        $size: {
+                            $filter: {
+                                input: "$answers",
+                                as: "a",
+                                cond: {
+                                    $and: [
+                                        { $eq: ["$$a.isCorrect", false] },
+                                        { $gt: [{ $strLenCP: { $ifNull: ["$$a.answer", ""] } }, 0] }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    student: {
+                        id: { $ifNull: ["$studentInfo._id", "$userId"] },
+                        name: { $ifNull: ["$studentInfo.name", "Unknown Student"] },
+                        email: { $ifNull: ["$studentInfo.email", "N/A"] },
+                        rollNumber: { $ifNull: ["$studentInfo.rollNumber", "N/A"] },
+                        department: { $ifNull: ["$studentInfo.department", "N/A"] },
+                        section: { $ifNull: ["$studentInfo.section", "N/A"] },
+                        avatar: "$studentInfo.avatar"
+                    }
+                }
+            },
+            { $sort: { totalScore: -1, totalTimeTaken: 1 } }
+        ]);
 
-        // --- Map Responses for Frontend (Fix undefined student error) ---
-        const mappedResponses = responses.map(r => {
-            const student = r.userId || {
-                name: 'Unknown User',
-                email: 'deleted@user.com',
-                rollNumber: 'N/A',
-                department: 'N/A',
-                section: 'N/A'
-            }; // Fallback for deleted users
+        // Map aggregated responses to include question details
+        const mappedResponses = aggregatedResponses.map(r => {
+            const detailedAnswers = r.answers.map(a => {
+                const question = quiz.questions.id(a.questionId);
+                return {
+                    ...a,
+                    questionText: question ? question.text : 'Question text unavailable',
+                    correctAnswer: question ? question.correctAnswer : 'N/A',
+                    options: question ? question.options : [],
+                    points: question ? question.points : 0
+                };
+            });
 
             return {
-                _id: r._id,
-                rank: r.rank,
-                student: {
-                    id: student._id,
-                    name: student.name,
-                    email: student.email,
-                    rollNumber: student.rollNumber,
-                    department: student.department || 'N/A',
-                    section: student.section || 'N/A',
-                    avatar: student.avatar
-                },
-                totalScore: r.totalScore,
-                maxPossibleScore: r.maxPossibleScore,
-                percentage: r.percentage,
-                correctCount: r.correctCount,
-                wrongCount: r.wrongCount,
-                unansweredCount: r.unansweredCount,
-                totalTimeTaken: r.totalTimeTaken,
-                averageTimePerQuestion: r.averageTimePerQuestion || 0,
-                startedAt: r.startedAt,
-                completedAt: r.completedAt,
-                status: r.status,
+                ...r,
                 passed: r.percentage >= (quiz.settings.passingScore || 40),
-                tabSwitchCount: r.tabSwitchCount || 0,
-                // Include answers for detailed view if needed, but maybe sanitize or limit
-                answers: r.answers
+                answers: detailedAnswers
             };
         });
 
@@ -935,20 +973,20 @@ exports.getQuizResults = async (req, res) => {
                 }
             } else {
                 // Public quiz: eligibility equals attempts (dynamic pool)
-                totalEligible = responses.length;
+                totalEligible = mappedResponses.length;
             }
         } else {
-            totalEligible = responses.length;
+            totalEligible = mappedResponses.length;
         }
 
         // --- Core Metrics ---
-        const attemptedCount = responses.length;
+        const attemptedCount = mappedResponses.length;
         const absentCount = Math.max(0, totalEligible - attemptedCount);
 
         // Filter out incomplete responses for score calculations if needed,
         // but typically all responses found are "attempts".
         // Use percentage for standardization
-        const scores = responses.map(r => r.percentage);
+        const scores = mappedResponses.map(r => r.percentage);
 
         const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
         const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
@@ -960,7 +998,7 @@ exports.getQuizResults = async (req, res) => {
 
         // --- Question Analytics ---
         const questionAnalytics = quiz.questions.map((q, index) => {
-            const correctResponses = responses.filter(r => {
+            const correctResponses = mappedResponses.filter(r => {
                 const answer = r.answers?.find(a => a.questionId?.toString() === q._id.toString());
                 return answer?.isCorrect;
             });
@@ -999,7 +1037,7 @@ exports.getQuizResults = async (req, res) => {
 
                 // Helper to safely get ID string
                 const getUserIdStr = (r) => r.userId ? r.userId._id.toString() : null;
-                const respondedUserIds = new Set(responses.map(getUserIdStr).filter(Boolean));
+                const respondedUserIds = new Set(mappedResponses.map(getUserIdStr).filter(Boolean));
 
                 absentStudents = allowedUsers
                     .filter(u => !respondedUserIds.has(u._id.toString()))
@@ -1029,34 +1067,39 @@ exports.getQuizResults = async (req, res) => {
                 },
                 analytics: {
                     totalParticipants: attemptedCount, // Frontend expects totalParticipants
-                    completedCount: responses.filter(r => r.status === 'completed').length,
-                    inProgressCount: responses.filter(r => r.status === 'in-progress').length,
-                    waitingCount: responses.filter(r => r.status === 'waiting').length,
-                    terminatedCount: responses.filter(r => r.status === 'terminated').length,
-                    totalEligible,
-                    attempted: attemptedCount,
-                    absent: absentCount,
-                    highestScore,
-                    lowestScore,
-                    avgScore: averageScore, // Frontend expects avgScore
-                    avgTime: responses.length > 0 ? responses.reduce((acc, r) => acc + (r.totalTimeTaken || 0), 0) / responses.length : 0,
-                    participationRate: totalEligible > 0 ? Math.round((attemptedCount / totalEligible) * 100) : 0,
+                    completedCount: mappedResponses.filter(r => r.status === 'completed').length,
+                    inProgressCount: mappedResponses.filter(r => r.status === 'in-progress').length,
+                    waitingCount: mappedResponses.filter(r => r.status === 'waiting' || r.status === 'joined').length,
+                    terminatedCount: mappedResponses.filter(r => r.status === 'terminated').length,
+                    tabSwitchersCount: mappedResponses.filter(r => (r.tabSwitchCount || 0) > 0).length,
+                    tabSwitchers: mappedResponses
+                        .filter(r => (r.tabSwitchCount || 0) > 0)
+                        .map(r => ({
+                            name: r.student.name,
+                            email: r.student.email,
+                            count: r.tabSwitchCount,
+                            terminated: r.status === 'terminated'
+                        })),
+                    avgScore: averageScore,
+                    highestScore: highestScore,
+                    lowestScore: lowestScore,
                     passRate: attemptedCount > 0 ? Math.round((passCount / attemptedCount) * 100) : 0,
                     passedCount: passCount,
                     failedCount: failCount,
-                    passingScore,
-                    tabSwitchersCount: responses.filter(r => (r.tabSwitchCount || 0) > 0).length,
-                    tabSwitchers: responses.filter(r => (r.tabSwitchCount || 0) > 0).map(r => ({
-                        name: r.userId ? r.userId.name : 'Unknown',
-                        email: r.userId ? r.userId.email : 'N/A',
-                        count: r.tabSwitchCount,
-                        terminated: r.status === 'terminated'
-                    }))
+                    avgTime: Math.round(mappedResponses.reduce((a, b) => a + (b.totalTimeTaken || 0), 0) / (attemptedCount || 1)),
+                    participationRate: totalEligible > 0 ? Math.round((attemptedCount / totalEligible) * 100) : 100
                 },
                 responses: mappedResponses,
-                // Leaderboard view (could be same as responses or subset)
-                leaderboard: mappedResponses,
                 questionAnalytics,
+                leaderboard: mappedResponses.map(r => ({
+                    student: r.student,
+                    totalScore: r.totalScore,
+                    maxPossibleScore: r.maxPossibleScore,
+                    percentage: r.percentage,
+                    totalTimeTaken: r.totalTimeTaken,
+                    rank: r.rank,
+                    status: r.status
+                })),
                 absentStudents
             }
         });
@@ -1225,5 +1268,69 @@ exports.rehostQuiz = async (req, res) => {
             message: 'Failed to re-host quiz',
             error: error.message
         });
+    }
+};
+// @desc    Get detailed result for a specific student in a quiz
+// @route   GET /api/quiz/:id/student/:studentId
+// @access  Private (Faculty or Admin or the Student themselves)
+exports.getStudentResult = async (req, res) => {
+    try {
+        const { id: quizId, studentId } = req.params;
+
+        const quiz = await Quiz.findById(quizId).lean();
+        if (!quiz) {
+            return res.status(404).json({ success: false, message: 'Quiz not found' });
+        }
+
+        const response = await Response.findOne({ quizId, userId: studentId }).lean();
+        if (!response) {
+            return res.status(404).json({ success: false, message: 'No response found for this student' });
+        }
+
+        // Authorization check
+        const isOwner = req.user.role === 'faculty' && String(quiz.createdBy) === String(req.user._id);
+        const isAdmin = req.user.role === 'admin';
+        const isSelf = String(req.user._id) === String(studentId);
+
+        if (!isOwner && !isAdmin && !isSelf) {
+            return res.status(403).json({ success: false, message: 'Not authorized to view these results' });
+        }
+
+        // Map question details into answers
+        const detailedResults = response.answers.map((a, idx) => {
+            const question = quiz.questions.find(q => String(q._id) === String(a.questionId));
+            return {
+                questionNumber: idx + 1,
+                questionId: a.questionId,
+                questionText: question ? question.text : 'Question text unavailable',
+                type: question ? question.type : 'mcq',
+                options: question ? question.options : [],
+                selectedAnswer: a.answer,
+                correctAnswer: question ? question.correctAnswer : 'N/A',
+                isCorrect: a.isCorrect,
+                scoreAwarded: a.pointsEarned,
+                maxPoints: question ? question.points : 0,
+                timeTaken: a.timeTaken,
+                explanation: question ? question.explanation : ''
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                studentId,
+                quizId,
+                quizTitle: quiz.title,
+                totalScore: response.totalScore,
+                maxPoints: response.maxPossibleScore,
+                percentage: response.percentage,
+                correctCount: response.correctCount,
+                wrongCount: response.wrongCount,
+                results: detailedResults
+            }
+        });
+    } catch (error) {
+        console.error('Get student result error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch student results' });
     }
 };

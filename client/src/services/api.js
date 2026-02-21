@@ -15,7 +15,7 @@ const getApiUrl = () => {
     }
 
     // Fallback for development
-    return 'http://localhost:5000/api/v1';
+    return 'http://localhost:5000/api';
 };
 
 const API_URL = getApiUrl();
@@ -173,19 +173,19 @@ export const authAPI = {
 
 // Quiz API
 export const quizAPI = {
-    create: (data) => api.post('/quizzes', data),
-    getAll: (params) => api.get('/quizzes', { params }),
-    getById: (id) => api.get(`/quizzes/${id}`),
-    update: (id, data) => api.put(`/quizzes/${id}`, data),
-    delete: (id) => api.delete(`/quizzes/${id}`),
-    join: (code) => api.post(`/quizzes/join/${code}`),
-    start: (id) => api.post(`/quizzes/${id}/start`),
-    end: (id) => api.post(`/quizzes/${id}/end`),
-    rehost: (id) => api.post(`/quizzes/${id}/rehost`),
-    getLeaderboard: (id) => api.get(`/quizzes/${id}/leaderboard`),
-    getResults: (id) => api.get(`/quizzes/${id}/results`),
-    getAttendance: (id) => api.get(`/quizzes/${id}/attendance`),
-    downloadReport: (id) => api.get(`/quizzes/${id}/report`, { responseType: 'blob' })
+    create: (data) => api.post('/quiz', data),
+    getAll: (params) => api.get('/quiz', { params }),
+    getById: (id) => api.get(`/quiz/${id}`),
+    update: (id, data) => api.put(`/quiz/${id}`, data),
+    delete: (id) => api.delete(`/quiz/${id}`),
+    join: (code) => api.post(`/quiz/join/${code}`),
+    start: (id) => api.post(`/quiz/${id}/start`),
+    end: (id) => api.post(`/quiz/${id}/end`),
+    rehost: (id) => api.post(`/quiz/${id}/rehost`),
+    getLeaderboard: (id) => api.get(`/quiz/${id}/leaderboard`),
+    getResults: (id) => api.get(`/quiz/${id}/results`),
+    getAttendance: (id) => api.get(`/quiz/${id}/attendance`),
+    downloadReport: (id) => api.get(`/quiz/${id}/report`, { responseType: 'blob' })
 };
 
 // Response API

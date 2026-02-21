@@ -119,48 +119,58 @@ export const SocketProvider = ({ children }) => {
 
     const joinQuiz = useCallback((quizId) => {
         if (socket && connected) {
+            console.log('🔌 [SOCKET] Joining quiz arena:', quizId);
             socket.emit('quiz:join', { quizId });
+        } else {
+            console.warn('⚠️ [SOCKET] Cannot join quiz: socket not connected');
         }
     }, [socket, connected]);
 
     const leaveQuiz = useCallback((quizId) => {
         if (socket) {
+            console.log('🔌 [SOCKET] Leaving quiz arena:', quizId);
             socket.emit('quiz:leave', { quizId });
         }
     }, [socket]);
 
     const startQuiz = useCallback((quizId) => {
         if (socket && connected) {
+            console.log('🚀 [SOCKET] Requesting quiz start:', quizId);
             socket.emit('quiz:start', { quizId });
         }
     }, [socket, connected]);
 
     const endQuiz = useCallback((quizId) => {
         if (socket && connected) {
+            console.log('⏹️ [SOCKET] Requesting quiz end:', quizId);
             socket.emit('quiz:end', { quizId });
         }
     }, [socket, connected]);
 
     const nextQuestion = useCallback((quizId) => {
         if (socket && connected) {
+            console.log('⏭️ [SOCKET] Requesting next question:', quizId);
             socket.emit('quiz:next-question', { quizId });
         }
     }, [socket, connected]);
 
     const submitAnswer = useCallback((data) => {
         if (socket && connected) {
+            console.log('📩 [SOCKET] Submitting answer for Q:', data.questionId);
             socket.emit('answer:submit', data);
         }
     }, [socket, connected]);
 
     const reportTabSwitch = useCallback((quizId) => {
         if (socket && connected) {
+            console.log('🛡️ [SOCKET] Reporting tab switch for quiz:', quizId);
             socket.emit('tab:switched', { quizId });
         }
     }, [socket, connected]);
 
     const completeQuiz = useCallback((quizId) => {
         if (socket && connected) {
+            console.log('🏁 [SOCKET] Signal quiz completion:', quizId);
             socket.emit('quiz:complete', { quizId });
         }
     }, [socket, connected]);

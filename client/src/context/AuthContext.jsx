@@ -19,13 +19,18 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const initAuth = async () => {
             const storedToken = localStorage.getItem('token');
+            const storedUser = localStorage.getItem('user');
+
+            console.log('🔐 [AUTH] Initializing session | Token exists:', !!storedToken);
+
             if (storedToken) {
                 try {
                     const response = await authAPI.getMe();
                     setUser(response.data.data.user);
                     setToken(storedToken);
+                    console.log('✅ [AUTH] Session verified for:', response.data.data.user.email);
                 } catch (error) {
-                    console.error('Auth init failed:', error);
+                    console.error('❌ [AUTH] Session verification failed:', error);
                     localStorage.removeItem('token');
                     localStorage.removeItem('refreshToken');
                     localStorage.removeItem('user');
@@ -36,8 +41,33 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
         };
 
+        const handleStorageChange = (e) => {
+            if (e.key === 'token' || e.key === 'user') {
+                const newToken = localStorage.getItem('token');
+                const newUser = localStorage.getItem('user');
+
+                if (!newToken) {
+                    // Logged out in another tab
+                    setToken(null);
+                    setUser(null);
+                } else if (newToken !== token) {
+                    // Token changed (probably different user or role)
+                    // We reload to ensure everything is fresh and consistent
+                    window.location.reload();
+                } else if (newUser) {
+                    try {
+                        setUser(JSON.parse(newUser));
+                    } catch (err) {
+                        console.error('Failed to parse user from storage:', err);
+                    }
+                }
+            }
+        };
+
         initAuth();
-    }, []);
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, [token]);
 
     const login = async (email, password, role) => {
         try {
@@ -59,7 +89,7 @@ export const AuthProvider = ({ children }) => {
 
             localStorage.setItem('token', authToken);
             localStorage.setItem('user', JSON.stringify(userData));
-            
+
             // Store refresh token if provided (for automatic token refresh)
             if (refreshToken) {
                 localStorage.setItem('refreshToken', refreshToken);
@@ -95,7 +125,7 @@ export const AuthProvider = ({ children }) => {
 
             localStorage.setItem('token', authToken);
             localStorage.setItem('user', JSON.stringify(userData));
-            
+
             // Store refresh token if provided
             if (refreshToken) {
                 localStorage.setItem('refreshToken', refreshToken);

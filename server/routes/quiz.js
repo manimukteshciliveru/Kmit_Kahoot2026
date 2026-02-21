@@ -13,7 +13,8 @@ const {
     rehostQuiz,
     getLeaderboard,
     getQuizResults,
-    getQuizAttendance
+    getQuizAttendance,
+    getStudentResult
 } = require('../controllers/quizController');
 const strictLimiter = require('../middleware/strictRateLimiter');
 const { getDetailedAnalytics } = require('../controllers/analyticsController');
@@ -73,6 +74,7 @@ router.route('/:id')
 // Quiz data & Analytics
 router.get('/:id/leaderboard', getLeaderboard);
 router.get('/:id/results', authorize('faculty', 'admin'), getQuizResults);
+router.get('/:id/student/:studentId', getStudentResult);
 router.get('/:id/attendance', authorize('faculty', 'admin'), getQuizAttendance);
 router.get('/:id/report', authorize('faculty', 'admin'), require('../controllers/reportController').downloadReport);
 

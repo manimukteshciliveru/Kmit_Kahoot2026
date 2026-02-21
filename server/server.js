@@ -7,13 +7,11 @@ const helmet = require('helmet');
 const path = require('path');
 
 // Global Exception Handler - MUST BE FIRST
-// Global Exception Handler - MUST BE FIRST (Replaced with new Logger)
 const logger = require('./utils/logger');
 process.on('uncaughtException', (err) => {
-    logger.error('❌ UNCAUGHT EXCEPTION! 💥 ' + err.message);
+    logger.error('❌ [CRITICAL] UNCAUGHT EXCEPTION!');
+    logger.error(err.message);
     logger.error(err.stack);
-    // Keep process alive for now to debug, or exit if critical
-    // process.exit(1); 
 });
 
 const connectDB = require('./config/db');
@@ -175,7 +173,7 @@ const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin');
 
 app.use('/api/auth', authRoutes);
-app.use('/api/quizzes', quizRoutes);
+app.use('/api/quiz', quizRoutes); // Renamed from quizzes
 app.use('/api/responses', responseRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
