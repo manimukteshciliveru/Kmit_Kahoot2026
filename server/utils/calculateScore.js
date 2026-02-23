@@ -4,7 +4,7 @@
  */
 
 const calculateScore = (question, answer, timeTakenSeconds, quizSettings = {}) => {
-    if (!answer) return { isCorrect: false, pointsEarned: 0 };
+    if (!answer) return { isCorrect: false, scoreAwarded: 0 };
 
     const normalize = (str) => str.toString().toLowerCase().trim();
     const userAnswer = normalize(answer);
@@ -47,7 +47,7 @@ const calculateScore = (question, answer, timeTakenSeconds, quizSettings = {}) =
             isCorrect = false;
     }
 
-    if (!isCorrect) return { isCorrect: false, pointsEarned: 0 };
+    if (!isCorrect) return { isCorrect: false, scoreAwarded: 0 };
 
     // 2. Points Calculation
     let points = question.points || 1000; // Default to 1000 like Kahoot
@@ -63,7 +63,7 @@ const calculateScore = (question, answer, timeTakenSeconds, quizSettings = {}) =
 
     return {
         isCorrect: true,
-        pointsEarned: points,
+        scoreAwarded: points,
         timeTaken: timeTakenSeconds
     };
 };

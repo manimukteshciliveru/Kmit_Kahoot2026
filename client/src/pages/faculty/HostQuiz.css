@@ -36,8 +36,43 @@
 
 .host-quiz-page {
     min-height: calc(100vh - 80px);
-    background: linear-gradient(135deg, var(--bg-primary) 0%, #1a1a2e 100%);
+    background: var(--bg-primary);
     padding: var(--space-lg);
+    color: var(--text-primary);
+}
+
+/* Day Mode Table Fixes */
+.attendance-table-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.attendance-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.attendance-table td {
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.live-row:hover {
+    background: var(--bg-tertiary);
+}
+
+.score-badge-live {
+    background: var(--primary-glow);
+    color: var(--primary);
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    font-weight: 700;
+}
+
+[data-theme="dark"] .host-quiz-page {
+    background: linear-gradient(135deg, #050409 0%, #1a1a2e 100%);
 }
 
 /* Loading State */

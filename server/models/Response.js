@@ -17,7 +17,7 @@ const answerSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    pointsEarned: {
+    scoreAwarded: {
         type: Number,
         default: 0
     },
@@ -147,7 +147,7 @@ responseSchema.pre('save', async function () {
             this.wrongCount = this.answers.filter(a => !a.isCorrect && a.answer).length;
             this.unansweredCount = this.answers.filter(a => !a.answer).length;
 
-            this.totalScore = this.answers.reduce((sum, a) => sum + (Number(a.pointsEarned) || 0), 0);
+            this.totalScore = this.answers.reduce((sum, a) => sum + (Number(a.scoreAwarded) || 0), 0);
             this.totalTimeTaken = this.answers.reduce((sum, a) => sum + (Number(a.timeTaken) || 0), 0);
 
             if (this.maxPossibleScore > 0) {

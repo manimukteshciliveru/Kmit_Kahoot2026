@@ -184,6 +184,7 @@ export const quizAPI = {
     rehost: (id) => api.post(`/quiz/${id}/rehost`),
     getLeaderboard: (id) => api.get(`/quiz/${id}/leaderboard`),
     getResults: (id) => api.get(`/quiz/${id}/results`),
+    getAnalytics: (id) => api.get(`/quiz/${id}/analytics`),
     getAttendance: (id) => api.get(`/quiz/${id}/attendance`),
     downloadReport: (id) => api.get(`/quiz/${id}/report`, { responseType: 'blob' })
 };

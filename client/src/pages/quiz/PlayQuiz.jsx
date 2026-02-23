@@ -24,11 +24,22 @@ const PlayQuiz = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [responseId, setResponseId] = useState(null);
 
-    // Answer State
-    const [selectedAnswer, setSelectedAnswer] = useState('');
-    const [textAnswer, setTextAnswer] = useState('');
-    const [isAnswered, setIsAnswered] = useState(false);
-    const [savedAnswers, setSavedAnswers] = useState({}); // { questionId: answer }
+    // --- Answer State (Centralized) ---
+    // Structure: { [questionId]: "Selected Option or Text" }
+    const [answers, setAnswers] = useState(() => {
+        const saved = localStorage.getItem(`quiz_answers_${quizId}`);
+        return saved ? JSON.parse(saved) : {};
+    });
+
+    // Temporary local state for text input smoothness
+    const [localTextAnswer, setLocalTextAnswer] = useState('');
+
+    // Persistence Layer
+    useEffect(() => {
+        if (quizId) {
+            localStorage.setItem(`quiz_answers_${quizId}`, JSON.stringify(answers));
+        }
+    }, [answers, quizId]);
 
     // Stats & UI
     const [score, setScore] = useState(0);
@@ -90,20 +101,15 @@ const PlayQuiz = () => {
             if (data.savedAnswers) {
                 data.savedAnswers.forEach(a => { if (a.answer) answersMap[a.questionId] = a.answer; });
             }
-            setSavedAnswers(answersMap);
+            setAnswers(answersMap);
 
-            // Set current Q state
+            // Set current Q local state (only for text inputs)
             const targetIndex = Math.max(0, data.currentQuestionIndex || 0);
             const currentQId = questions[targetIndex]?._id;
             if (currentQId && answersMap[currentQId]) {
-                const ans = answersMap[currentQId];
-                setSelectedAnswer(ans);
-                setTextAnswer(ans);
-                setIsAnswered(true);
+                setLocalTextAnswer(answersMap[currentQId]);
             } else {
-                setSelectedAnswer('');
-                setTextAnswer('');
-                setIsAnswered(false);
+                setLocalTextAnswer('');
             }
 
             if (data.remainingTime) setTimeLeft(Math.floor(data.remainingTime / 1000));
@@ -117,10 +123,10 @@ const PlayQuiz = () => {
             console.log('⚡ [STATE] Changed to:', data.status);
             setStatus(data.status);
             if (data.currentQuestionIndex !== undefined) {
-                setCurrentIndex(Math.max(0, data.currentQuestionIndex));
-                setIsAnswered(false);
-                setSelectedAnswer('');
-                setTextAnswer('');
+                const newIndex = Math.max(0, data.currentQuestionIndex);
+                setCurrentIndex(newIndex);
+                // Selection state is now derived from 'answers' object
+                // No need to manually reset or restore individual states
             }
             if (data.expiresAt) {
                 const diff = (new Date(data.expiresAt).getTime() - Date.now()) / 1000;
@@ -148,6 +154,23 @@ const PlayQuiz = () => {
 
         socket.on('quiz:sync_state', handleSyncState);
         socket.on('quiz:state_changed', handleStateChange);
+        socket.on('quizStatusUpdate', (newStatus) => {
+            console.log('⚡ [SOCKET] Status Update:', newStatus);
+            setStatus(newStatus);
+            if (newStatus === 'done') {
+                const rId = responseId;
+                if (rId) {
+                    toast.success('Quiz ended by host!');
+                    navigate(`/history/report/${rId}`);
+                } else {
+                    setStatus('done');
+                }
+            }
+        });
+        socket.on('leaderboardUpdate', (lbData) => {
+            console.log('📊 [SOCKET] Leaderboard Update:', lbData.length);
+            setLeaderboard(lbData);
+        });
         socket.on('answer:feedback', handleFeedback);
         socket.on('quiz:completed', handleQuizCompleted);
         socket.on('participant:count_update', (data) => setParticipantCount(data.count));
@@ -181,12 +204,16 @@ const PlayQuiz = () => {
 
     // Timer Logic
     useEffect(() => {
-        if (status !== 'question_active' || timeLeft <= 0 || isAnswered) return;
+        // Only run timer if there's no answer for CURRENT question (optional, but requested behavior is keep timer going)
+        const qId = questions[currentIndex]?._id;
+        const hasAnswer = !!answers[qId];
+
+        if (status !== 'question_active' || timeLeft <= 0 || hasAnswer) return;
         timerRef.current = setInterval(() => {
             setTimeLeft(p => p > 0 ? p - 1 : 0);
         }, 1000);
         return () => clearInterval(timerRef.current);
-    }, [status, timeLeft, isAnswered]);
+    }, [status, timeLeft, currentIndex, questions, answers]);
 
     // Join/Leave
     useEffect(() => {
@@ -196,57 +223,75 @@ const PlayQuiz = () => {
         }
     }, [socket, quizId, joinQuiz, leaveQuiz]);
 
-    const handleAnswerSubmit = useCallback((answerOverride = null) => {
-        // 🏆 Broadened for testing: allow interaction in draft/waiting too
-        const isActive = ['active', 'question_active', 'draft', 'waiting'].includes(status);
-        console.log('📩 [ANSWER] Attempting submit | Status:', status, 'Active:', isActive, 'Submitting:', isSubmitting, 'Connected:', connected);
-
+    const handleSelect = (questionId, option) => {
+        const isActive = ['active', 'question_active', 'live', 'draft', 'waiting'].includes(status);
         if (!isActive || isSubmitting || !connected) return;
 
-        const currentQuestion = questions[currentIndex];
-        const answer = answerOverride !== null ? answerOverride : (['mcq', 'msq'].includes(currentQuestion?.type?.toLowerCase()) ? selectedAnswer : textAnswer);
+        // 1. Update Centralized State (Auto-Persists via useEffect)
+        setAnswers(prev => ({
+            ...prev,
+            [questionId]: option
+        }));
 
+        // 2. Immediate emit for live dashboard tracking
+        socket.emit('answer:submit', {
+            quizId,
+            questionId,
+            answer: option,
+            timeTaken: (quiz?.settings?.questionTimer - timeLeft) * 1000
+        });
+    };
+
+    const handleTextUpdate = (questionId, text) => {
+        setLocalTextAnswer(text);
+        setAnswers(prev => ({
+            ...prev,
+            [questionId]: text
+        }));
+    };
+
+    const handleAnswerSubmit = () => {
+        const currentQ = questions[currentIndex];
+        if (!currentQ) return;
+        const answer = answers[currentQ._id];
         if (!answer) return;
-
-        setIsSubmitting(true);
-        setSavedAnswers(p => ({ ...p, [currentQuestion._id]: answer }));
-        setIsAnswered(true);
 
         socket.emit('answer:submit', {
             quizId,
-            questionId: currentQuestion._id,
+            questionId: currentQ._id,
             answer,
             timeTaken: (quiz?.settings?.questionTimer - timeLeft) * 1000
         });
-
-        // Finalize submission state - usually server feedback would trigger this if we were strictly synchronous
-        // But for smooth UI we release it after a short delay or on feedback
-        setTimeout(() => setIsSubmitting(false), 800);
-    }, [status, currentIndex, questions, selectedAnswer, textAnswer, quizId, timeLeft, quiz, isSubmitting, connected, socket]);
+    };
 
     const goToQuestion = (idx) => {
-        if (idx < 0 || idx >= questions.length) return;
+        if (idx < 0 || idx >= questions.length || !isDataReady) return;
         setCurrentIndex(idx);
-        const saved = savedAnswers[questions[idx]?._id];
-        setSelectedAnswer(saved || '');
-        setTextAnswer(saved || '');
-        // We don't set isAnswered to true automatically if we want them to be able to change it
-        // and only "submit" for local state tracking
-        setIsAnswered(!!saved);
+        // Sync local text answer for the new question
+        const qId = questions[idx]?._id;
+        setLocalTextAnswer(answers[qId] || '');
     };
 
     const handleFinalSubmit = async () => {
-        if (!window.confirm('Are you sure you want to submit your quiz?')) return;
+        if (!window.confirm('Are you sure you want to finalize and submit all answers?')) return;
         try {
             setLoading(true);
-            // 🚀 1. Call API for persistent DB update
-            await responseAPI.completeQuiz({ quizId });
+            // 🚀 1. Call API with FULL answers object (Architecture Fix)
+            await responseAPI.completeQuiz({
+                quizId,
+                answers // Sending the centralized object
+            });
 
-            // 🚀 2. Signal server via socket to trigger real-time rank updates & faculty notifications
+            // 🚀 2. Signal server via socket with FULL answers for real-time safety
             if (socket && connected) {
-                socket.emit('quiz:complete', { quizId });
+                socket.emit('quiz:complete', {
+                    quizId,
+                    answers
+                });
             }
 
+            // Clear local storage after successful submit
+            localStorage.removeItem(`quiz_answers_${quizId}`);
             toast.success('Quiz submitted successfully!');
         } catch (error) {
             console.error('Final submit failed:', error);
@@ -329,8 +374,8 @@ const PlayQuiz = () => {
                     <div className="top-nav-panel">
                         <div className="nav-horizontal-scroll">
                             {questions.map((_, i) => {
-                                const qId = questions[i]._id;
-                                const isAns = !!savedAnswers[qId];
+                                const qId = questions[i]?._id;
+                                const isAns = !!answers[qId];
                                 const isCurr = currentIndex === i;
                                 return (
                                     <div
@@ -363,18 +408,13 @@ const PlayQuiz = () => {
                                 {(['mcq', 'msq'].includes(q?.type?.toLowerCase()) || (q?.options && q?.options.length > 0)) ? (
                                     <div className="mcq-options-layout">
                                         {q?.options?.map((opt, i) => {
-                                            const isSelected = selectedAnswer === opt;
+                                            const isSelected = answers[q._id] === opt;
                                             const isActive = ['active', 'question_active', 'live', 'draft', 'waiting'].includes(status) && !isSubmitting && connected;
                                             return (
                                                 <button
                                                     key={i}
                                                     className={`mcq-option-btn ${isSelected ? 'selected' : ''}`}
-                                                    onClick={() => {
-                                                        if (isActive) {
-                                                            setSelectedAnswer(opt);
-                                                            handleAnswerSubmit(opt);
-                                                        }
-                                                    }}
+                                                    onClick={() => handleSelect(q._id, opt)}
                                                     disabled={!isActive}
                                                 >
                                                     <span className="opt-marker">{String.fromCharCode(65 + i)}</span>
@@ -389,18 +429,18 @@ const PlayQuiz = () => {
                                             <textarea
                                                 className="qa-textarea"
                                                 placeholder="Type your detailed answer here..."
-                                                value={textAnswer}
-                                                onChange={e => setTextAnswer(e.target.value)}
-                                                onBlur={() => handleAnswerSubmit()}
+                                                value={localTextAnswer}
+                                                onChange={e => handleTextUpdate(q._id, e.target.value)}
+                                                onBlur={handleAnswerSubmit}
                                                 disabled={!['active', 'question_active', 'live', 'draft', 'waiting'].includes(status) || isSubmitting || !connected}
                                             />
                                         ) : (
                                             <input
                                                 className="fill-blank-input"
                                                 placeholder="Type the correct word..."
-                                                value={textAnswer}
-                                                onChange={e => setTextAnswer(e.target.value)}
-                                                onBlur={() => handleAnswerSubmit()}
+                                                value={localTextAnswer}
+                                                onChange={e => handleTextUpdate(q._id, e.target.value)}
+                                                onBlur={handleAnswerSubmit}
                                                 disabled={!['active', 'question_active', 'live', 'draft', 'waiting'].includes(status) || isSubmitting || !connected}
                                             />
                                         )}

@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Quiz = require('../models/Quiz');
 const Response = require('../models/Response');
 const LeaderboardService = require('../services/leaderboardService');
+const QuizResult = require('../models/QuizResult');
 const { calculateScore } = require('../utils/calculateScore');
 const logger = require('../utils/logger');
 
@@ -47,12 +48,18 @@ module.exports = (io) => {
             try {
                 await Response.updateRanks(quizId);
                 const leaderboard = await Response.getLeaderboard(quizId, 500);
-                const roomName = String(quizId);
-                io.to(roomName).emit('leaderboard:update', { leaderboard });
+                const roomName = `quiz_${quizId}`;
+
+                // PART 2: Use proper room and event name as requested
+                io.to(roomName).emit('leaderboardUpdate', leaderboard);
+
+                // Keep the old one for compatibility if any other pages use it
+                io.to(String(quizId)).emit('leaderboard:update', { leaderboard });
+
                 logger.info(`📊 [LEADERBOARD] Broadcast to room: ${roomName} | Count: ${leaderboard.length}`);
                 rankUpdateDebounces.delete(quizId);
             } catch (err) { logger.error('Debounce Rank Update Error:', err); }
-        }, 3000);
+        }, 1500); // Reduced delay for better real-time feel
         rankUpdateDebounces.set(quizId, timeout);
     };
 
@@ -159,9 +166,11 @@ module.exports = (io) => {
         socket.on('quiz:join', async (data) => {
             const { quizId } = data;
             if (!quizId) return;
-            const roomName = String(quizId);
+            const roomName = `quiz_${quizId}`;
 
             socket.join(roomName);
+            // Join original as well for compatibility
+            socket.join(String(quizId));
             logger.info(`📥 [ROOM JOIN] User ${socket.user.name} joined room: ${roomName}`);
 
             if (userRole !== 'student') {
@@ -280,13 +289,13 @@ module.exports = (io) => {
         });
 
         // --- 4. ANSWER SUBMISSION (STUDENT ONLY) ---
-        socket.on('answer:submit', async (data) => {
+        // --- 4. ANSWER SUBMISSION (STUDENT ONLY) ---
+        const handleAnswerSubmit = async (data) => {
             if (userRole !== 'student') return;
             const { quizId, questionId, answer, timeTaken } = data;
-            const roomName = String(quizId);
+            const roomName = `quiz_${quizId}`;
             try {
                 const quiz = await Quiz.findById(quizId).select('status questions settings expiresAt currentQuestionIndex');
-
                 const allowedStates = [STATES.ACTIVE, STATES.QUESTION_ACTIVE, STATES.LIVE];
                 if (!quiz || !allowedStates.includes(quiz.status)) {
                     return socket.emit('error', { message: 'Selection blocked: Question is inactive' });
@@ -295,21 +304,16 @@ module.exports = (io) => {
                 const question = quiz.questions.id(questionId);
                 if (!question) return;
 
-                const { isCorrect, pointsEarned } = calculateScore(question, answer, timeTaken / 1000, quiz.settings);
+                const { isCorrect, scoreAwarded } = calculateScore(question, answer, timeTaken / 1000, quiz.settings);
                 const response = await Response.findOne({ quizId, userId: socket.user._id });
-
                 if (!response || response.status !== 'in-progress') return;
 
                 let answerObj = response.answers.find(a => a.questionId.toString() === questionId);
-                if (answerObj && answerObj.answeredAt) {
-                    return socket.emit('error', { message: 'Already answered' });
-                }
-
                 const answerData = {
                     questionId,
                     answer: String(answer),
                     isCorrect,
-                    pointsEarned,
+                    scoreAwarded,
                     timeTaken: timeTaken || 0,
                     answeredAt: new Date(),
                     questionIndex: quiz.currentQuestionIndex
@@ -321,13 +325,12 @@ module.exports = (io) => {
                     response.answers.push(answerData);
                 }
 
-                response.totalScore = response.answers.reduce((s, a) => s + (a.pointsEarned || 0), 0);
                 await response.save();
 
                 // Acknowledge to student
-                socket.emit('answer:feedback', { isCorrect, pointsEarned, totalScore: response.totalScore });
+                socket.emit('answer:feedback', { isCorrect, scoreAwarded, totalScore: response.totalScore });
 
-                // Notify host room
+                // Notify host room for live dashboard
                 io.to(`${roomName}:host`).emit('response:received', {
                     participantId: userIdStr,
                     participantName: socket.user.name,
@@ -336,26 +339,112 @@ module.exports = (io) => {
                     progress: response.answers.filter(a => a.answer).length
                 });
 
+                // Trigger real-time rank/leaderboard updates
                 debounceRankUpdate(quizId);
             } catch (err) { logger.error('Submit Answer Error:', err); }
-        });
+        };
+
+        socket.on('answerSelected', handleAnswerSubmit);
+        socket.on('answer:submit', handleAnswerSubmit);
 
         // --- 5. QUIZ COMPLETION ---
         socket.on('quiz:complete', async (data) => {
             if (userRole !== 'student') return;
-            const { quizId } = data;
-            const roomName = String(quizId);
+            const { quizId, answers } = data;
+            const roomName = `quiz_${quizId}`;
             try {
+                const quiz = await Quiz.findById(quizId);
                 const response = await Response.findOne({ quizId, userId: socket.user._id });
-                if (!response) return;
+                if (!response || !quiz) return;
 
                 if (response.status !== 'completed' && response.status !== 'terminated') {
+                    // 🚀 Process final batch if provided via socket too
+                    if (answers && typeof answers === 'object') {
+                        for (const [qId, userAns] of Object.entries(answers)) {
+                            const question = quiz.questions.id(qId);
+                            if (!question) continue;
+                            const { isCorrect, scoreAwarded } = calculateScore(question, userAns, 0, quiz.settings);
+                            let aObj = response.answers.find(a => a.questionId.toString() === qId);
+                            if (aObj) {
+                                aObj.answer = userAns;
+                                aObj.isCorrect = isCorrect;
+                                aObj.scoreAwarded = scoreAwarded;
+                                aObj.answeredAt = aObj.answeredAt || new Date();
+                            } else {
+                                response.answers.push({
+                                    questionId: qId,
+                                    answer: userAns,
+                                    isCorrect,
+                                    scoreAwarded,
+                                    answeredAt: new Date()
+                                });
+                            }
+                        }
+                    }
+
                     response.status = 'completed';
                     response.completedAt = new Date();
                     await response.save();
 
+                    // PART 1: Aggregate total score using DB query & Store in QuizResult
+                    const aggregatedData = await Response.aggregate([
+                        { $match: { _id: response._id } },
+                        {
+                            $project: {
+                                totalScore: { $sum: "$answers.scoreAwarded" },
+                                correctCount: {
+                                    $size: {
+                                        $filter: {
+                                            input: "$answers",
+                                            as: "a",
+                                            cond: { $eq: ["$$a.isCorrect", true] }
+                                        }
+                                    }
+                                },
+                                wrongCount: {
+                                    $size: {
+                                        $filter: {
+                                            input: "$answers",
+                                            as: "a",
+                                            cond: { $eq: ["$$a.isCorrect", false] }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]);
+
+                    const stats = aggregatedData[0] || { totalScore: 0, correctCount: 0, wrongCount: 0 };
+
+                    // Save to QuizResult collection as requested
+                    await QuizResult.findOneAndUpdate(
+                        { quizId: quiz._id, userId: socket.user._id },
+                        {
+                            rollNumber: socket.user.rollNumber,
+                            studentName: socket.user.name,
+                            totalScore: stats.totalScore,
+                            correctCount: stats.correctCount,
+                            incorrectCount: stats.wrongCount,
+                            percentage: quiz.totalPoints > 0 ? (stats.totalScore / quiz.totalPoints) * 100 : 0,
+                            totalTimeTaken: response.totalTimeTaken,
+                            answers: response.answers.map(a => {
+                                const q = quiz.questions.find(quest => String(quest._id) === String(a.questionId));
+                                return {
+                                    questionId: a.questionId,
+                                    selectedOption: a.answer,
+                                    correctOption: q ? q.correctAnswer : 'N/A',
+                                    isCorrect: a.isCorrect,
+                                    scoreAwarded: a.scoreAwarded,
+                                    timeTaken: a.timeTaken
+                                };
+                            }),
+                            completedAt: new Date()
+                        },
+                        { upsert: true, new: true }
+                    );
+
                     await Response.updateRanks(quizId);
-                    logger.info(`🏁 [COMPLETED] Quiz ${quizId} completed by ${socket.user.name}`);
+                    logger.info(`🏁 [COMPLETED] Quiz ${quizId} completed and results stored for ${socket.user.name}`);
                 }
 
                 const finalResults = {
@@ -371,6 +460,9 @@ module.exports = (io) => {
                     name: socket.user.name,
                     score: response.totalScore
                 });
+
+                // PART 2: Emit leaderboard update after completion too
+                debounceRankUpdate(quizId);
             } catch (err) { logger.error('Complete Quiz Error:', err); }
         });
 

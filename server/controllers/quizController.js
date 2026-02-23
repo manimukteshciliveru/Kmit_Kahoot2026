@@ -707,10 +707,12 @@ exports.startQuiz = async (req, res) => {
             { $set: { status: 'in-progress', startedAt: new Date() } }
         );
 
-        // Emit socket event
+        // Emit socket event with standardized name
         const io = req.app.get('io');
         if (io) {
-            io.to(String(quiz._id)).emit('quiz:state_changed', {
+            const roomName = `quiz_${quiz._id}`;
+            io.to(roomName).emit('quizStatusUpdate', 'live');
+            io.to(roomName).emit('quiz:state_changed', {
                 status: 'live',
                 currentQuestionIndex: 0,
                 expiresAt: quiz.expiresAt
@@ -778,8 +780,10 @@ exports.endQuiz = async (req, res) => {
 
         const io = req.app.get('io');
         if (io) {
-            io.to(String(quiz._id)).emit('quiz:ended', { leaderboard });
-            io.to(String(quiz._id)).emit('quiz:state_changed', { status: 'done', leaderboard });
+            const roomName = `quiz_${quiz._id}`;
+            io.to(roomName).emit('quizStatusUpdate', 'done');
+            io.to(roomName).emit('quiz:ended', { leaderboard });
+            io.to(roomName).emit('quiz:state_changed', { status: 'done', leaderboard });
         }
 
         res.status(200).json({
@@ -841,6 +845,101 @@ exports.getLeaderboard = async (req, res) => {
     }
 };
 
+// @desc    Get comprehensive quiz analytics
+// @route   GET /api/quiz/:id/analytics
+// @access  Private (Faculty or Admin)
+exports.getQuizAnalytics = async (req, res) => {
+    try {
+        const { id: quizId } = req.params;
+
+        const quiz = await Quiz.findById(quizId).select('title code totalPoints questions').lean();
+        if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found' });
+
+        // 1. Leaderboard (Aggregated for accuracy)
+        const leaderboard = await Response.find({ quizId, status: { $in: ['in-progress', 'completed'] } })
+            .populate('userId', 'name rollNumber department section avatar')
+            .sort({ totalScore: -1, totalTimeTaken: 1 })
+            .limit(100)
+            .lean();
+
+        // 2. Question-wise stats
+        const questionStats = await Response.aggregate([
+            { $match: { quizId: new mongoose.Types.ObjectId(quizId) } },
+            { $unwind: '$answers' },
+            {
+                $group: {
+                    _id: '$answers.questionId',
+                    correctCount: { $sum: { $cond: ['$answers.isCorrect', 1, 0] } },
+                    totalAttempts: { $sum: { $cond: [{ $ifNull: ['$answers.answer', false] }, 1, 0] } },
+                    avgTime: { $avg: '$answers.timeTaken' }
+                }
+            },
+            {
+                $project: {
+                    questionId: '$_id',
+                    accuracy: {
+                        $cond: [
+                            { $eq: ['$totalAttempts', 0] },
+                            0,
+                            { $multiply: [{ $divide: ['$correctCount', '$totalAttempts'] }, 100] }
+                        ]
+                    },
+                    avgTime: 1,
+                    correctCount: 1,
+                    totalAttempts: 1
+                }
+            }
+        ]);
+
+        // 3. Overall performance metrics
+        const overallMetrics = await Response.aggregate([
+            { $match: { quizId: new mongoose.Types.ObjectId(quizId), status: 'completed' } },
+            {
+                $group: {
+                    _id: null,
+                    avgScore: { $avg: '$totalScore' },
+                    highestScore: { $max: '$totalScore' },
+                    lowestScore: { $min: '$totalScore' },
+                    avgTime: { $avg: '$totalTimeTaken' },
+                    totalParticipants: { $sum: 1 }
+                }
+            }
+        ]);
+
+        // 4. Student Breakdown (Detailed)
+        const studentBreakdown = leaderboard.map(r => ({
+            studentId: r.userId?._id,
+            name: r.userId?.name,
+            rollNumber: r.userId?.rollNumber,
+            totalScore: r.totalScore,
+            rank: r.rank,
+            correctCount: r.correctCount,
+            percentage: r.percentage,
+            timeTaken: r.totalTimeTaken
+        }));
+
+        const metrics = overallMetrics[0] || { avgScore: 0, highestScore: 0, lowestScore: 0, avgTime: 0, totalParticipants: 0 };
+
+        res.status(200).json({
+            success: true,
+            data: {
+                leaderboard: studentBreakdown.slice(0, 10), // Top 10 for quick view
+                questionStats,
+                studentBreakdown,
+                averageTime: metrics.avgTime,
+                highestScore: metrics.highestScore,
+                lowestScore: metrics.lowestScore,
+                totalParticipants: metrics.totalParticipants,
+                avgScore: metrics.avgScore
+            }
+        });
+
+    } catch (error) {
+        console.error('Quiz Analytics Error:', error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
 // @desc    Get quiz results (for download)
 // @route   GET /api/quizzes/:id/results
 // @access  Private (Faculty owner or Admin)
@@ -885,7 +984,7 @@ exports.getQuizResults = async (req, res) => {
                     startedAt: 1,
                     completedAt: 1,
                     totalTimeTaken: 1,
-                    totalScore: { $sum: "$answers.pointsEarned" }, // DB Level Summation
+                    totalScore: { $sum: "$answers.scoreAwarded" }, // DB Level Summation
                     maxPossibleScore: 1,
                     percentage: 1,
                     tabSwitchCount: 1,
@@ -1308,7 +1407,7 @@ exports.getStudentResult = async (req, res) => {
                 selectedAnswer: a.answer,
                 correctAnswer: question ? question.correctAnswer : 'N/A',
                 isCorrect: a.isCorrect,
-                scoreAwarded: a.pointsEarned,
+                scoreAwarded: a.scoreAwarded,
                 maxPoints: question ? question.points : 0,
                 timeTaken: a.timeTaken,
                 explanation: question ? question.explanation : ''

@@ -437,7 +437,15 @@ exports.reportTabSwitch = async (req, res) => {
 // @access  Private (Student)
 exports.completeQuiz = async (req, res) => {
     try {
-        const { quizId } = req.body;
+        const { quizId, answers } = req.body;
+
+        const quiz = await Quiz.findById(quizId);
+        if (!quiz) {
+            return res.status(404).json({
+                success: false,
+                message: 'Quiz not found'
+            });
+        }
 
         const response = await Response.findOne({ quizId, userId: req.user._id });
         if (!response) {
@@ -448,7 +456,6 @@ exports.completeQuiz = async (req, res) => {
         }
 
         if (response.status === 'completed' || response.status === 'terminated') {
-            console.log(`ℹ️  [COMPLETE QUIZ] User ${req.user.name} already in ${response.status} state. Returning success.`);
             return res.status(200).json({
                 success: true,
                 message: `Quiz already ${response.status}`,
@@ -465,9 +472,40 @@ exports.completeQuiz = async (req, res) => {
             });
         }
 
-        console.log(`🏁 [COMPLETE QUIZ] Marking ${req.user.name} as completed`);
+        // 🚀 1. Process Batch Answers if provided (Architecture Fix)
+        if (answers && typeof answers === 'object') {
+            console.log(`[ARENA] Processing batch answers for ${req.user.name} | Count: ${Object.keys(answers).length}`);
+
+            for (const [qId, userAns] of Object.entries(answers)) {
+                const question = quiz.questions.id(qId);
+                if (!question) continue;
+
+                const { isCorrect, scoreAwarded } = calculateScore(question, userAns, 0, quiz.settings);
+
+                let answerObj = response.answers.find(a => a.questionId.toString() === qId);
+                if (!answerObj) {
+                    response.answers.push({
+                        questionId: qId,
+                        answer: userAns,
+                        isCorrect,
+                        scoreAwarded,
+                        answeredAt: new Date()
+                    });
+                } else {
+                    // Update existing only if not already answered or to overwrite with final state
+                    answerObj.answer = userAns;
+                    answerObj.isCorrect = isCorrect;
+                    answerObj.scoreAwarded = scoreAwarded;
+                    answerObj.answeredAt = answerObj.answeredAt || new Date();
+                }
+            }
+        }
+
+        console.log(`🏁 [COMPLETE QUIZ] Finalizing submission for ${req.user.name}`);
         response.status = 'completed';
         response.completedAt = new Date();
+
+        // This save will trigger the pre-save hook for final aggregation
         await response.save();
 
         // Update ranks

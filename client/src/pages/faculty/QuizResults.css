@@ -4,6 +4,28 @@
     max-width: 1400px;
     margin: 0 auto;
     padding: var(--space-xl);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Day Mode Visibility Tweaks */
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+}
+
+.table-header th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.question-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+}
+
+.performance-card {
+    background: var(--bg-card);
 }
 
 /* Header */

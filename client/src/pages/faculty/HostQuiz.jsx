@@ -108,6 +108,19 @@ const HostQuiz = () => {
             setAnsweredCount(prev => prev + 1);
         });
 
+        socket.on('leaderboardUpdate', (data) => {
+            console.log('📊 [SOCKET] Leaderboard Update Received:', data.length);
+            setLeaderboard(data);
+        });
+
+        socket.on('quizStatusUpdate', (newStatus) => {
+            console.log('⚡ [SOCKET] Status Update:', newStatus);
+            setStatus(mapStateToUI(newStatus));
+            if (newStatus === 'done') {
+                toast.success('Quiz finalized!');
+            }
+        });
+
         socket.on('leaderboard:update', (data) => {
             if (data.leaderboard) setLeaderboard(data.leaderboard);
         });

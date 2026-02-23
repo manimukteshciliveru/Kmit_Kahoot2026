@@ -13,12 +13,12 @@
 :root {
   /* === DAY MODE COLORS (Professional & Crisp) === */
   /* Background: Premium Light Gray */
-  --bg-primary: #F3F4F6;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #F9FAFB;
-  --bg-card: #FFFFFF;
+  --bg-primary: #f9fafb;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3f4f6;
+  --bg-card: #ffffff;
   --bg-glass: rgba(255, 255, 255, 0.95);
-  --bg-navbar: #FFFFFF;
+  --bg-navbar: #ffffff;
 
   /* Primary Brand Color: Deep Royal Blue */
   --primary: #1E40AF;
@@ -39,10 +39,10 @@
   --info: #3B82F6;
 
   /* Text Colors (High Contrast) */
-  --text-primary: #111827;
-  /* Near Black */
-  --text-secondary: #4B5563;
-  --text-muted: #9CA3AF;
+  --text-primary: #1f2937;
+  /* Stronger Dark Gray */
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
 
   /* Border Colors */
   --border: #E5E7EB;
