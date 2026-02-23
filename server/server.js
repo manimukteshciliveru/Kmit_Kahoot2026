@@ -152,7 +152,30 @@ try {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Routes
-// API Routes - Version 1
+// --- 3. Core Health & Test Routes (Priority) ---
+app.get("/test", (req, res) => {
+    console.log("✅ [TEST ROUTE] Hit!");
+    res.json({ success: true, message: "Backend working" });
+});
+
+app.get('/api/v1/health', (req, res) => {
+    console.log("✅ [HEALTH v1 ROUTE] Hit!");
+    res.status(200).json({
+        success: true,
+        message: 'QuizMaster API v1 is running',
+        version: 'v1',
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ success: true, message: 'QuizMaster API is online' });
+});
+
+app.get("/", (req, res) => {
+    res.json({ message: "QuizMaster API is ONLINE", status: "Ready" });
+});
+
 app.use('/api/v1', v1Router);
 
 // Aliases for backward compatibility (Optional, logs warning)
@@ -178,40 +201,6 @@ app.use('/api/responses', responseRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
-
-// Health check
-app.get('/api/health', (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: 'QuizMaster API is running (Legacy Endpoint)',
-        timestamp: new Date().toISOString()
-    });
-});
-
-app.get('/api/v1/health', (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: 'QuizMaster API v1 is running',
-        version: 'v1',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// Test route to confirm backend works
-app.get("/test", (req, res) => {
-    res.json({ message: "Backend working" });
-});
-
-// Base URL check
-app.get("/", (req, res) => {
-    res.json({
-        message: "QuizMaster API is Online",
-        endpoints: {
-            health: "/api/v1/health",
-            test: "/test"
-        }
-    });
-});
 
 // --- 4. Global Error Handlers ---
 
