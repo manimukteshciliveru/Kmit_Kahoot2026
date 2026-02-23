@@ -44,6 +44,23 @@ requiredEnv.forEach((key) => {
 const app = express();
 const server = http.createServer(app);
 
+// --- 0. DEPLOYMENT VERIFICATION (ABSOLUTE TOP) ---
+app.get("/deploy-check", (req, res) => {
+    res.json({
+        status: "LIVE",
+        version: "1.0.4 - Priority Routes",
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get("/test", (req, res) => {
+    res.json({ success: true, message: "Backend working - Version 1.0.4" });
+});
+
+app.get("/", (req, res) => {
+    res.json({ message: "QuizMaster API is ONLINE", version: "1.0.4" });
+});
+
 // Request Logger (Debug 404s/CORS)
 app.use((req, res, next) => {
     console.log(`📡 [REQUEST] ${req.method} ${req.url} | Origin: ${req.headers.origin || 'Unknown'}`);
@@ -151,30 +168,7 @@ try {
 // Static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// API Routes
-// --- 3. Core Health & Test Routes (Priority) ---
-app.get("/test", (req, res) => {
-    console.log("✅ [TEST ROUTE] Hit!");
-    res.json({ success: true, message: "Backend working" });
-});
-
-app.get('/api/v1/health', (req, res) => {
-    console.log("✅ [HEALTH v1 ROUTE] Hit!");
-    res.status(200).json({
-        success: true,
-        message: 'QuizMaster API v1 is running',
-        version: 'v1',
-        timestamp: new Date().toISOString()
-    });
-});
-
-app.get('/api/health', (req, res) => {
-    res.status(200).json({ success: true, message: 'QuizMaster API is online' });
-});
-
-app.get("/", (req, res) => {
-    res.json({ message: "QuizMaster API is ONLINE", status: "Ready" });
-});
+// --- 3. API Routes Section ---
 
 app.use('/api/v1', v1Router);
 
