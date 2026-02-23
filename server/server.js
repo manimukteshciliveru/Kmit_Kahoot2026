@@ -197,6 +197,24 @@ app.get('/api/v1/health', (req, res) => {
     });
 });
 
+// Test route to confirm backend works
+app.get("/test", (req, res) => {
+    res.json({ message: "Backend working" });
+});
+
+// Base URL check
+app.get("/", (req, res) => {
+    res.json({
+        message: "QuizMaster API is Online",
+        endpoints: {
+            health: "/api/v1/health",
+            test: "/test"
+        }
+    });
+});
+
+// --- 4. Global Error Handlers ---
+
 // 404 handler
 app.use((req, res) => {
     console.warn(`⚠️ 404 Not Found: ${req.method} ${req.url}`);
@@ -238,11 +256,6 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-// Test route to confirm backend works
-app.get("/test", (req, res) => {
-    res.json({ message: "Backend working" });
 });
 
 // --- 5. Production Safety: Crash Handlers ---
