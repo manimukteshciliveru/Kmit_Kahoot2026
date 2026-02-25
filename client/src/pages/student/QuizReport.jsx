@@ -50,18 +50,30 @@ const QuizReport = () => {
             setReport(reportData);
             setParticipationStats(stats);
 
-            // Fetch leaderboard for stats
+            // Fetch AI review first so it's not affected by leaderboard failures
             if (reportData.quizId?._id) {
-                const lbRes = await quizAPI.getLeaderboard(reportData.quizId._id);
-                const lbData = lbRes.data.data.leaderboard || [];
-                setLeaderboard(lbData);
-                generateAnalytics(reportData, lbData);
                 fetchAIReview(reportData.quizId._id);
             }
+
+            // Decoupled Leaderboard Fetch (Privacy Safe)
+            try {
+                if (reportData.quizId?._id) {
+                    const lbRes = await quizAPI.getLeaderboard(reportData.quizId._id);
+                    const lbData = lbRes.data.data.leaderboard || [];
+                    setLeaderboard(lbData);
+                    generateAnalytics(reportData, lbData);
+                }
+            } catch (lbError) {
+                console.warn('Leaderboard hidden or inaccessible:', lbError.message);
+                // Fallback: Generate basic analytics without leaderboard comparison
+                generateAnalytics(reportData, []);
+            }
+
         } catch (error) {
             console.error('Error fetching report:', error);
             const message = error.response?.data?.message || 'Failed to load report data';
             toast.error(message);
+            // Only redirect if the PRIMARY report data fetch failed with 403/404
             if (error.response?.status === 403 || error.response?.status === 404) {
                 navigate('/history');
             }
@@ -539,8 +551,27 @@ const QuizReport = () => {
                 </div>
             </section>
 
-            <div className="footer-actions">
-                <button className="btn-back" onClick={() => navigate('/history')}><FiArrowLeft /> Back to Dashboard</button>
+            <div className="footer-actions" style={{ display: 'flex', gap: '1rem', marginTop: '3rem', paddingBottom: '2rem', borderTop: '1px solid var(--border)', paddingTop: '2rem' }}>
+                <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                        // If we came from PlayQuiz (status active), go to dashboard
+                        // If we came from History, go back to History
+                        if (window.history.length > 2) {
+                            navigate(-1);
+                        } else {
+                            navigate('/dashboard');
+                        }
+                    }}
+                >
+                    <FiArrowLeft /> Back to Dashboard
+                </button>
+                <button
+                    className="btn btn-outline"
+                    onClick={() => navigate('/history')}
+                >
+                    <FiActivity /> All History
+                </button>
             </div>
 
             <style>{`
@@ -675,9 +706,19 @@ const QuizReport = () => {
                 .text-accent { color: var(--accent) !important; }
 
                 /* Leaderboard Highlights */
-                .top-1-special { background: linear-gradient(90deg, rgba(255, 215, 0, 0.15), transparent) !important; border-left: 4px solid #FFD700 !important; }
-                .top-5-highlight { background: linear-gradient(90deg, rgba(255, 127, 17, 0.1), transparent) !important; border-left: 4px solid var(--primary) !important; }
-                .row-highlight { background: rgba(30, 64, 175, 0.1) !important; outline: 1px solid var(--primary); }
+                /* Enhanced Gold Glow */
+                .top-1-special { 
+                    background: linear-gradient(90deg, rgba(255, 215, 0, 0.1), transparent) !important; 
+                    border-left: 5px solid #FFD700 !important;
+                    box-shadow: inset 5px 0 15px -5px rgba(255, 215, 0, 0.4);
+                    position: relative;
+                }
+                
+                .top-5-highlight { 
+                    background: linear-gradient(90deg, rgba(30, 64, 175, 0.08), transparent) !important; 
+                    border-left: 5px solid var(--primary) !important;
+                    box-shadow: inset 5px 0 15px -5px rgba(30, 64, 175, 0.3);
+                }
                 .rank-1 { filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.6)); scale: 1.2; display: inline-block; }
                 .rank-2 { filter: drop-shadow(0 0 4px rgba(192, 192, 192, 0.5)); scale: 1.1; display: inline-block; }
                 .rank-3 { filter: drop-shadow(0 0 3px rgba(205, 127, 50, 0.4)); scale: 1.05; display: inline-block; }

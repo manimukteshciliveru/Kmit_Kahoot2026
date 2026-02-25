@@ -70,13 +70,13 @@ exports.submitAnswer = async (req, res) => {
 
         // Check if answer is correct (Using Centralized Utility)
         const timeInSeconds = timeTaken && timeTaken > 100 ? timeTaken / 1000 : (timeTaken || 0);
-        const { isCorrect, pointsEarned } = calculateScore(question, answer, timeInSeconds, quiz.settings);
+        const { isCorrect, scoreAwarded } = calculateScore(question, answer, timeInSeconds, quiz.settings);
 
         // --- DEBUG LOGS (Requested by User) ---
         console.log(`[SCORE DEBUG] Student: ${req.user._id} (${req.user.name})`);
         console.log(`[SCORE DEBUG] Quiz: ${quizId} | Question: ${questionId}`);
         console.log(`[SCORE DEBUG] Selected: "${answer}" | Correct: "${question.correctAnswer}"`);
-        console.log(`[SCORE DEBUG] Result: ${isCorrect ? '✅ CORRECT' : '❌ WRONG'} | Score: ${pointsEarned}`);
+        console.log(`[SCORE DEBUG] Result: ${isCorrect ? '✅ CORRECT' : '❌ WRONG'} | Score: ${scoreAwarded}`);
 
         // Find existing response to update
         const response = await Response.findOne({
@@ -111,7 +111,7 @@ exports.submitAnswer = async (req, res) => {
                 questionIndex: quiz.questions.findIndex(q => q._id.toString() === questionId.toString()),
                 answer,
                 isCorrect,
-                pointsEarned,
+                scoreAwarded,
                 timeTaken: timeTaken || 0,
                 answeredAt: new Date()
             });
@@ -119,7 +119,7 @@ exports.submitAnswer = async (req, res) => {
             // Update existing placeholder
             response.answers[answerIndex].answer = answer;
             response.answers[answerIndex].isCorrect = isCorrect;
-            response.answers[answerIndex].pointsEarned = pointsEarned;
+            response.answers[answerIndex].scoreAwarded = scoreAwarded;
             response.answers[answerIndex].timeTaken = timeTaken || 0;
             response.answers[answerIndex].answeredAt = new Date();
         }
@@ -152,7 +152,7 @@ exports.submitAnswer = async (req, res) => {
                 section: req.user.section,
                 questionId,
                 isCorrect,
-                pointsEarned,
+                scoreAwarded,
                 timeTaken,
                 score: response.totalScore,
                 totalScore: response.totalScore

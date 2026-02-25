@@ -235,7 +235,7 @@ const StudentDashboard = () => {
                         ) : recentQuizzes.length > 0 ? (
                             <div className="quiz-list">
                                 {recentQuizzes.map((response) => (
-                                    <Link key={response._id} to="/history" className="quiz-item" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                    <Link key={response._id} to={`/history/report/${response._id}`} className="quiz-item" style={{ textDecoration: 'none', color: 'inherit' }}>
                                         <div className="quiz-info">
                                             <h3>{response.quizId?.title || 'Unknown Quiz'}</h3>
                                             <span className="quiz-meta">
