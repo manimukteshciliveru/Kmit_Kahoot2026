@@ -157,6 +157,7 @@ const FacultyLiveAnalysis = ({ leaderboard, absentStudents = [], totalQuestions,
                                     outerRadius={60}
                                     paddingAngle={5}
                                     dataKey="value"
+                                    label={false} // Removed direct labels for speed/cleanliness
                                 >
                                     {attendanceData.chart.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -223,7 +224,9 @@ const FacultyLiveAnalysis = ({ leaderboard, absentStudents = [], totalQuestions,
                                 innerRadius={60}
                                 outerRadius={85}
                                 dataKey="value"
-                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                // Only show label if percentage > 10% to prevent overlap
+                                label={({ name, percent }) => percent > 0.1 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                                labelLine={false}
                             >
                                 {accuracyOverview.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
