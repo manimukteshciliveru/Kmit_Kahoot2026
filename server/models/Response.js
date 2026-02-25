@@ -128,7 +128,18 @@ const responseSchema = new mongoose.Schema({
     aiFeedback: {
         type: String, // Generated summary from AI
         default: null
-    }
+    },
+    deviceFingerprint: {
+        type: String, // Store IP + UserAgent hash/string to detect takeovers
+        default: null
+    },
+    securityIncidents: [{
+        event: String, // e.g., 'BLOCKED_TAKEOVER'
+        ip: String,
+        userAgent: String,
+        timestamp: { type: Date, default: Date.now },
+        details: String
+    }]
 }, {
     timestamps: true
 });

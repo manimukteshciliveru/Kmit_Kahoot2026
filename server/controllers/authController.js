@@ -10,9 +10,17 @@ const sendTokenResponse = async (user, statusCode, res) => {
 
     // Save refresh token to user
     user.refreshTokens = user.refreshTokens || [];
-    user.refreshTokens.push(refreshToken);
-    // Keep only last 5 sessions to prevent document bloat
-    if (user.refreshTokens.length > 5) user.refreshTokens.shift();
+
+    // --- SECURITY: Single Session Enforcement ---
+    if (user.role === 'student') {
+        // For students, clear all previous sessions to strictly prevent exam split-sessions
+        user.refreshTokens = [refreshToken];
+    } else {
+        // For faculty/admin, allow up to 5 concurrent sessions for multi-device management
+        user.refreshTokens.push(refreshToken);
+        if (user.refreshTokens.length > 5) user.refreshTokens.shift();
+    }
+
     await user.save({ validateBeforeSave: false });
 
     const cookieOptions = {
@@ -113,7 +121,7 @@ exports.register = async (req, res) => {
     }
 };
 
-const logger = require('../utils/logger');
+const Response = require('../models/Response');
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -170,6 +178,55 @@ exports.login = async (req, res) => {
                 success: false,
                 message: `This account is registered as a ${user.role}. Please use the correct login tab.`
             });
+        }
+
+        // --- DEFENSIVE SESSION OWNERSHIP (Anti-DoS / Exam Integrity) ---
+        if (user.role === 'student') {
+            const activeQuiz = await Response.findOne({
+                userId: user._id,
+                status: 'in-progress'
+            });
+
+            if (activeQuiz && activeQuiz.deviceFingerprint) {
+                const currentFingerprint = `${req.ip}_${req.headers['user-agent']}`;
+
+                // Only perform check if fingerprints differ
+                if (activeQuiz.deviceFingerprint !== currentFingerprint) {
+                    const lastActive = new Date(activeQuiz.lastActivityAt).getTime();
+                    const now = Date.now();
+                    const idleTimeSeconds = (now - lastActive) / 1000;
+
+                    // If student was active within the last 2 minutes, protect their session
+                    if (idleTimeSeconds < 120) {
+                        const incidentData = {
+                            event: 'BLOCKED_TAKEOVER',
+                            ip: req.ip,
+                            userAgent: req.headers['user-agent'],
+                            details: `Multi-login attempt blocked while student was active.`
+                        };
+
+                        // Log to DB for permanent record
+                        activeQuiz.securityIncidents.push(incidentData);
+                        await activeQuiz.save();
+
+                        // Notify Faculty Instantly via socket
+                        const io = req.app.get('io');
+                        if (io) {
+                            io.to(`${activeQuiz.quizId.toString()}:host`).emit('security:incident', {
+                                studentName: user.name,
+                                rollNumber: user.rollNumber,
+                                ...incidentData
+                            });
+                        }
+
+                        console.warn(`🛡️ [SECURITY] Blocked login takeover for ${user.name}. Session active on another device.`);
+                        return res.status(403).json({
+                            success: false,
+                            message: 'EXAM IN PROGRESS: This account is currently active in a quiz on another device. For security, login is blocked while the session is active. If your device crashed, please wait 2 minutes and try again.'
+                        });
+                    }
+                }
+            }
         }
 
         // 5. Account Status Check
@@ -348,7 +405,7 @@ exports.refreshToken = async (req, res) => {
     try {
         // Support both cookie and Authorization header for refresh token
         let refreshToken = req.cookies.refreshToken;
-        
+
         // If not in cookie, check Authorization header
         if (!refreshToken && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
             refreshToken = req.headers.authorization.split(' ')[1];

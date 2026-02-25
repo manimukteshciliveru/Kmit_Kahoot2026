@@ -121,9 +121,24 @@ module.exports = (io) => {
         const userRole = socket.user.role;
         const connectionKey = `${userIdStr}_${userRole}`;
 
-        // 🛡️ [SECURITY] Multi-tab notification (Inform but don't strictly evict to support multi-device)
+        // 🛡️ [SECURITY] Multi-tab eviction (Strict enforcement for exam integrity)
         if (activeUserConnections.has(connectionKey)) {
-            logger.info(`📱 [DUPLICATE] User ${socket.user.name} connected from another tab/device`);
+            const oldSocketId = activeUserConnections.get(connectionKey);
+            const oldSocket = io.sockets.sockets.get(oldSocketId);
+
+            if (oldSocket && oldSocket.id !== socket.id) {
+                logger.info(`🚨 [EVICTION] Closing old session for ${socket.user.name} to prevent multi-tab access`);
+
+                // Notify the old tab before killing it
+                oldSocket.emit('error', {
+                    message: 'Your account was logged in from another device or tab. Disconnecting this session for security.'
+                });
+
+                // Allow a tiny delay for message to arrive before disconnect
+                setTimeout(() => {
+                    oldSocket.disconnect(true);
+                }, 500);
+            }
         }
         activeUserConnections.set(connectionKey, socket.id);
 

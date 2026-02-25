@@ -542,11 +542,14 @@ exports.joinQuiz = async (req, res) => {
             try {
                 // If quiz is already live/active, set status to 'in-progress' directly
                 const isQuizLive = ['live', 'active', 'question_active', 'started'].includes(quiz.status);
+                const currentFingerprint = `${req.ip}_${req.headers['user-agent']}`;
+
                 response = await Response.create({
                     quizId: quiz._id,
                     userId: req.user._id,
                     status: isQuizLive ? 'in-progress' : 'waiting',
                     startedAt: isQuizLive ? new Date() : null,
+                    deviceFingerprint: currentFingerprint, // Lock session to this device
                     maxPossibleScore: questions.reduce((sum, q) => sum + (q.points || 0), 0),
                     questionOrder: shuffledQuestions.map(q => q._id),
                     answers: shuffledQuestions.map((q, idx) => ({
@@ -566,6 +569,12 @@ exports.joinQuiz = async (req, res) => {
                     // Duplicate key error, another request probably created it
                     console.log(`ℹ️  [JOIN QUIZ] Duplicate key (race condition), fetching existing Response`);
                     response = await Response.findOne({ quizId: quiz._id, userId: req.user._id });
+
+                    // Update fingerprint if it was missing
+                    if (response && !response.deviceFingerprint) {
+                        response.deviceFingerprint = `${req.ip}_${req.headers['user-agent']}`;
+                        await response.save();
+                    }
                 } else {
                     console.error('❌ [JOIN QUIZ] Error creating Response:', err);
                     throw err;
@@ -573,6 +582,11 @@ exports.joinQuiz = async (req, res) => {
             }
         } else {
             console.log(`ℹ️  [JOIN QUIZ] Response already exists for ${req.user.name}`);
+            // Ensure fingerprint is set if student is returning to an existing response
+            if (!response.deviceFingerprint) {
+                response.deviceFingerprint = `${req.ip}_${req.headers['user-agent']}`;
+                await response.save();
+            }
         }
 
         if (!response) {
