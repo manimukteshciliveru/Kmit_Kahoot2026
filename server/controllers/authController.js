@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { generateToken, generateRefreshToken } = require('../middleware/auth');
 const validator = require('validator');
 const jwt = require('jsonwebtoken');
+const logger = require('../utils/logger');
 
 // Helper to send tokens in response and cookie
 const sendTokenResponse = async (user, statusCode, res) => {
