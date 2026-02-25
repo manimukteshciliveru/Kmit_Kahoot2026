@@ -333,6 +333,11 @@ const QuizResults = () => {
                 <div className="tab-content">
                     <FacultyLiveAnalysis
                         leaderboard={getFilteredLeaderboard()}
+                        absentStudents={(data.absentStudents || []).filter(s => {
+                            const branchMatch = branchFilter === 'ALL' || s.department === branchFilter;
+                            const sectionMatch = sectionFilter === 'ALL' || s.section === sectionFilter;
+                            return branchMatch && sectionMatch;
+                        })}
                         totalQuestions={quiz.totalQuestions}
                         quiz={{ ...quiz, questions: data.questions || quiz.questions }}
                     />
@@ -414,7 +419,7 @@ const QuizResults = () => {
                             </div>
                         </div>
                         <div className="section-card">
-                            <h3>Needs Attention (< 60%)</h3>
+                            <h3>Needs Attention ({'<'} 60%)</h3>
                             <div className="performers-list">
                                 {[...responses].sort((a, b) => a.percentage - b.percentage)
                                     .filter(r => r.percentage < 60)

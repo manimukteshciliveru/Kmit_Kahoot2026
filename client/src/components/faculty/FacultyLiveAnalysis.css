@@ -1,23 +1,26 @@
-.faculty-analysis-grid {
+.faculty-analysis-dashboard {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
     padding: 1rem;
+    animation: fadeIn 0.5s ease-out;
 }
 
 .analysis-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: 1.75rem;
     box-shadow: var(--shadow-md);
     transition: var(--transition);
+    position: relative;
+    overflow: hidden;
 }
 
 .analysis-card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-4px);
     box-shadow: var(--shadow-lg);
-    border-color: var(--primary-light);
+    border-color: var(--primary);
 }
 
 .full-width {
@@ -27,129 +30,197 @@
 .card-header-visual {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
+    gap: 0.85rem;
+    margin-bottom: 1.75rem;
 }
 
 .card-header-visual h3 {
-    font-size: 1.1rem;
-    font-weight: 700;
+    font-size: 1.15rem;
+    font-weight: 750;
     color: var(--text-primary);
     margin: 0;
+    letter-spacing: -0.01em;
 }
 
 .card-header-visual svg {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
 }
 
-.icon-blue {
-    color: var(--primary);
+/* Attendance Styling */
+.attendance-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
 }
 
-.icon-green {
-    color: var(--success);
-}
-
-.icon-rose {
-    color: var(--accent);
-}
-
-.icon-yellow {
-    color: var(--warning);
-}
-
-.chart-container {
-    width: 100%;
-    min-height: 250px;
-}
-
-.chart-container-flex {
+.attendance-stats {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    gap: 1.5rem;
 }
 
-.mini-stats {
-    display: flex;
-    gap: 1rem;
-    margin-top: 1rem;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.mini-stat-item {
-    background: var(--bg-tertiary);
-    padding: 0.4rem 0.8rem;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    display: flex;
-    gap: 0.5rem;
-}
-
-.stat-label {
-    color: var(--text-secondary);
-}
-
-.stat-value {
-    font-weight: 700;
-    color: var(--primary);
-}
-
-.participation-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.metric-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 1rem;
-    background: rgba(99, 102, 241, 0.05);
+.attendance-main-pill {
+    background: linear-gradient(135deg, var(--primary), #4f46e5);
+    padding: 1rem 1.5rem;
     border-radius: 12px;
-    border: 1px solid rgba(99, 102, 241, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: white;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
 }
 
-.metric-box.green {
-    background: rgba(16, 185, 129, 0.05);
-    border-color: rgba(16, 185, 129, 0.1);
+.attendance-main-pill .rate {
+    font-size: 2.2rem;
+    font-weight: 900;
+    line-height: 1;
 }
 
-.metric-box.purple {
-    background: rgba(168, 85, 247, 0.05);
-    border-color: rgba(168, 85, 247, 0.1);
+.attendance-main-pill .lbl {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.9;
 }
 
-.metric-val {
-    font-size: 1.8rem;
+.attendance-breakdown {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.att-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: 10px;
+    border-top: 3px solid #94A3B8;
+}
+
+.att-item.success {
+    border-top-color: var(--success);
+}
+
+.att-item.danger {
+    border-top-color: var(--danger);
+}
+
+.att-item .val {
+    font-size: 1.25rem;
     font-weight: 800;
     color: var(--text-primary);
 }
 
-.metric-lab {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-align: center;
+.att-item .lab {
+    font-size: 0.65rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    color: var(--text-muted);
 }
 
-.improvement-note {
-    background: var(--bg-tertiary);
-    padding: 0.75rem;
-    border-radius: 10px;
-    font-size: 0.9rem;
+.attendance-chart-container {
+    width: 140px;
+}
+
+/* Insight Banner */
+.insight-banner {
+    background: linear-gradient(to right, rgba(99, 102, 241, 0.05), transparent);
     border-left: 4px solid var(--primary);
 }
 
+.insight-content {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+}
+
+.insight-icon {
+    font-size: 2rem;
+    color: var(--primary);
+    margin-top: 0.25rem;
+}
+
+.insight-content .text h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.insight-content .text p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* Recharts Customization overrides if needed */
+.recharts-default-tooltip {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+.recharts-tooltip-label {
+    color: var(--text-primary) !important;
+    font-weight: 700 !important;
+    margin-bottom: 4px !important;
+}
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+    stroke: var(--border);
+}
+
+/* Icons */
+.icon-blue {
+    color: #3B82F6;
+}
+
+.icon-purple {
+    color: #8B5CF6;
+}
+
+.icon-green {
+    color: #10B981;
+}
+
+.icon-rose {
+    color: #F43F5E;
+}
+
+.icon-emerald {
+    color: #059669;
+}
+
+.icon-yellow {
+    color: #F59E0B;
+}
+
 @media (max-width: 1024px) {
-    .faculty-analysis-grid {
+    .faculty-analysis-dashboard {
         grid-template-columns: 1fr;
     }
 
     .full-width {
         grid-column: span 1;
+    }
+
+    .attendance-content {
+        flex-direction: column;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }

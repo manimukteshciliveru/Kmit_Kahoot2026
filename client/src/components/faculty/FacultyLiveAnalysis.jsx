@@ -1,229 +1,316 @@
 import React, { useMemo } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend
+    PieChart, Pie, Cell, LineChart, Line, Legend, AreaChart, Area
 } from 'recharts';
-import { FiTrendingUp, FiClock, FiCheckCircle, FiUsers, FiPieChart } from 'react-icons/fi';
+import {
+    FiTrendingUp, FiClock, FiCheckCircle, FiUsers,
+    FiPieChart, FiBarChart2, FiActivity, FiAlertCircle
+} from 'react-icons/fi';
 
-const FacultyLiveAnalysis = ({ leaderboard, totalQuestions, quiz }) => {
+const FacultyLiveAnalysis = ({ leaderboard, absentStudents = [], totalQuestions, quiz }) => {
 
-    // 1. Overall Ranking Data (Top 10)
-    const rankingData = useMemo(() => {
-        return leaderboard
-            .slice(0, 10)
-            .map(entry => ({
-                name: entry.userId?.name || entry.studentName,
-                score: entry.totalScore,
-                accuracy: entry.percentage || 0
-            }));
+    // 1. ATTENDANCE SUMMARY DATA
+    const attendanceData = useMemo(() => {
+        const attended = leaderboard.length;
+        const absent = absentStudents.length;
+        const total = attended + absent;
+        const rate = total > 0 ? Math.round((attended / total) * 100) : 0;
+
+        return {
+            total,
+            attended,
+            absent,
+            rate,
+            chart: [
+                { name: 'Attended', value: attended, color: '#10B981' },
+                { name: 'Absent', value: absent, color: '#F43F5E' }
+            ]
+        };
+    }, [leaderboard, absentStudents]);
+
+    // 2. SCORE DISTRIBUTION (HISTOGRAM BINS)
+    const scoreDistribution = useMemo(() => {
+        const bins = [
+            { name: '0-20%', range: [0, 20], count: 0 },
+            { name: '21-40%', range: [21, 40], count: 0 },
+            { name: '41-60%', range: [41, 60], count: 0 },
+            { name: '61-80%', range: [61, 80], count: 0 },
+            { name: '81-100%', range: [81, 100], count: 0 }
+        ];
+
+        leaderboard.forEach(entry => {
+            const perc = entry.percentage || 0;
+            const bin = bins.find(b => perc >= b.range[0] && perc <= b.range[1]);
+            if (bin) bin.count++;
+        });
+
+        return bins;
     }, [leaderboard]);
 
-    // 2. Section-wise Analysis
-    const sectionData = useMemo(() => {
+    // 3. SECTION-WISE PERFORMANCE (BAR CHART)
+    const sectionPerformance = useMemo(() => {
         const sections = {};
         leaderboard.forEach(entry => {
-            const sec = entry.userId?.section || 'Unknown';
-            if (!sections[sec]) sections[sec] = { name: sec, count: 0, totalScore: 0, accuracySum: 0 };
+            const sec = entry.userId?.section || entry.student?.section || 'N/A';
+            if (!sections[sec]) sections[sec] = { name: `Sec ${sec}`, totalScore: 0, count: 0 };
+            sections[sec].totalScore += (entry.percentage || 0);
             sections[sec].count++;
-            sections[sec].totalScore += entry.totalScore;
-            sections[sec].accuracySum += (entry.percentage || 0);
         });
 
         return Object.values(sections).map(s => ({
             name: s.name,
-            avgScore: Math.round(s.totalScore / s.count),
-            avgAccuracy: Math.round(s.accuracySum / s.count),
-            participants: s.count
-        }));
+            avgScore: Math.round(s.totalScore / s.count)
+        })).sort((a, b) => a.name.localeCompare(b.name));
     }, [leaderboard]);
 
-    // 3. Question-wise Analysis
-    const questionData = useMemo(() => {
+    // 4. ACCURACY OVERVIEW (PIE CHART - Correct/Incorrect/Skipped)
+    const accuracyOverview = useMemo(() => {
+        let correct = 0;
+        let incorrect = 0;
+        let skipped = 0;
+        const totalExpected = leaderboard.length * totalQuestions;
+
+        leaderboard.forEach(entry => {
+            entry.answers?.forEach(ans => {
+                if (ans.isCorrect) correct++;
+                else incorrect++;
+            });
+            // Difference is skipped if participants didn't answer all
+            const answeredCount = entry.answers?.length || 0;
+            skipped += (totalQuestions - answeredCount);
+        });
+
+        return [
+            { name: 'Correct', value: correct, color: '#10B981' },
+            { name: 'Incorrect', value: incorrect, color: '#F43F5E' },
+            { name: 'Skipped', value: skipped, color: '#94A3B8' }
+        ].filter(v => v.value >= 0); // Safety check
+    }, [leaderboard, totalQuestions]);
+
+    // 5. QUESTION DIFFICULTY & TIME ANALYSIS (LINE/AREA CHARTS)
+    const questionAnalysis = useMemo(() => {
         if (!quiz?.questions) return [];
 
         return quiz.questions.map((q, idx) => {
             let correct = 0;
             let attempted = 0;
+            let totalTime = 0;
 
             leaderboard.forEach(entry => {
-                const ans = entry.answers?.find(a => a.questionId.toString() === q._id.toString());
+                const ans = entry.answers?.find(a =>
+                    String(a.questionId) === String(q._id || q.id)
+                );
                 if (ans) {
                     attempted++;
                     if (ans.isCorrect) correct++;
+                    if (ans.timeTaken) totalTime += ans.timeTaken;
                 }
             });
 
             return {
                 name: `Q${idx + 1}`,
                 accuracy: attempted > 0 ? Math.round((correct / attempted) * 100) : 0,
-                correct,
-                wrong: attempted - correct
+                avgTime: attempted > 0 ? Number((totalTime / attempted / 1000).toFixed(1)) : 0
             };
         });
     }, [leaderboard, quiz]);
 
-    // 4. Time Analysis (Average Time per Question)
-    const timeData = useMemo(() => {
-        if (!quiz?.questions) return [];
-
-        return quiz.questions.map((q, idx) => {
-            let totalTime = 0;
-            let count = 0;
-
-            leaderboard.forEach(entry => {
-                const ans = entry.answers?.find(a => a.questionId.toString() === q._id.toString());
-                if (ans && ans.timeTaken) {
-                    totalTime += ans.timeTaken;
-                    count++;
-                }
-            });
-
-            return {
-                name: `Q${idx + 1}`,
-                avgTime: count > 0 ? Number((totalTime / count / 1000).toFixed(1)) : 0 // in seconds
-            };
-        });
-    }, [leaderboard, quiz]);
-
-    // COLORS for charts
-    const COLORS = ['#6366F1', '#10B981', '#F43F5E', '#F59E0B', '#0EA5E9', '#A855F7'];
+    const COLORS = ['#6366F1', '#10B981', '#F43F5E', '#F59E0B', '#0EA5E9'];
 
     return (
-        <div className="faculty-analysis-grid">
+        <div className="faculty-analysis-dashboard">
 
-            {/* 1. Overall Ranking Chart */}
+            {/* --- ATTENDANCE SUMMARY (NEW) --- */}
+            <div className="analysis-card visual-card attendance-card">
+                <div className="card-header-visual">
+                    <FiUsers className="icon-blue" />
+                    <h3>Attendance Summary</h3>
+                </div>
+                <div className="attendance-content">
+                    <div className="attendance-stats">
+                        <div className="attendance-main-pill">
+                            <span className="rate">{attendanceData.rate}%</span>
+                            <span className="lbl">Attendance</span>
+                        </div>
+                        <div className="attendance-breakdown">
+                            <div className="att-item">
+                                <span className="val">{attendanceData.total}</span>
+                                <span className="lab">Eligible</span>
+                            </div>
+                            <div className="att-item success">
+                                <span className="val">{attendanceData.attended}</span>
+                                <span className="lab">Attended</span>
+                            </div>
+                            <div className="att-item danger">
+                                <span className="val">{attendanceData.absent}</span>
+                                <span className="lab">Absent</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="attendance-chart-container">
+                        <ResponsiveContainer width="100%" height={140}>
+                            <PieChart>
+                                <Pie
+                                    data={attendanceData.chart}
+                                    innerRadius={45}
+                                    outerRadius={60}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {attendanceData.chart.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+
+            {/* --- SCORE DISTRIBUTION (HISTOGRAM) --- */}
             <div className="analysis-card visual-card">
                 <div className="card-header-visual">
-                    <FiTrendingUp className="icon-blue" />
-                    <h3>Overall Ranking (Top 10)</h3>
+                    <FiBarChart2 className="icon-purple" />
+                    <h3>Score Distribution (Bins)</h3>
                 </div>
                 <div className="chart-container">
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={rankingData} layout="vertical" margin={{ left: 40, right: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.1} />
-                            <XAxis type="number" hide />
-                            <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12 }} />
-                            <Tooltip
-                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                            />
-                            <Bar dataKey="score" fill="var(--primary)" radius={[0, 4, 4, 0]} barSize={20} />
+                    <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={scoreDistribution}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                            <YAxis axisLine={false} tickLine={false} />
+                            <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                            <Bar dataKey="count" fill="#6366F1" radius={[4, 4, 0, 0]} barSize={40} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
             </div>
 
-            {/* 2. Section-wise Comparison */}
+            {/* --- SECTION-WISE PERFORMANCE --- */}
             <div className="analysis-card visual-card">
                 <div className="card-header-visual">
-                    <FiPieChart className="icon-green" />
-                    <h3>Section-wise Performance</h3>
+                    <FiActivity className="icon-green" />
+                    <h3>Section-wise Average Score</h3>
                 </div>
-                <div className="chart-container-flex">
+                <div className="chart-container">
+                    <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={sectionPerformance}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                            <YAxis unit="%" axisLine={false} tickLine={false} />
+                            <Tooltip />
+                            <Bar dataKey="avgScore" fill="#10B981" radius={[4, 4, 0, 0]} barSize={40} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* --- ACCURACY OVERVIEW (PIE) --- */}
+            <div className="analysis-card visual-card">
+                <div className="card-header-visual">
+                    <FiPieChart className="icon-rose" />
+                    <h3>Accuracy Overview</h3>
+                </div>
+                <div className="chart-container-centered">
                     <ResponsiveContainer width="100%" height={250}>
                         <PieChart>
                             <Pie
-                                data={sectionData}
+                                data={accuracyOverview}
                                 cx="50%"
                                 cy="50%"
                                 innerRadius={60}
-                                outerRadius={80}
-                                paddingAngle={5}
-                                dataKey="participants"
-                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                outerRadius={85}
+                                dataKey="value"
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                             >
-                                {sectionData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                {accuracyOverview.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
                             <Tooltip />
                             <Legend verticalAlign="bottom" height={36} />
                         </PieChart>
                     </ResponsiveContainer>
-                    <div className="mini-stats">
-                        {sectionData.map((s, i) => (
-                            <div key={i} className="mini-stat-item">
-                                <span className="stat-label">{s.name} Acc:</span>
-                                <span className="stat-value">{s.avgAccuracy}%</span>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             </div>
 
-            {/* 3. Question-wise Analysis */}
+            {/* --- QUESTION DIFFICULTY (LINE) --- */}
             <div className="analysis-card visual-card full-width">
                 <div className="card-header-visual">
-                    <FiCheckCircle className="icon-rose" />
-                    <h3>Question-wise Accuracy (%)</h3>
+                    <FiCheckCircle className="icon-emerald" />
+                    <h3>Question Difficulty Analysis (%)</h3>
                 </div>
                 <div className="chart-container">
                     <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={questionData}>
+                        <AreaChart data={questionAnalysis}>
                             <defs>
                                 <linearGradient id="colorAcc" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="var(--success)" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="var(--success)" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
                             <XAxis dataKey="name" />
                             <YAxis unit="%" />
                             <Tooltip />
-                            <Area type="monotone" dataKey="accuracy" stroke="var(--success)" fillOpacity={1} fill="url(#colorAcc)" />
+                            <Area
+                                type="monotone"
+                                dataKey="accuracy"
+                                stroke="#10B981"
+                                strokeWidth={3}
+                                fillOpacity={1}
+                                fill="url(#colorAcc)"
+                            />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
             </div>
 
-            {/* 4. Time Analysis */}
-            <div className="analysis-card visual-card">
+            {/* --- TIME ANALYSIS (LINE) --- */}
+            <div className="analysis-card visual-card full-width">
                 <div className="card-header-visual">
                     <FiClock className="icon-yellow" />
-                    <h3>Average Response Time (s)</h3>
+                    <h3>Time Analysis (Average Seconds per Question)</h3>
                 </div>
                 <div className="chart-container">
-                    <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={timeData}>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={questionAnalysis}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
                             <XAxis dataKey="name" />
-                            <YAxis />
+                            <YAxis unit="s" />
                             <Tooltip />
-                            <Bar dataKey="avgTime" fill="var(--warning)" radius={[4, 4, 0, 0]} />
-                        </BarChart>
+                            <Legend />
+                            <Line
+                                name="Avg Time (s)"
+                                type="monotone"
+                                dataKey="avgTime"
+                                stroke="#F59E0B"
+                                strokeWidth={3}
+                                dot={{ r: 6, fill: '#F59E0B' }}
+                                activeDot={{ r: 8 }}
+                            />
+                        </LineChart>
                     </ResponsiveContainer>
                 </div>
             </div>
 
-            {/* 5. Improvement / Participation Tracker */}
-            <div className="analysis-card visual-card">
-                <div className="card-header-visual">
-                    <FiUsers className="icon-blue" />
-                    <h3>Live Participation Stats</h3>
-                </div>
-                <div className="participation-metrics">
-                    <div className="metric-box">
-                        <span className="metric-val">{leaderboard.length}</span>
-                        <span className="metric-lab">Total Participating</span>
+            {/* --- INSIGHTS --- */}
+            <div className="analysis-card visual-card full-width insight-banner">
+                <div className="insight-content">
+                    <FiActivity className="insight-icon" />
+                    <div className="text">
+                        <h4>Class Performance Insight</h4>
+                        <p>
+                            {questionAnalysis.length > 0 ? (
+                                <>
+                                    The toughest challenge for students was <strong>{questionAnalysis.sort((a, b) => a.accuracy - b.accuracy)[0].name}</strong> with only {questionAnalysis.sort((a, b) => a.accuracy - b.accuracy)[0].accuracy}% accuracy.
+                                    Average response time across all questions is <strong>{(questionAnalysis.reduce((acc, q) => acc + q.avgTime, 0) / questionAnalysis.length).toFixed(1)}s</strong>.
+                                </>
+                            ) : 'Aggregating live student performance data...'}
+                        </p>
                     </div>
-                    <div className="metric-box green">
-                        <span className="metric-val">
-                            {Math.round(leaderboard.reduce((acc, curr) => acc + (curr.percentage || 0), 0) / (leaderboard.length || 1))}%
-                        </span>
-                        <span className="metric-lab">Avg Group Accuracy</span>
-                    </div>
-                    <div className="metric-box purple">
-                        <span className="metric-val">
-                            {leaderboard.filter(e => e.status === 'completed').length}
-                        </span>
-                        <span className="metric-lab">Final Submissions</span>
-                    </div>
-                </div>
-                <div className="improvement-note">
-                    <strong>💡 Insight:</strong> {
-                        questionData.length > 0 ?
-                            `Question ${questionData.sort((a, b) => a.accuracy - b.accuracy)[0].name.slice(1)} is the toughest so far.`
-                            : 'Collecting data...'
-                    }
                 </div>
             </div>
 
