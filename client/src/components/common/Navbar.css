@@ -166,92 +166,73 @@
     border-color: #FFFFFF;
 }
 
-/* Sophisticated 'LIVE' Aura Button */
+/* Solid & Attractive 'LIVE' Button */
 .connection-status {
     display: flex;
     align-items: center;
-    gap: 0.7rem;
-    padding: 0.55rem 1.25rem;
-    border-radius: 10px;
-    /* Rectangular with curves */
+    gap: 0.65rem;
+    padding: 0.5rem 1.1rem;
+    border-radius: 8px;
+    /* Clean rectangular curves */
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    position: relative;
-    overflow: hidden;
-    background: var(--bg-glass);
-    border: 1px solid var(--border);
-    backdrop-filter: blur(10px);
+    letter-spacing: 0.8px;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
 }
 
 .connection-status.connected {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.05));
-    color: #10B981;
-    border: 1px solid rgba(16, 185, 129, 0.4);
-    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
-}
-
-.connection-status.connected::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 60%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transform: skewX(-20deg);
-    animation: glass-shimmer 6s infinite ease-in-out;
-}
-
-@keyframes glass-shimmer {
-    0% {
-        left: -100%;
-    }
-
-    20%,
-    100% {
-        left: 200%;
-    }
+    background: #10B981;
+    /* Solid Emerald - Optimal visibility */
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .status-dot {
     width: 8px;
     height: 8px;
-    background: #10B981;
+    background: white;
     border-radius: 50%;
     position: relative;
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
-    transition: all 0.3s ease;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
 }
 
 .connected .status-dot {
-    animation: organic-pulse 3s infinite ease-in-out;
+    animation: simple-pulse 2s infinite;
 }
 
-@keyframes organic-pulse {
-
-    0%,
-    100% {
+@keyframes simple-pulse {
+    0% {
         transform: scale(1);
-        box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+        opacity: 1;
     }
 
     50% {
-        transform: scale(1.25);
-        box-shadow: 0 0 18px rgba(16, 185, 129, 0.9);
+        transform: scale(1.3);
+        opacity: 0.7;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
     }
 }
 
 .connection-status.disconnected {
-    background: rgba(100, 116, 139, 0.05);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
+    background: #F1F5F9;
+    color: #475569;
+    border: 1px solid #E2E8F0;
+}
+
+[data-theme="dark"] .connection-status.disconnected {
+    background: #1E293B;
+    color: #94A3B8;
+    border-color: #334155;
 }
 
 .disconnected .status-dot {
-    background: var(--text-muted);
+    background: #94A3B8;
     box-shadow: none;
 }
 

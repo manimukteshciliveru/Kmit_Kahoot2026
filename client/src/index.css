@@ -15,9 +15,11 @@
   --bg-primary: #F8FAFC;
   --bg-secondary: #FFFFFF;
   --bg-tertiary: #EEF2F6;
-  --bg-card: rgba(255, 255, 255, 0.85);
-  --bg-glass: rgba(255, 255, 255, 0.7);
-  --bg-navbar: rgba(255, 255, 255, 0.8);
+  --bg-card: #FFFFFF;
+  /* Fully solid for maximum clarity */
+  --bg-glass: rgba(255, 255, 255, 0.95);
+  /* High opacity for better sight */
+  --bg-navbar: rgba(255, 255, 255, 0.98);
 
   /* Primary: Vibrant Indigo */
   --primary: #6366F1;
@@ -84,8 +86,9 @@
   --bg-primary: #020617;
   --bg-secondary: #0F172A;
   --bg-tertiary: #1E293B;
-  --bg-card: rgba(15, 23, 42, 0.8);
-  --bg-glass: rgba(15, 23, 42, 0.7);
+  --bg-card: #0F172A;
+  /* Solid dark background */
+  --bg-glass: rgba(15, 23, 42, 0.98);
 
   --text-primary: #F8FAFC;
   --text-secondary: #94A3B8;
