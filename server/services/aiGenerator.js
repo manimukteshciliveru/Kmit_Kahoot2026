@@ -31,9 +31,10 @@ class AIQuestionGenerator {
         if (this.initialized) return;
 
         // Initialize Gemini
-        if (process.env.GOOGLE_AI_API_KEY) {
+        const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+        if (geminiKey) {
             try {
-                this.gemini = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
+                this.gemini = new GoogleGenerativeAI(geminiKey);
                 logger.info('✅ AI Service: Google Gemini initialized');
             } catch (error) {
                 logger.error('❌ AI Service: Failed to initialize Gemini', error);

@@ -10,8 +10,9 @@ class AIAnalyticsService {
     }
 
     initialize() {
-        if (process.env.GOOGLE_AI_API_KEY) {
-            this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
+        const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+        if (geminiKey) {
+            this.genAI = new GoogleGenerativeAI(geminiKey);
             this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         }
     }
