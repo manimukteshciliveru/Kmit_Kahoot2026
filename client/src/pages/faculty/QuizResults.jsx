@@ -333,6 +333,7 @@ const QuizResults = () => {
                 <div className="tab-content">
                     <FacultyLiveAnalysis
                         leaderboard={getFilteredLeaderboard()}
+                        responses={getFilteredResponses()}
                         absentStudents={(data.absentStudents || []).filter(s => {
                             const branchMatch = branchFilter === 'ALL' || s.department === branchFilter;
                             const sectionMatch = sectionFilter === 'ALL' || s.section === sectionFilter;

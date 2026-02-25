@@ -688,18 +688,22 @@
 }
 
 .action-btn {
-    width: 28px;
-    height: 28px;
+    min-width: 32px;
+    height: 32px;
+    width: fit-content;
+    padding: 0 14px;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     background: var(--bg-tertiary);
     color: var(--text-secondary);
     font-size: 0.85rem;
+    font-weight: 600;
 }
 
 .action-btn:hover {
