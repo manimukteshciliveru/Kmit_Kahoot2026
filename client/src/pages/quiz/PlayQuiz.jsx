@@ -44,9 +44,12 @@ const PlayQuiz = () => {
     // Stats & UI
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(0);
+    const [quizTimeLeft, setQuizTimeLeft] = useState(0); // Overall quiz timer
     const [leaderboard, setLeaderboard] = useState([]);
     const [participantCount, setParticipantCount] = useState(0);
     const timerRef = useRef(null);
+    const quizTimerRef = useRef(null);
+    const autoSubmittedRef = useRef(false);
 
     // --- Core Synchronization ---
     const requestSync = useCallback(() => {
@@ -92,18 +95,15 @@ const PlayQuiz = () => {
         const handleSyncState = (data) => {
             console.log('🔄 [SYNC] State recovery:', data);
             setStatus(data.status);
-            // Ensure index is never negative on the client
             setCurrentIndex(Math.max(0, data.currentQuestionIndex || 0));
             setScore(data.totalScore || 0);
 
-            // Restore answers
             const answersMap = {};
             if (data.savedAnswers) {
                 data.savedAnswers.forEach(a => { if (a.answer) answersMap[a.questionId] = a.answer; });
             }
             setAnswers(answersMap);
 
-            // Set current Q local state (only for text inputs)
             const targetIndex = Math.max(0, data.currentQuestionIndex || 0);
             const currentQId = questions[targetIndex]?._id;
             if (currentQId && answersMap[currentQId]) {
@@ -112,9 +112,12 @@ const PlayQuiz = () => {
                 setLocalTextAnswer('');
             }
 
-            if (data.remainingTime) setTimeLeft(Math.floor(data.remainingTime / 1000));
+            if (data.remainingTime) {
+                const secs = Math.floor(data.remainingTime / 1000);
+                setTimeLeft(secs);
+                setQuizTimeLeft(secs);
+            }
 
-            // Critical: Ensure questions exist before turning off loader
             if (isDataReady) setLoading(false);
             if (data.responseId) setResponseId(data.responseId);
         };
@@ -123,14 +126,13 @@ const PlayQuiz = () => {
             console.log('⚡ [STATE] Changed to:', data.status);
             setStatus(data.status);
             if (data.currentQuestionIndex !== undefined) {
-                const newIndex = Math.max(0, data.currentQuestionIndex);
-                setCurrentIndex(newIndex);
-                // Selection state is now derived from 'answers' object
-                // No need to manually reset or restore individual states
+                setCurrentIndex(Math.max(0, data.currentQuestionIndex));
             }
             if (data.expiresAt) {
                 const diff = (new Date(data.expiresAt).getTime() - Date.now()) / 1000;
-                setTimeLeft(Math.max(0, Math.floor(diff)));
+                const secs = Math.max(0, Math.floor(diff));
+                setTimeLeft(secs);
+                setQuizTimeLeft(secs);
             }
             if (data.leaderboard) setLeaderboard(data.leaderboard);
         };
@@ -138,7 +140,7 @@ const PlayQuiz = () => {
         const handleFeedback = (data) => {
             console.log('🎯 [FEEDBACK] Server acknowledged answer:', data);
             setScore(data.totalScore);
-            setIsSubmitting(false); // ✅ Reset on server ack as requested
+            setIsSubmitting(false);
         };
 
         const handleQuizCompleted = (data) => {
@@ -152,19 +154,31 @@ const PlayQuiz = () => {
             }
         };
 
+        // Handle auto-start from scheduler
+        const handleQuizStarted = (data) => {
+            console.log('🚀 [AUTO-START] Quiz started by scheduler:', data);
+            setStatus('active');
+            setCurrentIndex(0);
+            if (data.questions) setQuestions(data.questions);
+            if (data.expiresAt) {
+                const diff = (new Date(data.expiresAt).getTime() - Date.now()) / 1000;
+                const secs = Math.max(0, Math.floor(diff));
+                setTimeLeft(secs);
+                setQuizTimeLeft(secs);
+            }
+            setLoading(false);
+            toast.success('Quiz has started! Good luck! 🚀');
+        };
+
         socket.on('quiz:sync_state', handleSyncState);
         socket.on('quiz:state_changed', handleStateChange);
+        socket.on('quiz:started', handleQuizStarted);
         socket.on('quizStatusUpdate', (newStatus) => {
             console.log('⚡ [SOCKET] Status Update:', newStatus);
             setStatus(newStatus);
             if (newStatus === 'done') {
-                const rId = responseId;
-                if (rId) {
-                    toast.success('Quiz ended by host!');
-                    navigate(`/history/report/${rId}`);
-                } else {
-                    setStatus('done');
-                }
+                toast.success('Quiz ended by host!');
+                setStatus('done');
             }
         });
         socket.on('leaderboardUpdate', (lbData) => {
@@ -175,25 +189,22 @@ const PlayQuiz = () => {
         socket.on('quiz:completed', handleQuizCompleted);
         socket.on('participant:count_update', (data) => setParticipantCount(data.count));
         socket.on('quiz:ended', (data) => {
-            console.log('🏁 [END] Quiz finished by host');
+            console.log('🏁 [END] Quiz finished (host or timer)');
             setLeaderboard(data.leaderboard || []);
-
-            // Try to navigate to report if we have rId
-            const rId = responseId;
-            if (rId) {
-                toast.success('Quiz ended! Closing arena...');
-                navigate(`/history/report/${rId}`);
-            } else {
-                setStatus('done');
-            }
+            toast.success(data.autoEnded ? 'Time\'s up! Quiz ended automatically.' : 'Quiz ended! Closing arena...');
+            setStatus('done');
         });
 
         return () => {
             socket.off('quiz:sync_state', handleSyncState);
             socket.off('quiz:state_changed', handleStateChange);
+            socket.off('quiz:started', handleQuizStarted);
             socket.off('answer:feedback', handleFeedback);
             socket.off('quiz:completed', handleQuizCompleted);
             socket.off('quiz:ended');
+            socket.off('quizStatusUpdate');
+            socket.off('leaderboardUpdate');
+            socket.off('participant:count_update');
         };
     }, [socket, questions, quizId]);
 
@@ -202,18 +213,55 @@ const PlayQuiz = () => {
         if (connected) requestSync();
     }, [connected, requestSync]);
 
-    // Timer Logic
+    // Per-question timer logic
     useEffect(() => {
-        // Only run timer if there's no answer for CURRENT question (optional, but requested behavior is keep timer going)
         const qId = questions[currentIndex]?._id;
         const hasAnswer = !!answers[qId];
-
         if (status !== 'question_active' || timeLeft <= 0 || hasAnswer) return;
         timerRef.current = setInterval(() => {
             setTimeLeft(p => p > 0 ? p - 1 : 0);
         }, 1000);
         return () => clearInterval(timerRef.current);
     }, [status, timeLeft, currentIndex, questions, answers]);
+
+    // Overall quiz timer - counts down total quiz duration
+    useEffect(() => {
+        const activeStates = ['active', 'question_active', 'live', 'leaderboard'];
+        if (!activeStates.includes(status) || quizTimeLeft <= 0) return;
+        quizTimerRef.current = setInterval(() => {
+            setQuizTimeLeft(p => {
+                if (p <= 1) {
+                    clearInterval(quizTimerRef.current);
+                    return 0;
+                }
+                return p - 1;
+            });
+        }, 1000);
+        return () => clearInterval(quizTimerRef.current);
+    }, [status, quizTimeLeft > 0]);
+
+    // Auto-submit when quiz timer reaches 0
+    useEffect(() => {
+        const activeStates = ['active', 'question_active', 'live'];
+        if (quizTimeLeft === 0 && activeStates.includes(status) && !autoSubmittedRef.current) {
+            autoSubmittedRef.current = true;
+            toast('⏰ Time\'s up! Auto-submitting your quiz...', { icon: '⏰', duration: 3000 });
+
+            // Auto-submit all answers
+            const doAutoSubmit = async () => {
+                try {
+                    await responseAPI.completeQuiz({ quizId, answers });
+                    if (socket && connected) {
+                        socket.emit('quiz:complete', { quizId, answers });
+                    }
+                    localStorage.removeItem(`quiz_answers_${quizId}`);
+                } catch (err) {
+                    console.error('Auto-submit error:', err);
+                }
+            };
+            doAutoSubmit();
+        }
+    }, [quizTimeLeft, status]);
 
     // Join/Leave
     useEffect(() => {
@@ -343,7 +391,7 @@ const PlayQuiz = () => {
                         </div>
                     </div>
                     <div className="action-buttons-stack">
-                        <button className="btn-premium primary" style={{ marginBottom: '1rem' }} onClick={() => navigate(`/history/report/${responseId}`)}>REVIEW DETAILED ANALYTICS</button>
+                        {responseId && <button className="btn-premium primary" style={{ marginBottom: '1rem' }} onClick={() => navigate(`/history/report/${responseId}`)}>REVIEW DETAILED ANALYTICS</button>}
                         <button className="btn-premium secondary" onClick={() => navigate('/dashboard')}>EXIT ARENA</button>
                     </div>
                 </div>
@@ -390,9 +438,13 @@ const PlayQuiz = () => {
                         </div>
 
                         <div className="top-stats-bar">
-                            <div className="stat-pill"><FiClock /> {timeLeft}s</div>
+                            {quizTimeLeft > 0 && (
+                                <div className={`stat-pill quiz-timer ${quizTimeLeft < 60 ? 'critical' : ''}`}>
+                                    <FiClock /> {Math.floor(quizTimeLeft / 60)}:{String(quizTimeLeft % 60).padStart(2, '0')}
+                                </div>
+                            )}
                             <div className="stat-pill primary">Score: {score}</div>
-                            <div className="stat-pill">Points: {q?.points}</div>
+                            <div className="stat-pill">Q{currentIndex + 1}/{questions.length}</div>
                         </div>
                     </div>
 

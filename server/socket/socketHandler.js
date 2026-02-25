@@ -221,8 +221,12 @@ module.exports = (io) => {
                 quiz.status = STATES.LIVE;
                 quiz.startedAt = new Date();
                 quiz.currentQuestionIndex = 0;
-                if (quiz.settings?.questionTimer > 0) {
-                    quiz.expiresAt = new Date(Date.now() + quiz.settings.questionTimer * 1000);
+                // Use quizTimer (total quiz duration) for overall expiry
+                if (quiz.settings?.quizTimer > 0) {
+                    quiz.expiresAt = new Date(Date.now() + quiz.settings.quizTimer * 1000);
+                } else if (quiz.settings?.questionTimer > 0) {
+                    // Fallback: if no quizTimer, use questionTimer * total questions
+                    quiz.expiresAt = new Date(Date.now() + quiz.settings.questionTimer * (quiz.questions?.length || 1) * 1000);
                 }
                 await quiz.save();
 
@@ -234,7 +238,8 @@ module.exports = (io) => {
                 io.to(roomName).emit('quiz:state_changed', {
                     status: STATES.LIVE,
                     currentQuestionIndex: 0,
-                    expiresAt: quiz.expiresAt
+                    expiresAt: quiz.expiresAt,
+                    quizTimer: quiz.settings?.quizTimer || 0
                 });
                 logger.info(`📢 [STARTED] Broadcast state change to room: ${roomName}`);
             } catch (err) { logger.error('Start Error:', err); }

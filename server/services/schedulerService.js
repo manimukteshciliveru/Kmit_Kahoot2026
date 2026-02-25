@@ -63,9 +63,9 @@ const checkScheduledQuizzes = async (io) => {
 const checkExpiredQuizzes = async (io) => {
     try {
         const now = new Date();
-        // Find active quizzes that have expired
+        // Find active quizzes that have expired (check all active-like statuses)
         const expiredQuizzes = await Quiz.find({
-            status: 'active',
+            status: { $in: ['active', 'live', 'question_active', 'leaderboard', 'started'] },
             expiresAt: { $ne: null, $lte: now }
         });
 

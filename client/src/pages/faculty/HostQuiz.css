@@ -967,9 +967,17 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+    .host-quiz-page {
+        padding: var(--space-md);
+    }
+
     .pin-code {
         font-size: 2.5rem;
         letter-spacing: 4px;
+    }
+
+    .pin-container {
+        padding: var(--space-lg) var(--space-xl);
     }
 
     .options-display {
@@ -980,12 +988,190 @@
         font-size: 1.4rem;
     }
 
+    .question-display {
+        padding: var(--space-lg);
+    }
+
     .leaderboard-podium {
         flex-direction: column;
     }
 
     .podium-item.rank-1 {
         order: -1;
+    }
+
+    .active-header {
+        flex-direction: column;
+        gap: var(--space-md);
+        padding: var(--space-md);
+    }
+
+    .quiz-progress {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .response-stats {
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-md);
+    }
+
+    .stat-card {
+        min-width: 100%;
+        padding: var(--space-md);
+    }
+
+    .stat-value {
+        font-size: 1.8rem;
+    }
+
+    .active-actions {
+        flex-direction: column;
+        gap: var(--space-md);
+    }
+
+    .btn-xl {
+        padding: 1rem 2.5rem;
+        font-size: 1.2rem;
+    }
+
+    .host-lobby {
+        gap: var(--space-lg);
+    }
+
+    .lobby-header h1 {
+        font-size: 1.8rem;
+    }
+
+    .lobby-status-bar {
+        flex-direction: column;
+        gap: var(--space-md);
+        padding: var(--space-md);
+    }
+
+    .participant-card {
+        min-width: 80px;
+        padding: var(--space-sm);
+    }
+
+    .participant-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+    }
+
+    .participant-name {
+        font-size: 0.8rem;
+        max-width: 80px;
+    }
+
+    .completed-header h1 {
+        font-size: 1.8rem;
+    }
+
+    .host-nav-tabs {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .leaderboard-styled-table {
+        font-size: 0.85rem;
+    }
+
+    .leaderboard-styled-table thead th {
+        padding: 0.8rem 0.5rem;
+        font-size: 0.65rem;
+    }
+
+    .leaderboard-table-scroll {
+        max-height: 400px;
+    }
+
+    .filter-system {
+        padding: var(--space-md);
+    }
+
+    .filter-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .filter-pills {
+        width: 100%;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-card.large {
+        grid-column: span 1;
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .stats-row-group {
+        grid-template-columns: 1fr;
+        grid-column: span 1;
+    }
+
+    .stats-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .attendance-table-container {
+        overflow-x: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .host-quiz-page {
+        padding: var(--space-sm);
+    }
+
+    .pin-code {
+        font-size: 2rem;
+        letter-spacing: 3px;
+    }
+
+    .lobby-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .question-text-host {
+        font-size: 1.2rem;
+    }
+
+    .btn-xl {
+        padding: 0.8rem 2rem;
+        font-size: 1rem;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
+    .option-display {
+        padding: var(--space-md);
+        font-size: 0.9rem;
+    }
+
+    .option-display .option-letter {
+        width: 28px;
+        height: 28px;
+        font-size: 0.85rem;
+    }
+
+    .participants-area {
+        padding: var(--space-md);
+        min-height: 150px;
+    }
+
+    .participants-list {
+        gap: var(--space-sm);
     }
 }
 
