@@ -194,7 +194,7 @@
     align-items: center;
     padding: var(--space-lg) var(--space-xl);
     background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .player-count {
@@ -664,7 +664,7 @@
     background: var(--bg-card);
     border-radius: var(--radius-xl);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     scrollbar-width: thin;
     scrollbar-color: var(--primary) transparent;
 }
@@ -726,6 +726,7 @@
 .rank-display {
     font-size: 1.1rem;
     font-weight: 800;
+    color: var(--text-primary);
 }
 
 .medal-shine {
@@ -849,7 +850,7 @@
 .attendance-table th,
 .attendance-table td {
     padding: 16px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .attendance-table th {
@@ -1387,9 +1388,13 @@
 }
 
 .live-dashboard-table {
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+}
+
+[data-theme="dark"] .live-dashboard-table {
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: #1e1e2d;
-    /* Professional dark mode background for dashboard */
 }
 
 .live-row {
@@ -1404,7 +1409,7 @@
 
 .name-bold {
     font-weight: 700;
-    color: white;
+    color: var(--text-primary);
     font-size: 0.95rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -1413,7 +1418,7 @@
 .roll-mono {
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: var(--text-muted);
 }
 
 .dept-sec-info {
@@ -1430,7 +1435,7 @@
 
 .sec-tag {
     font-size: 0.75rem;
-    color: #a0aec0;
+    color: var(--text-muted);
 }
 
 .timing-info {
@@ -1586,7 +1591,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
 }
 
 .live-count-pill.success {
@@ -1621,9 +1626,14 @@
     flex-direction: column;
     gap: 15px;
     margin-bottom: 25px;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--bg-tertiary);
     padding: 20px;
     border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .filter-system {
+    background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -1651,7 +1661,7 @@
 .pill {
     padding: 6px 16px;
     border-radius: var(--radius-full);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border);
     background: transparent;
     color: var(--text-secondary);
     font-weight: 600;
