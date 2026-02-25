@@ -179,7 +179,7 @@ responseSchema.statics.getLeaderboard = async function (quizId, limit = 100) {
 
         const leaderboard = await this.find({
             quizId,
-            status: { $in: ['in-progress', 'completed'] }
+            status: { $in: ['waiting', 'in-progress', 'completed'] }
         })
             .populate('userId', 'name email avatar department section rollNumber')
             .sort({ totalScore: -1, totalTimeTaken: 1 })

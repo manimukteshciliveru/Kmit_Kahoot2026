@@ -539,10 +539,13 @@ exports.joinQuiz = async (req, res) => {
                 : [];
 
             try {
+                // If quiz is already live/active, set status to 'in-progress' directly
+                const isQuizLive = ['live', 'active', 'question_active', 'started'].includes(quiz.status);
                 response = await Response.create({
                     quizId: quiz._id,
                     userId: req.user._id,
-                    status: 'waiting',
+                    status: isQuizLive ? 'in-progress' : 'waiting',
+                    startedAt: isQuizLive ? new Date() : null,
                     maxPossibleScore: questions.reduce((sum, q) => sum + (q.points || 0), 0),
                     questionOrder: shuffledQuestions.map(q => q._id),
                     answers: shuffledQuestions.map((q, idx) => ({
