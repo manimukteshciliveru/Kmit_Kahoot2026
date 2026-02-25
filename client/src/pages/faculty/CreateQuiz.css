@@ -183,15 +183,17 @@
 
 .mode-btn:hover {
     border-color: var(--primary);
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    transform: translateY(-2px);
+    background: var(--primary-glow);
+    color: var(--primary);
+    transform: translateY(-4px);
+    box-shadow: 0 6px 20px var(--primary-glow);
 }
 
 .mode-btn.active {
     border-color: var(--primary);
-    background: rgba(255, 101, 0, 0.1);
+    background: var(--primary-glow);
     color: var(--primary);
+    box-shadow: inset 0 0 0 1px var(--primary);
 }
 
 .mode-btn svg {
@@ -714,15 +716,17 @@
 
 .audience-btn:hover {
     border-color: var(--primary);
-    background: var(--bg-tertiary);
-    transform: translateY(-2px);
-    color: var(--text-primary);
+    background: var(--primary-glow);
+    transform: translateY(-4px);
+    color: var(--primary);
+    box-shadow: 0 6px 20px var(--primary-glow);
 }
 
 .audience-btn.active {
     border-color: var(--primary);
-    background: rgba(255, 101, 0, 0.05);
+    background: var(--primary-glow);
     color: var(--primary);
+    box-shadow: inset 0 0 0 1px var(--primary);
 }
 
 .audience-btn svg {

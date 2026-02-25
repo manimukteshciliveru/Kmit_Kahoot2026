@@ -8,12 +8,12 @@ import {
     FiPieChart, FiBarChart2, FiActivity, FiAlertCircle
 } from 'react-icons/fi';
 
-const FacultyLiveAnalysis = ({ leaderboard, responses = [], absentStudents = [], totalQuestions, quiz }) => {
+const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents = [], totalQuestions, quiz }) => {
 
     // 1. ATTENDANCE SUMMARY DATA
     const attendanceData = useMemo(() => {
-        // Use responses for "Attended" count as it includes in-progress users
-        const attended = Math.max(leaderboard.length, responses.length);
+        // Use responses as primary source for joined participants
+        const attended = responses.length;
         const absent = absentStudents.length;
         const total = attended + absent;
         const rate = total > 0 ? Math.round((attended / total) * 100) : 0;
@@ -28,7 +28,7 @@ const FacultyLiveAnalysis = ({ leaderboard, responses = [], absentStudents = [],
                 { name: 'Absent', value: absent, color: '#F43F5E' }
             ]
         };
-    }, [leaderboard, responses, absentStudents]);
+    }, [responses, absentStudents]);
 
     // 2. SCORE DISTRIBUTION (HISTOGRAM BINS)
     const scoreDistribution = useMemo(() => {
@@ -40,7 +40,6 @@ const FacultyLiveAnalysis = ({ leaderboard, responses = [], absentStudents = [],
             { name: '81-100%', range: [81, 100], count: 0 }
         ];
 
-        // Use responses to include everyone participating
         responses.forEach(entry => {
             const perc = entry.percentage || 0;
             const bin = bins.find(b => perc >= b.range[0] && perc <= b.range[1]);
@@ -52,18 +51,18 @@ const FacultyLiveAnalysis = ({ leaderboard, responses = [], absentStudents = [],
 
     // 3. SECTION-WISE PERFORMANCE (BAR CHART)
     const sectionPerformance = useMemo(() => {
-        const sections = {};
+        const sectionsArr = {};
         responses.forEach(entry => {
-            const s = entry.student || entry.userId || {};
-            const sec = s.section || 'N/A';
-            if (!sections[sec]) sections[sec] = { name: `Sec ${sec}`, totalScore: 0, count: 0 };
-            sections[sec].totalScore += (entry.percentage || 0);
-            sections[sec].count++;
+            const student = entry.student || entry.userId || {};
+            const sec = student.section || 'N/A';
+            if (!sectionsArr[sec]) sectionsArr[sec] = { name: `Sec ${sec}`, totalScore: 0, count: 0 };
+            sectionsArr[sec].totalScore += (entry.percentage || 0);
+            sectionsArr[sec].count++;
         });
 
-        return Object.values(sections).map(s => ({
+        return Object.values(sectionsArr).map(s => ({
             name: s.name,
-            avgScore: Math.round(s.totalScore / s.count)
+            avgScore: s.count > 0 ? Math.round(s.totalScore / s.count) : 0
         })).sort((a, b) => a.name.localeCompare(b.name));
     }, [responses]);
 
@@ -71,25 +70,24 @@ const FacultyLiveAnalysis = ({ leaderboard, responses = [], absentStudents = [],
     const accuracyOverview = useMemo(() => {
         let correct = 0;
         let incorrect = 0;
-        let skipped = 0;
+        let totalAnswered = 0;
+        const totalExpected = responses.length * (totalQuestions || 1);
 
-        // Use responses for the most up-to-date data
         responses.forEach(entry => {
-            const entryAnswers = entry.answers || [];
-            entryAnswers.forEach(ans => {
+            (entry.answers || []).forEach(ans => {
+                totalAnswered++;
                 if (ans.isCorrect) correct++;
                 else incorrect++;
             });
-            // Difference is skipped if participants didn't answer all
-            const answeredCount = entryAnswers.length;
-            skipped += Math.max(0, totalQuestions - answeredCount);
         });
+
+        const skipped = Math.max(0, totalExpected - totalAnswered);
 
         return [
             { name: 'Correct', value: correct, color: '#10B981' },
             { name: 'Incorrect', value: incorrect, color: '#F43F5E' },
             { name: 'Skipped', value: skipped, color: '#94A3B8' }
-        ].filter(v => v.value > 0); // Hide if 0 values
+        ].filter(v => v.value > 0);
     }, [responses, totalQuestions]);
 
     // 5. QUESTION DIFFICULTY & TIME ANALYSIS (LINE/AREA CHARTS)
@@ -98,7 +96,7 @@ const FacultyLiveAnalysis = ({ leaderboard, responses = [], absentStudents = [],
 
         return quiz.questions.map((q, idx) => {
             let correct = 0;
-            let attempted = 0;
+            let attemptedCount = 0;
             let totalTime = 0;
 
             responses.forEach(entry => {
@@ -106,7 +104,7 @@ const FacultyLiveAnalysis = ({ leaderboard, responses = [], absentStudents = [],
                     String(a.questionId) === String(q._id || q.id)
                 );
                 if (ans) {
-                    attempted++;
+                    attemptedCount++;
                     if (ans.isCorrect) correct++;
                     if (ans.timeTaken) totalTime += ans.timeTaken;
                 }
@@ -114,8 +112,8 @@ const FacultyLiveAnalysis = ({ leaderboard, responses = [], absentStudents = [],
 
             return {
                 name: `Q${idx + 1}`,
-                accuracy: attempted > 0 ? Math.round((correct / attempted) * 100) : 0,
-                avgTime: attempted > 0 ? Number((totalTime / attempted / 1000).toFixed(1)) : 0
+                accuracy: attemptedCount > 0 ? Math.round((correct / attemptedCount) * 100) : 0,
+                avgTime: attemptedCount > 0 ? Number((totalTime / attemptedCount / 1000).toFixed(1)) : 0
             };
         });
     }, [responses, quiz]);
