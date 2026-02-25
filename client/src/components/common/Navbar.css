@@ -317,15 +317,22 @@
 }
 
 .user-name {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 0.95rem;
+    /* Slightly larger */
+    font-weight: 700;
+    /* Bolder */
     color: var(--text-primary);
+    line-height: 1.2;
 }
 
 .user-role {
-    font-size: 0.7rem;
-    text-transform: capitalize;
+    font-size: 0.75rem;
+    /* Slightly larger */
+    text-transform: uppercase;
+    /* More formal */
+    letter-spacing: 0.5px;
     color: var(--text-muted);
+    font-weight: 600;
 }
 
 /* User Dropdown */
@@ -398,7 +405,8 @@
     }
 
     .user-details {
-        display: none;
+        display: flex;
+        /* Keep visible on mobile for clarity */
     }
 
     .status-text {
