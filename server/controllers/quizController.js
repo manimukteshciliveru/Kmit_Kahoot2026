@@ -178,10 +178,11 @@ exports.getQuizzes = async (req, res) => {
             ];
 
             // Explicitly exclude drafts/completed unless asked (already handled by status filter above)
+        } else {
+            // Faculty / admin — apply simple status/mode filters
+            if (status) query.status = status;
+            if (mode) query.mode = mode;
         }
-
-        if (status) query.status = status;
-        if (mode) query.mode = mode;
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 

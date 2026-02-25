@@ -193,6 +193,14 @@ const PlayQuiz = () => {
             setLeaderboard(data.leaderboard || []);
             toast.success(data.autoEnded ? 'Time\'s up! Quiz ended automatically.' : 'Quiz ended! Closing arena...');
             setStatus('done');
+
+            // Auto-redirect to results after 3 seconds
+            setTimeout(() => {
+                const rId = responseId;
+                if (rId) {
+                    navigate(`/history/report/${rId}`);
+                }
+            }, 3000);
         });
 
         return () => {
@@ -250,13 +258,27 @@ const PlayQuiz = () => {
             // Auto-submit all answers
             const doAutoSubmit = async () => {
                 try {
-                    await responseAPI.completeQuiz({ quizId, answers });
+                    const res = await responseAPI.completeQuiz({ quizId, answers });
+                    const rId = res?.data?.data?.responseId || res?.data?.responseId || responseId;
+                    if (rId) setResponseId(rId);
+
                     if (socket && connected) {
                         socket.emit('quiz:complete', { quizId, answers });
                     }
                     localStorage.removeItem(`quiz_answers_${quizId}`);
+                    setStatus('done');
+
+                    // Auto-redirect to results after 3 seconds
+                    setTimeout(() => {
+                        if (rId) {
+                            navigate(`/history/report/${rId}`);
+                        } else {
+                            navigate('/dashboard');
+                        }
+                    }, 3000);
                 } catch (err) {
                     console.error('Auto-submit error:', err);
+                    setStatus('done');
                 }
             };
             doAutoSubmit();
@@ -391,7 +413,14 @@ const PlayQuiz = () => {
                         </div>
                     </div>
                     <div className="action-buttons-stack">
-                        {responseId && <button className="btn-premium primary" style={{ marginBottom: '1rem' }} onClick={() => navigate(`/history/report/${responseId}`)}>REVIEW DETAILED ANALYTICS</button>}
+                        {responseId && (
+                            <>
+                                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                                    ⏳ Redirecting to detailed results in a few seconds...
+                                </p>
+                                <button className="btn-premium primary" style={{ marginBottom: '1rem' }} onClick={() => navigate(`/history/report/${responseId}`)}>REVIEW DETAILED ANALYTICS</button>
+                            </>
+                        )}
                         <button className="btn-premium secondary" onClick={() => navigate('/dashboard')}>EXIT ARENA</button>
                     </div>
                 </div>

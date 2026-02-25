@@ -155,10 +155,12 @@ const FacultyDashboard = () => {
         }
     };
 
-    // Calculate statistics
+    // Calculate statistics — account for all status variants
     const totalQuizzes = quizzes.length;
-    const activeQuizzes = quizzes.filter(q => q.status === 'active').length;
-    const completedQuizzes = quizzes.filter(q => q.status === 'completed').length;
+    const activeStatuses = ['active', 'live', 'started', 'question_active', 'leaderboard', 'waiting'];
+    const completedStatuses = ['completed', 'done', 'finished'];
+    const activeQuizzes = quizzes.filter(q => activeStatuses.includes(q.status)).length;
+    const completedQuizzes = quizzes.filter(q => completedStatuses.includes(q.status)).length;
     const totalParticipants = quizzes.reduce((sum, q) => sum + (q.participants?.length || 0), 0);
     const totalQuestions = quizzes.reduce((sum, q) => sum + (q.questions?.length || 0), 0);
 
@@ -173,7 +175,14 @@ const FacultyDashboard = () => {
         const info = {
             draft: { class: 'status-draft', icon: <FiEdit2 />, label: 'Draft' },
             active: { class: 'status-active', icon: <FiPlay />, label: 'Live' },
+            live: { class: 'status-active', icon: <FiPlay />, label: 'Live' },
+            started: { class: 'status-active', icon: <FiPlay />, label: 'Live' },
+            question_active: { class: 'status-active', icon: <FiPlay />, label: 'Live' },
+            leaderboard: { class: 'status-active', icon: <FiPlay />, label: 'Live' },
+            waiting: { class: 'status-active', icon: <FiClock />, label: 'Waiting' },
             completed: { class: 'status-completed', icon: <FiCheckCircle />, label: 'Done' },
+            done: { class: 'status-completed', icon: <FiCheckCircle />, label: 'Done' },
+            finished: { class: 'status-completed', icon: <FiCheckCircle />, label: 'Done' },
             scheduled: { class: 'status-scheduled', icon: <FiClock />, label: 'Scheduled' }
         };
         return info[status] || info.draft;
@@ -308,7 +317,7 @@ const FacultyDashboard = () => {
                         <span className="live-dot"></span>
                         <strong>{activeQuizzes} Live Quiz{activeQuizzes > 1 ? 'zes' : ''}</strong>
                     </div>
-                    {quizzes.filter(q => q.status === 'active').slice(0, 3).map(quiz => (
+                    {quizzes.filter(q => activeStatuses.includes(q.status)).slice(0, 3).map(quiz => (
                         <div key={quiz._id} className="active-quiz-item">
                             <span className="quiz-name">{quiz.title}</span>
                             <span className="quiz-code" onClick={(e) => copyCode(quiz.code, e)}>
@@ -373,8 +382,8 @@ const FacultyDashboard = () => {
                                     return (
                                         <tr
                                             key={quiz._id}
-                                            className={quiz.status === 'active' ? 'row-active' : ''}
-                                            onClick={() => navigate(quiz.status === 'completed' ? `/quiz/${quiz._id}/results` : `/quiz/${quiz._id}/host`)}
+                                            className={activeStatuses.includes(quiz.status) ? 'row-active' : ''}
+                                            onClick={() => navigate(completedStatuses.includes(quiz.status) ? `/quiz/${quiz._id}/results` : `/quiz/${quiz._id}/host`)}
                                         >
                                             <td className="cell-title">
                                                 <span className="title-text">{quiz.title}</span>
@@ -394,7 +403,7 @@ const FacultyDashboard = () => {
                                             </td>
                                             <td className="cell-actions">
                                                 <div className="action-btns">
-                                                    {quiz.status === 'active' ? (
+                                                    {activeStatuses.includes(quiz.status) ? (
                                                         <>
                                                             <button
                                                                 className="action-btn view"
@@ -411,7 +420,7 @@ const FacultyDashboard = () => {
                                                                 <FiStopCircle />
                                                             </button>
                                                         </>
-                                                    ) : quiz.status === 'completed' ? (
+                                                    ) : completedStatuses.includes(quiz.status) ? (
                                                         <>
                                                             <button
                                                                 className="action-btn view"
@@ -487,7 +496,7 @@ const FacultyDashboard = () => {
                         <h3><FiAward /> Recent Completed</h3>
                     </div>
                     <div className="recent-list">
-                        {quizzes.filter(q => q.status === 'completed').slice(0, 5).map(quiz => (
+                        {quizzes.filter(q => completedStatuses.includes(q.status)).slice(0, 5).map(quiz => (
                             <div
                                 key={quiz._id}
                                 className="recent-item"
@@ -499,7 +508,7 @@ const FacultyDashboard = () => {
                                 </span>
                             </div>
                         ))}
-                        {quizzes.filter(q => q.status === 'completed').length === 0 && (
+                        {quizzes.filter(q => completedStatuses.includes(q.status)).length === 0 && (
                             <div className="empty-mini">No completed quizzes yet</div>
                         )}
                     </div>

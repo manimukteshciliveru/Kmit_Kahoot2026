@@ -141,14 +141,26 @@ const StudentDashboard = () => {
                                 {upcomingQuizzes.map((quiz) => (
                                     <div key={quiz._id} className="quiz-item">
                                         <div className="quiz-info">
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                                 <h3>{quiz.title}</h3>
                                                 <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>{quiz.subject}</span>
+                                                {quiz.questions?.length > 0 && (
+                                                    <span className="badge badge-info" style={{ fontSize: '0.65rem' }}>
+                                                        {quiz.questions.length} Qs
+                                                    </span>
+                                                )}
                                             </div>
                                             <span className="quiz-meta">
                                                 <FiClock />
                                                 {(quiz.status === 'active' || quiz.status === 'live') ? (
-                                                    <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>Live Now</span>
+                                                    <span style={{ color: 'var(--success)', fontWeight: 'bold' }}>
+                                                        Live Now
+                                                        {quiz.settings?.quizTimer > 0 && (
+                                                            <span style={{ color: 'var(--text-secondary)', fontWeight: '500', marginLeft: '8px' }}>
+                                                                • {Math.round(quiz.settings.quizTimer / 60)} min
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                 ) : (
                                                     // Helper specific to this view
                                                     (() => {
@@ -163,25 +175,37 @@ const StudentDashboard = () => {
                                                             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                                                             return <span className="countdown-text" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
                                                                 Starts in {hours > 0 ? `${hours}h ` : ''}{minutes}m
+                                                                {quiz.settings?.quizTimer > 0 && (
+                                                                    <span style={{ color: 'var(--text-secondary)', fontWeight: '500', marginLeft: '8px' }}>
+                                                                        • {Math.round(quiz.settings.quizTimer / 60)} min duration
+                                                                    </span>
+                                                                )}
                                                             </span>;
                                                         }
 
-                                                        return `Scheduled: ${scheduled.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`;
+                                                        return <span>
+                                                            {scheduled.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                                            {quiz.settings?.quizTimer > 0 && (
+                                                                <span style={{ color: 'var(--text-secondary)', fontWeight: '500', marginLeft: '8px' }}>
+                                                                    • {Math.round(quiz.settings.quizTimer / 60)} min
+                                                                </span>
+                                                            )}
+                                                        </span>;
                                                     })()
                                                 )}
                                             </span>
                                         </div>
                                         <div className="quiz-status" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                                            <div className={`status-badge ${(quiz.status === 'active' || quiz.status === 'live') ? 'active' : (quiz.status === 'finished' || quiz.status === 'done') ? 'finished' : 'scheduled'}`}>
-                                                {(quiz.status === 'active' || quiz.status === 'live') ? 'Live' : (quiz.status === 'finished' || quiz.status === 'done') ? 'Finished' : 'Upcoming'}
+                                            <div className={`status-badge ${(quiz.status === 'active' || quiz.status === 'live') ? 'active' : (quiz.status === 'finished' || quiz.status === 'done' || quiz.status === 'completed') ? 'finished' : 'scheduled'}`}>
+                                                {(quiz.status === 'active' || quiz.status === 'live') ? 'Live' : (quiz.status === 'finished' || quiz.status === 'done' || quiz.status === 'completed') ? 'Finished' : 'Upcoming'}
                                             </div>
                                             <button
                                                 className={`btn btn-sm ${(quiz.status === 'active' || quiz.status === 'live') ? 'btn-primary' : 'btn-ghost'}`}
-                                                onClick={() => (quiz.status !== 'finished' && quiz.status !== 'done') && navigate(`/quiz/${quiz._id}/play`)}
+                                                onClick={() => (quiz.status !== 'finished' && quiz.status !== 'done' && quiz.status !== 'completed') && navigate(`/quiz/${quiz._id}/play`)}
                                                 style={{ fontSize: '0.75rem', padding: '4px 12px' }}
-                                                disabled={quiz.status === 'finished' || quiz.status === 'done'}
+                                                disabled={quiz.status === 'finished' || quiz.status === 'done' || quiz.status === 'completed'}
                                             >
-                                                {(quiz.status === 'active' || quiz.status === 'live') ? 'Join Now' : (quiz.status === 'finished' || quiz.status === 'done') ? 'Ended' : 'Enter Lobby'}
+                                                {(quiz.status === 'active' || quiz.status === 'live') ? 'Join Now' : (quiz.status === 'finished' || quiz.status === 'done' || quiz.status === 'completed') ? 'Ended' : 'Enter Lobby'}
                                             </button>
                                         </div>
                                     </div>
