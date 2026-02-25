@@ -288,18 +288,17 @@
     transition: width 0.5s ease;
 }
 
-/* Active Quiz Banner */
 /* Active Quiz Banner - Premium Glassmorphic Design */
 .active-banner {
     background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95));
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: var(--radius-lg);
-    padding: var(--space-md) var(--space-lg);
+    padding: var(--space-lg) var(--space-xl);
     margin-bottom: var(--space-lg);
     display: flex;
-    align-items: center;
-    gap: var(--space-md);
+    align-items: stretch;
+    gap: var(--space-lg);
     flex-wrap: wrap;
     box-shadow: 0 8px 32px rgba(16, 185, 129, 0.2);
     animation: slideDown 0.5s ease-out;
@@ -316,12 +315,18 @@
     align-items: center;
     gap: var(--space-sm);
     color: white;
-    font-size: 0.9rem;
+    font-size: 1rem;
+    white-space: nowrap;
+    padding-right: var(--space-sm);
+}
+
+.banner-info strong {
+    font-size: 1.05rem;
 }
 
 .live-dot {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     background: white;
     border-radius: 50%;
     animation: pulse-dot 1.5s infinite;
@@ -344,53 +349,62 @@
 .active-quiz-item {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    background: rgba(255, 255, 255, 0.15);
-    padding: 6px var(--space-md);
+    gap: var(--space-md);
+    background: rgba(255, 255, 255, 0.18);
+    padding: var(--space-sm) var(--space-lg);
     border-radius: var(--radius-md);
     flex: 1;
-    min-width: 250px;
+    min-width: 280px;
+    min-height: 48px;
 }
 
 .active-quiz-item .quiz-name {
-    font-weight: 600;
+    font-weight: 700;
     color: white;
     flex: 1;
-    font-size: 0.9rem;
+    font-size: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .active-quiz-item .quiz-code {
     display: flex;
     align-items: center;
-    gap: 4px;
-    background: rgba(255, 255, 255, 0.2);
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.8rem;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.25);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
     color: white;
     cursor: pointer;
     font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.5px;
 }
 
 .active-quiz-item .quiz-code:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.35);
 }
 
 .active-quiz-item .quiz-participants {
     display: flex;
     align-items: center;
-    gap: 4px;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 0.85rem;
+    gap: 5px;
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 0.9rem;
+    font-weight: 600;
 }
 
 .btn-sm {
-    padding: 5px 10px;
-    font-size: 0.75rem;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 6px;
 }
 
 .btn-light {
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.92);
     color: var(--success);
 }
 
