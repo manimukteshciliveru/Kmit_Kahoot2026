@@ -604,10 +604,36 @@
     /* Solid Amber */
 }
 
+.status-active {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10B981;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    border-radius: 8px !important;
+    /* Curves to the rectangular body */
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+    font-weight: 800;
+    animation: live-pulse-glow 2s infinite ease-in-out;
+}
+
 [data-theme="dark"] .status-active {
-    background: #10B981;
-    /* Solid Green */
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.25);
+    color: #10B981 !important;
+    border: 1px solid rgba(16, 185, 129, 0.6);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+}
+
+@keyframes live-pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+        opacity: 1;
+    }
+
+    50% {
+        box-shadow: 0 0 25px rgba(16, 185, 129, 0.7);
+        opacity: 0.85;
+    }
 }
 
 [data-theme="dark"] .status-completed {
