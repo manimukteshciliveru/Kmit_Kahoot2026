@@ -821,14 +821,15 @@ exports.getLeaderboard = async (req, res) => {
         console.log(`[Leaderboard] Fetching for Quiz ID: ${req.params.id}`);
         let leaderboard = await Response.getLeaderboard(req.params.id);
 
-        // Privacy: Sanitize for students
+        // Privacy: Sanitize for students 
         if (req.user.role === 'student') {
             leaderboard = leaderboard.map(entry => ({
                 ...entry,
                 userId: {
+                    _id: entry.userId?._id || entry.userId?.id,
                     name: entry.userId?.name,
                     avatar: entry.userId?.avatar,
-                    // Remove email, rollNumber, etc.
+                    // Remove sensitive info like email
                 }
             }));
         }

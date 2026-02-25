@@ -492,14 +492,37 @@ const QuizReport = () => {
                         <tbody>
                             {(showAllLeaderboard ? getFilteredLeaderboard() : getFilteredLeaderboard().slice(0, 5)).map((lb, idx) => {
                                 const s = lb.userId || {};
-                                // Find global rank from full leaderboard
-                                const currentRank = leaderboard.findIndex(p => (p.userId?._id || p.userId?.id) === (s._id || s.id)) + 1;
+                                // Find global rank from full leaderboard using robust ID comparison
+                                const currentRank = leaderboard.findIndex(p =>
+                                    String(p.userId?._id || p.userId?.id || '') === String(s._id || s.id || '')
+                                ) + 1;
+
                                 const maxPossible = report.maxPossibleScore || 100;
                                 const performancePercent = Math.round((lb.totalScore / maxPossible) * 100);
+                                const totalParticipants = leaderboard.length;
+
+                                // Determine highlight class
+                                let highlights = [];
+                                if (totalParticipants > 65) {
+                                    if (currentRank <= 5) highlights.push('top-5-highlight');
+                                } else {
+                                    if (currentRank === 1) highlights.push('top-1-special');
+                                }
+
+                                if (String(user?._id || user?.id) === String(s._id || s.id)) {
+                                    highlights.push('row-highlight');
+                                }
+
                                 return (
-                                    <tr key={idx} className={user._id === (s._id || s.id) ? 'row-highlight' : ''}>
+                                    <tr key={idx} className={highlights.join(' ')}>
                                         <td className="rank-col">
-                                            {currentRank <= 3 ? <span className="rank-emoji">{['🥇', '🥈', '🥉'][currentRank - 1]}</span> : <span className="rank-number">#{currentRank}</span>}
+                                            {currentRank <= 3 ? (
+                                                <span className={`rank-emoji rank-${currentRank}`}>
+                                                    {['🥇', '🥈', '🥉'][currentRank - 1]}
+                                                </span>
+                                            ) : (
+                                                <span className="rank-number">#{currentRank}</span>
+                                            )}
                                         </td>
                                         <td className="student-col"><div className="student-meta"><span className="name">{s.name}</span><span className="roll">{s.rollNumber || 'N/A'}</span></div></td>
                                         <td className="branch-col"><div className="branch-meta"><span className="dept">{s.department || 'CSE'}</span><span className="sec">Section {s.section || 'E'}</span></div></td>
@@ -650,6 +673,14 @@ const QuizReport = () => {
                 .row-correct:hover { background: rgba(16, 185, 129, 0.05) !important; }
                 .row-incorrect:hover { background: rgba(239, 68, 68, 0.05) !important; }
                 .text-accent { color: var(--accent) !important; }
+
+                /* Leaderboard Highlights */
+                .top-1-special { background: linear-gradient(90deg, rgba(255, 215, 0, 0.15), transparent) !important; border-left: 4px solid #FFD700 !important; }
+                .top-5-highlight { background: linear-gradient(90deg, rgba(255, 127, 17, 0.1), transparent) !important; border-left: 4px solid var(--primary) !important; }
+                .row-highlight { background: rgba(30, 64, 175, 0.1) !important; outline: 1px solid var(--primary); }
+                .rank-1 { filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.6)); scale: 1.2; display: inline-block; }
+                .rank-2 { filter: drop-shadow(0 0 4px rgba(192, 192, 192, 0.5)); scale: 1.1; display: inline-block; }
+                .rank-3 { filter: drop-shadow(0 0 3px rgba(205, 127, 50, 0.4)); scale: 1.05; display: inline-block; }
 
                 .spinner-xs { width: 12px; height: 12px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite; }
                 @keyframes spin { to { transform: rotate(360deg); } }
