@@ -59,10 +59,25 @@
 
   /* Shared Properties */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
   --radius-xl: 32px;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Spacing System - CRITICAL for layout */
+  --space-xs: 0.5rem;
+  /* 8px */
+  --space-sm: 0.75rem;
+  /* 12px */
+  --space-md: 1.25rem;
+  /* 20px */
+  --space-lg: 1.75rem;
+  /* 28px */
+  --space-xl: 2.5rem;
+  /* 40px */
+  --space-2xl: 4rem;
+  /* 64px */
 }
 
 [data-theme="dark"] {
@@ -139,6 +154,14 @@ body::before {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+main {
+  flex: 1;
+  padding: var(--space-xl) var(--space-lg);
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 /* ===== Typography ===== */

@@ -3,7 +3,10 @@
 .faculty-dashboard {
     max-width: 1400px;
     margin: 0 auto;
-    padding: var(--space-lg);
+    padding: var(--space-xl) var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
 }
 
 /* Header */
@@ -30,8 +33,9 @@
 .stats-grid-main {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-md);
-    margin-bottom: var(--space-lg);
+    gap: var(--space-lg);
+    /* Increased from md to lg */
+    margin-bottom: var(--space-md);
 }
 
 @media (max-width: 900px) {
@@ -168,8 +172,9 @@
 .analytics-row {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: var(--space-md);
-    margin-bottom: var(--space-lg);
+    gap: var(--space-lg);
+    /* Increased from md to lg */
+    margin-bottom: var(--space-md);
 }
 
 @media (max-width: 1200px) {
@@ -429,8 +434,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-sm) var(--space-md);
-    border-bottom: 1px solid var(--border);
+    padding: 1.25rem var(--space-lg);
+    border-bottom: 2px solid var(--border);
     background: var(--bg-secondary);
 }
 
@@ -489,7 +494,8 @@
 }
 
 .data-table td {
-    padding: 10px 12px;
+    padding: 1.15rem 1.25rem;
+    /* More vertical breathing room */
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
 }

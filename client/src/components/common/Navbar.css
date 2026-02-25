@@ -69,21 +69,25 @@
 .navbar-links {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    gap: var(--space-md);
+    /* Increased from sm to md */
     list-style: none;
 }
 
 .nav-link {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
+    gap: 0.6rem;
+    /* Slightly more space between icon and text */
+    padding: 0.6rem 1.25rem;
+    /* Better breathing room */
     color: var(--text-secondary);
     text-decoration: none;
-    font-weight: 500;
-    font-size: 0.9rem;
+    font-weight: 600;
+    /* Bolder for better visibility */
+    font-size: 0.95rem;
     border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
+    transition: all var(--transition);
 }
 
 .nav-link:hover {
