@@ -126,9 +126,7 @@ userSchema.methods.generateAvatar = function () {
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(this.name)}&background=7C3AED&color=fff&size=128`;
 };
 
-// Indexes
-userSchema.index({ email: 1 });
-userSchema.index({ rollNumber: 1 });
+// Indexes (email already indexed via `unique: true`, rollNumber via `sparse: true`)
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 

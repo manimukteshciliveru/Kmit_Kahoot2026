@@ -246,10 +246,8 @@ quizSchema.methods.getShuffledQuestions = function (seed) {
     return shuffled;
 };
 
-// Indexes
-quizSchema.index({ code: 1 });
+// Indexes (code already indexed via `unique: true`, createdBy via `index: true`)
 quizSchema.index({ status: 1 });
-quizSchema.index({ createdBy: 1 });
 quizSchema.index({ 'settings.difficultyLevel': 1 });
 
 // Enable virtuals in JSON
