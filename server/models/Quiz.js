@@ -86,7 +86,7 @@ const quizSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['draft', 'live', 'done'],
+        enum: ['draft', 'scheduled', 'waiting', 'started', 'active', 'question_active', 'leaderboard', 'live', 'finished', 'completed', 'done'],
         default: 'draft'
     },
     settings: {
