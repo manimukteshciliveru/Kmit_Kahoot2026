@@ -385,45 +385,57 @@ const QuizResults = () => {
                         <div className="section-card">
                             <h3>Top Performers</h3>
                             <div className="performers-list">
-                                {[...responses].sort((a, b) => b.percentage - a.percentage).slice(0, 3).map((r, i) => {
-                                    const s = r.student || {};
-                                    return (
-                                        <div key={i} className="performer-item">
-                                            <div className="perf-info">
-                                                <span className="perf-name">{s.name || 'Unknown'}</span>
-                                                <span className="perf-meta">
-                                                    {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
-                                                </span>
+                                {[...responses].sort((a, b) => b.percentage - a.percentage)
+                                    .filter(r => r.percentage >= 75)
+                                    .slice(0, 3)
+                                    .map((r, i) => {
+                                        const s = r.student || {};
+                                        const getLabel = (p) => p >= 90 ? 'O - Outstanding' : 'Distinction';
+                                        return (
+                                            <div key={i} className="performer-item">
+                                                <div className="perf-info">
+                                                    <span className="perf-name">{s.name || 'Unknown'}</span>
+                                                    <span className="perf-meta">
+                                                        {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="perf-stats">
+                                                    <span className="perf-val success">{r.percentage}%</span>
+                                                    <span className="perf-lbl success">{getLabel(r.percentage)}</span>
+                                                </div>
                                             </div>
-                                            <div className="perf-stats">
-                                                <span className="perf-val success">{r.percentage}%</span>
-                                                <span className="perf-lbl success">Distinction</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                {[...responses].filter(r => r.percentage >= 75).length === 0 && (
+                                    <div className="empty-mini-alert">
+                                        <p>No students scored above 75% in this attempt.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="section-card">
-                            <h3>Needs Attention</h3>
+                            <h3>Needs Attention (< 60%)</h3>
                             <div className="performers-list">
-                                {[...responses].sort((a, b) => a.percentage - b.percentage).slice(0, 3).filter(r => r.percentage < 60).map((r, i) => {
-                                    const s = r.student || {};
-                                    return (
-                                        <div key={i} className="performer-item">
-                                            <div className="perf-info">
-                                                <span className="perf-name">{s.name || 'Unknown'}</span>
-                                                <span className="perf-meta">
-                                                    {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
-                                                </span>
+                                {[...responses].sort((a, b) => a.percentage - b.percentage)
+                                    .filter(r => r.percentage < 60)
+                                    .slice(0, 5) // Show more for attention
+                                    .map((r, i) => {
+                                        const s = r.student || {};
+                                        return (
+                                            <div key={i} className="performer-item">
+                                                <div className="perf-info">
+                                                    <span className="perf-name">{s.name || 'Unknown'}</span>
+                                                    <span className="perf-meta">
+                                                        {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="perf-stats">
+                                                    <span className="perf-val danger">{r.percentage}%</span>
+                                                    <span className="perf-lbl danger">Review Needed</span>
+                                                </div>
                                             </div>
-                                            <div className="perf-stats">
-                                                <span className="perf-val danger">{r.percentage}%</span>
-                                                <span className="perf-lbl danger">Review Needed</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
                                 {[...responses].filter(r => r.percentage < 60).length === 0 && (
                                     <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                         <FiCheckCircle style={{ fontSize: '1.5rem', color: 'var(--success)', marginBottom: '0.5rem' }} />
