@@ -28,111 +28,114 @@
     gap: var(--space-md);
 }
 
-/* Stats Grid */
+/* Stats Grid - High End Floating Cards */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-lg);
-    margin-bottom: var(--space-xl);
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
 }
 
 .stat-card {
     display: flex;
     align-items: center;
-    gap: var(--space-lg);
-    padding: var(--space-lg);
+    gap: 1.25rem;
+    padding: 1.75rem;
     background: var(--bg-card);
-    backdrop-filter: none;
+    backdrop-filter: blur(12px);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    /* animation removed */
-    transition: transform 0.2s ease;
-    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.05);
+    transition: var(--transition);
+    box-shadow: var(--shadow-md);
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
 }
 
 .stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.1);
-    border-color: var(--border-focus);
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-light);
 }
 
-/* ... keep icons ... */
-
-/* Modern Quiz List (Card Style) */
-.table-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 80px;
-    gap: var(--space-md);
-    padding: 1rem;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: var(--radius-md);
-    margin-bottom: 0.5rem;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+.stat-primary::before {
+    background: var(--primary);
 }
 
-.table-row:last-child {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+.stat-success::before {
+    background: var(--success);
 }
 
-.table-row:hover {
-    background: rgba(255, 255, 255, 0.06);
-    transform: scale(1.005) translateX(4px);
-    border-color: rgba(255, 153, 51, 0.4);
-    /* Saffron */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 10;
+.stat-accent::before {
+    background: var(--accent);
+}
+
+.stat-info::before {
+    background: var(--info);
 }
 
 .stat-icon {
-    width: 56px;
-    height: 56px;
+    width: 60px;
+    height: 60px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius-md);
-    font-size: 1.5rem;
+    border-radius: 16px;
+    font-size: 1.6rem;
+    transition: var(--transition);
+}
+
+.stat-card:hover .stat-icon {
+    transform: scale(1.1) rotate(5deg);
 }
 
 .stat-primary .stat-icon {
-    background: rgba(255, 153, 51, 0.15);
-    /* Saffron */
-    color: #FF7F11;
+    background: var(--primary-glow);
+    color: var(--primary);
 }
 
 .stat-success .stat-icon {
-    background: rgba(19, 136, 8, 0.15);
-    /* India Green */
-    color: #138808;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
 }
 
 .stat-accent .stat-icon {
-    background: rgba(247, 219, 145, 0.25);
-    /* Golden */
-    color: #D4A74A;
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--accent);
 }
 
 .stat-info .stat-icon {
-    background: rgba(0, 0, 128, 0.15);
-    /* Navy Blue */
-    color: #000080;
+    background: rgba(14, 165, 233, 0.1);
+    color: var(--info);
 }
 
-.stat-info {
+.stat-info-container {
     display: flex;
     flex-direction: column;
 }
 
 .stat-value {
-    font-size: 1.8rem;
-    font-weight: 700;
+    font-size: 2rem;
+    font-weight: 800;
     color: var(--text-primary);
+    line-height: 1;
+    margin-bottom: 0.25rem;
 }
 
 .stat-label {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 600;
     color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .stat-subtext {

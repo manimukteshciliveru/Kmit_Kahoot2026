@@ -162,7 +162,7 @@ exports.submitAnswer = async (req, res) => {
         // Prepare feedback
         const feedback = quiz.settings.showInstantFeedback ? {
             isCorrect,
-            pointsEarned,
+            scoreAwarded,
             correctAnswer: quiz.settings.showCorrectAnswer ? question.correctAnswer : undefined,
             explanation: question.explanation
         } : {};
@@ -514,18 +514,24 @@ exports.completeQuiz = async (req, res) => {
         // Get updated response with rank
         const updatedResponse = await Response.findById(response._id);
 
-        // Update user stats
-        await User.findByIdAndUpdate(req.user._id, {
-            $inc: { 'stats.totalPoints': response.totalScore }
-        });
+        // Update user stats (Atomic and Efficient)
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            { $inc: { 'stats.totalPoints': response.totalScore } },
+            { new: true }
+        );
 
-        // Update average score
-        const user = await User.findById(req.user._id);
-        const allResponses = await Response.find({ userId: req.user._id, status: 'completed' });
-        const avgScore = allResponses.reduce((sum, r) => sum + r.percentage, 0) / allResponses.length;
-        await User.findByIdAndUpdate(req.user._id, {
-            $set: { 'stats.averageScore': Math.round(avgScore) }
-        });
+        // Calculate average score using an aggregation pipeline (much faster than fetching all records)
+        const stats = await Response.aggregate([
+            { $match: { userId: req.user._id, status: 'completed' } },
+            { $group: { _id: null, avgScore: { $avg: "$percentage" } } }
+        ]);
+
+        if (stats.length > 0) {
+            await User.findByIdAndUpdate(req.user._id, {
+                $set: { 'stats.averageScore': Math.round(stats[0].avgScore) }
+            });
+        }
 
         // Emit leaderboard update
         const io = req.app.get('io');

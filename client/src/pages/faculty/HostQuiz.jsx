@@ -5,6 +5,8 @@ import toast from 'react-hot-toast';
 import { useSocket } from '../../context/SocketContext';
 import { quizAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import FacultyLiveAnalysis from '../../components/faculty/FacultyLiveAnalysis';
+import '../../components/faculty/FacultyLiveAnalysis.css';
 import './HostQuiz.css';
 
 const HostQuiz = () => {
@@ -19,7 +21,8 @@ const HostQuiz = () => {
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answeredCount, setAnsweredCount] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
-    const [activeTab, setActiveTab] = useState('leaderboard'); // Default to leaderboard
+    const [activeTab, setActiveTab] = useState('insights'); // Default to Insights as requested
+
     const [answeredParticipants, setAnsweredParticipants] = useState([]);
     const [cheatingAlerts, setCheatingAlerts] = useState([]);
     const [timeLeft, setTimeLeft] = useState(0);
@@ -320,8 +323,9 @@ const HostQuiz = () => {
             <div className="host-active">
                 <div className="active-header">
                     <div className="host-nav-tabs">
-                        <button className={`tab-btn ${activeTab === 'leaderboard' ? 'active' : ''}`} onClick={() => setActiveTab('leaderboard')}>Live Dashboard</button>
-                        <button className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>Attendance</button>
+                        <button className={`tab-btn ${activeTab === 'insights' ? 'active' : ''}`} onClick={() => setActiveTab('insights')}>Insights 📊</button>
+                        <button className={`tab-btn ${activeTab === 'leaderboard' ? 'active' : ''}`} onClick={() => setActiveTab('leaderboard')}>Ranking 🏆</button>
+                        <button className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>Attendance 👥</button>
                         <button className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security 🛡️</button>
                     </div>
                     <div className="quiz-info-pill">
@@ -349,6 +353,16 @@ const HostQuiz = () => {
                 </div>
 
                 <div className="tab-content-area">
+
+                    {activeTab === 'insights' && (
+                        <div className="insights-view animate-fadeIn">
+                            <FacultyLiveAnalysis
+                                leaderboard={getFilteredLeaderboard()}
+                                totalQuestions={totalQuestions}
+                                quiz={quiz}
+                            />
+                        </div>
+                    )}
 
                     {activeTab === 'leaderboard' && (
                         <div className="leaderboard-view animate-fadeIn">

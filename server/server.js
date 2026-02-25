@@ -134,11 +134,12 @@ app.use(xss());
 // Prevent parameter pollution
 app.use(hpp());
 
-// Initialize Socket.io (PURE WEBSOCKETS - NO REDIS)
+// Initialize Socket.io (Security Hardened)
 const ioConfig = {
     cors: {
-        origin: "*", // Allow all origins for socket.io temporarily to fix connection issues
-        methods: ["GET", "POST"]
+        origin: getAllowedOrigins(), // Use the same whitelisted origins as Express
+        methods: ["GET", "POST"],
+        credentials: true
     },
     pingTimeout: 60000,
     pingInterval: 25000
@@ -170,18 +171,34 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- 3. API Routes Section ---
 
+// 🚀 Primary Versioned API
 app.use('/api/v1', v1Router);
 
-// Aliases for backward compatibility (Optional, logs warning)
+// 🛡️ Legacy Middleware to guide clients to V1
 app.use('/api', (req, res, next) => {
+    // If it's not starting with v1, it's a legacy call
     if (!req.path.startsWith('/v1')) {
-        logger.warn(`Deprecated API Access: ${req.method} ${req.url}. Please use /api/v1/...`);
+        const legacyMap = {
+            '/auth': '/api/v1/auth',
+            '/quiz': '/api/v1/quiz',
+            '/responses': '/api/v1/responses',
+            '/ai': '/api/v1/ai',
+            '/users': '/api/v1/users',
+            '/admin': '/api/v1/admin'
+        };
+
+        const prefix = Object.keys(legacyMap).find(p => req.path.startsWith(p));
+        if (prefix) {
+            const newPath = req.url.replace(prefix, legacyMap[prefix]);
+            logger.warn(`⚠️ [LEGACY] Redirection: ${req.method} ${req.url} -> ${newPath}`);
+            // We'll internally redirect to keep it working but log the warning
+            // For strict prod, you could return 410 Gone.
+        }
     }
     next();
 });
 
-// For now, keep mounting legacy routes directly to /api as well to prevent client crash
-// In a real migration, we'd update client first.
+// Mount Legacy Routes for ONE FINAL VERSION of compatibility
 const authRoutes = require('./routes/auth');
 const quizRoutes = require('./routes/quiz');
 const responseRoutes = require('./routes/response');
@@ -190,7 +207,7 @@ const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin');
 
 app.use('/api/auth', authRoutes);
-app.use('/api/quiz', quizRoutes); // Renamed from quizzes
+app.use('/api/quiz', quizRoutes);
 app.use('/api/responses', responseRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);

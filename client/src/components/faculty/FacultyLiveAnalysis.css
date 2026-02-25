@@ -1,0 +1,155 @@
+.faculty-analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    padding: 1rem;
+}
+
+.analysis-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+    transition: var(--transition);
+}
+
+.analysis-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-light);
+}
+
+.full-width {
+    grid-column: span 2;
+}
+
+.card-header-visual {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.card-header-visual h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.card-header-visual svg {
+    font-size: 1.5rem;
+}
+
+.icon-blue {
+    color: var(--primary);
+}
+
+.icon-green {
+    color: var(--success);
+}
+
+.icon-rose {
+    color: var(--accent);
+}
+
+.icon-yellow {
+    color: var(--warning);
+}
+
+.chart-container {
+    width: 100%;
+    min-height: 250px;
+}
+
+.chart-container-flex {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.mini-stats {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.mini-stat-item {
+    background: var(--bg-tertiary);
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+}
+
+.stat-value {
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.participation-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.metric-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    background: rgba(99, 102, 241, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.metric-box.green {
+    background: rgba(16, 185, 129, 0.05);
+    border-color: rgba(16, 185, 129, 0.1);
+}
+
+.metric-box.purple {
+    background: rgba(168, 85, 247, 0.05);
+    border-color: rgba(168, 85, 247, 0.1);
+}
+
+.metric-val {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.metric-lab {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.improvement-note {
+    background: var(--bg-tertiary);
+    padding: 0.75rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    border-left: 4px solid var(--primary);
+}
+
+@media (max-width: 1024px) {
+    .faculty-analysis-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .full-width {
+        grid-column: span 1;
+    }
+}

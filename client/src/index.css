@@ -11,152 +11,90 @@
 }
 
 :root {
-  /* === DAY MODE COLORS (Professional & Crisp) === */
-  /* Background: Premium Light Gray */
-  --bg-primary: #f9fafb;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f3f4f6;
-  --bg-card: #ffffff;
-  --bg-glass: rgba(255, 255, 255, 0.95);
-  --bg-navbar: #ffffff;
+  /* === THE "FRESH" PALETTE (Modern SaaS / Academic Premium) === */
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #EEF2F6;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-glass: rgba(255, 255, 255, 0.7);
+  --bg-navbar: rgba(255, 255, 255, 0.8);
 
-  /* Primary Brand Color: Deep Royal Blue */
-  --primary: #1E40AF;
-  /* Stronger Blue */
-  --primary-light: #3B82F6;
-  --primary-dark: #1E3A8A;
-  --primary-glow: rgba(30, 64, 175, 0.25);
+  /* Primary: Vibrant Indigo */
+  --primary: #6366F1;
+  --primary-light: #818CF8;
+  --primary-dark: #4F46E5;
+  --primary-glow: rgba(99, 102, 241, 0.15);
 
-  /* Accent Color: Teal */
-  --accent: #0D9488;
-  --accent-light: #2DD4BF;
-  --accent-dark: #115E59;
+  /* Secondary/Accent: Vibrant Rose */
+  --accent: #F43F5E;
+  --accent-light: #FB7185;
+  --accent-dark: #E11D48;
 
-  /* Status Colors (Refined) */
+  /* Fresh Success: Emerald */
   --success: #10B981;
   --warning: #F59E0B;
   --danger: #EF4444;
-  --info: #3B82F6;
+  --info: #0EA5E9;
 
-  /* Text Colors (High Contrast) */
-  --text-primary: #1f2937;
-  /* Stronger Dark Gray */
-  --text-secondary: #4b5563;
-  --text-muted: #6b7280;
+  /* Text: Slate */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
 
-  /* Border Colors */
-  --border: #E5E7EB;
-  --border-focus: #1E40AF;
+  /* Border */
+  --border: #E2E8F0;
+  --border-focus: #6366F1;
 
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%);
-  --gradient-secondary: linear-gradient(135deg, #059669 0%, #34D399 100%);
-  --gradient-accent: linear-gradient(135deg, #0891B2 0%, #22D3EE 100%);
-  --gradient-hero: linear-gradient(135deg, rgba(30, 64, 175, 0.08) 0%, rgba(13, 148, 136, 0.08) 100%);
+  /* High-End Gradients */
+  --gradient-main: linear-gradient(135deg, #6366F1 0%, #A855F7 100%);
+  --gradient-soft: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
+  --gradient-success: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  --gradient-danger: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%);
 
-  /* Shadows (Softer, more modern) */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
-  --shadow-glow: 0 0 15px rgba(30, 64, 175, 0.2);
-  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);
+  /* Premium Elevation */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.08), 0 8px 16px -4px rgba(0, 0, 0, 0.03);
+  --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.2);
 
-  /* Typography */
+  /* Shared Properties */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-
-  /* Spacing */
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3rem;
-
-  /* Border Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-full: 9999px;
-
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-
-  /* Z-Index */
-  --z-dropdown: 100;
-  --z-modal: 200;
-  --z-toast: 300;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 [data-theme="dark"] {
-  /* === NIGHT MODE: Neo-Tokyo Cyberpunk === */
-  /* Background: Deep Void Purple/Navy */
-  --bg-primary: #050409;
-  /* Deepest Void */
-  --bg-secondary: #0F0A1F;
-  /* Deep Indigo */
-  --bg-tertiary: #1A103C;
-  /* Lighter Purple */
-  --bg-card: rgba(20, 15, 45, 0.65);
-  /* Glass Purple */
-  --bg-glass: rgba(10, 5, 25, 0.85);
-  /* Frosty Void */
-  --bg-navbar: rgba(5, 4, 9, 0.8);
+  --bg-primary: #020617;
+  --bg-secondary: #0F172A;
+  --bg-tertiary: #1E293B;
+  --bg-card: rgba(15, 23, 42, 0.8);
+  --bg-glass: rgba(15, 23, 42, 0.7);
 
-  /* Primary Brand Color: Neon Cyan (Electric) */
-  --primary: #00F0FF;
-  /* Cyber Cyan */
-  --primary-light: #60F7FF;
-  /* Ice Blue */
-  --primary-dark: #00BDD6;
-  /* Ocean Tech */
-  --primary-glow: rgba(0, 240, 255, 0.6);
-  /* Cyan Glow */
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
 
-  /* Accent Color: Hot Magenta */
-  --accent: #FF0099;
-  /* Neon Pink/Magenta */
-  --accent-light: #FF5CB8;
-  /* Light Pink */
-  --accent-dark: #CC007A;
-  /* Deep Magenta */
+  --border: rgba(255, 255, 255, 0.06);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
 
-  /* Status Colors (Neon Glitch) */
-  --success: #39FF14;
-  /* Neon Green */
-  --warning: #FAFF00;
-  /* Neon Yellow */
-  --danger: #FF2A6D;
-  /* Punk Red */
-  --info: #00DDEB;
-  /* Tech Blue */
+body {
+  background-color: var(--bg-primary);
+  background-image:
+    radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+    radial-gradient(at 50% 0%, hsla(225, 39%, 10%, 1) 0, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(339, 49%, 10%, 1) 0, transparent 50%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+}
 
-  /* Text Colors */
-  --text-primary: #F0F6FC;
-  /* Ice White */
-  --text-secondary: #B8C1EC;
-  /* Pale Blue-Grey */
-  --text-muted: #6B728E;
-  /* Muted Indigo */
-
-  /* Border Colors */
-  --border: rgba(100, 116, 139, 0.15);
-  --border-focus: #00F0FF;
-
-  /* Gradients (Synthwave) */
-  --gradient-primary: linear-gradient(135deg, #00F0FF 0%, #0075FF 100%);
-  --gradient-secondary: linear-gradient(135deg, #FF0099 0%, #7E22CE 100%);
-  /* Magenta to Purple */
-  --gradient-hero: linear-gradient(135deg, rgba(0, 240, 255, 0.15) 0%, rgba(255, 0, 153, 0.15) 100%);
-
-  /* Shadows (Neon Bloom) */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 0 25px rgba(0, 240, 255, 0.15);
-  --shadow-glow: 0 0 30px rgba(0, 240, 255, 0.3);
-  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 32px rgba(0, 0, 0, 0.6);
+body[data-theme="light"] {
+  background-image:
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(168, 85, 247, 0.05) 0, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(244, 63, 94, 0.05) 0, transparent 50%);
 }
 
 /* Dark Mode Body Gradient (Cleaner) */

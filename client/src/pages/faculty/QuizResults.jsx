@@ -23,6 +23,8 @@ import {
 } from 'react-icons/fi';
 import { quizAPI, aiAPI } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
+import FacultyLiveAnalysis from '../../components/faculty/FacultyLiveAnalysis';
+import '../../components/faculty/FacultyLiveAnalysis.css';
 import toast from 'react-hot-toast';
 import './QuizResults.css';
 
@@ -292,6 +294,12 @@ const QuizResults = () => {
                     <FiBarChart2 /> Overview ({analytics.totalParticipants})
                 </button>
                 <button
+                    className={`tab ${activeTab === 'analytics' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('analytics')}
+                >
+                    <FiTrendingUp /> Analytics Report
+                </button>
+                <button
                     className={`tab ${activeTab === 'students' ? 'active' : ''}`}
                     onClick={() => setActiveTab('students')}
                 >
@@ -325,7 +333,17 @@ const QuizResults = () => {
                 )}
             </div>
 
-            {/* Overview Tab */}
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+                <div className="tab-content">
+                    <FacultyLiveAnalysis
+                        leaderboard={getFilteredLeaderboard()}
+                        totalQuestions={quiz.totalQuestions}
+                        quiz={{ ...quiz, questions: data.questions || quiz.questions }}
+                    />
+                </div>
+            )}
+
             {activeTab === 'overview' && (
                 <div className="tab-content">
                     {/* Stats Grid */}
