@@ -312,17 +312,12 @@ const QuizResults = () => {
                     <FiFileText /> Questions
                 </button>
                 <button
-                    className={`tab ${activeTab === 'leaderboard' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('leaderboard')}
-                >
-                    <FiAward /> Leaderboard
-                </button>
-                <button
                     className={`tab ${activeTab === 'dashboard' ? 'active' : ''}`}
                     onClick={() => setActiveTab('dashboard')}
                 >
                     <FiZap /> Live Dashboard
                 </button>
+
                 {absentStudents && absentStudents.length > 0 && (
                     <button
                         className={`tab ${activeTab === 'absent' ? 'active' : ''}`}
@@ -694,100 +689,7 @@ const QuizResults = () => {
                 </div>
             )}
 
-            {/* Leaderboard Tab */}
-            {activeTab === 'leaderboard' && (
-                <div className="tab-content">
-                    <div className="leaderboard-v2">
-                        <FilterControls />
-                        {/* Top 3 Featured Cards */}
-                        <div className="featured-winners">
-                            {getFilteredLeaderboard().slice(0, 3).map((r, idx) => {
-                                const s = r.student || r.userId || {};
-                                return (
-                                    <div key={s.id || idx} className={`winner-card rank-${idx + 1}`}>
-                                        <div className="winner-rank">
-                                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                                            <span>#{idx + 1}</span>
-                                        </div>
-                                        <div className="winner-details">
-                                            <div className="winner-main">
-                                                <h3>{s.name || 'Unknown'}</h3>
-                                                <span className="roll">{s.rollNumber || 'N/A'}</span>
-                                            </div>
-                                            <div className="winner-sub">
-                                                <span className="info-tag"><FiAward /> {s.department || '-'}</span>
-                                                <span className="info-tag section-tag">Section: {s.section || '-'}</span>
-                                            </div>
-                                        </div>
-                                        <div className="winner-stats">
-                                            <div className="stat-group">
-                                                <span className="stat-val">{r.totalScore}/{r.maxPossibleScore}</span>
-                                                <span className="stat-lbl">Marks ({r.percentage}%)</span>
-                                            </div>
-                                            <div className="stat-group">
-                                                <span className="stat-val">{formatTime(r.totalTimeTaken)}</span>
-                                                <span className="stat-lbl">Time Taken</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
 
-                        {/* Full Leaderboard Table */}
-                        <div className="leaderboard-table-container">
-                            <table className="leaderboard-table">
-                                <thead>
-                                    <tr>
-                                        <th>Rank</th>
-                                        <th>Student Details</th>
-                                        <th>Branch/Section</th>
-                                        <th>Performance</th>
-                                        <th>Time</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {getFilteredLeaderboard().map((r, idx) => {
-                                        const s = r.student || r.userId || {};
-                                        // Find true rank from original leaderboard
-                                        const trueRank = leaderboard.findIndex(le => (le.student?._id || le.userId?._id) === (s._id || s.id)) + 1;
-                                        return (
-                                            <tr key={s.id || idx} className={trueRank <= 3 ? `top-rank rank-${trueRank}` : ''}>
-                                                <td className="rank-col">
-                                                    {trueRank === 1 ? '🥇' : trueRank === 2 ? '🥈' : trueRank === 3 ? '🥉' : `#${trueRank}`}
-                                                </td>
-                                                <td className="student-col">
-                                                    <div className="student-meta">
-                                                        <span className="name">{s.name || 'Unknown'}</span>
-                                                        <span className="roll">{s.rollNumber || 'N/A'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="branch-col">
-                                                    <div className="branch-meta">
-                                                        <span className="dept">{s.department || '-'}</span>
-                                                        <span className="sec">Section {s.section || '-'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="score-col">
-                                                    <div className="score-meta">
-                                                        <span className="marks">{r.totalScore}/{r.maxPossibleScore}</span>
-                                                        <div className="progress-mini">
-                                                            <div className="fill" style={{ width: `${r.percentage}%` }}></div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="time-col">
-                                                    <span className="time">{formatTime(r.totalTimeTaken)}</span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Live Dashboard Tab (Enhanced Metrics) */}
             {activeTab === 'dashboard' && (
@@ -810,17 +712,30 @@ const QuizResults = () => {
                                     <th>STUDENT</th>
                                     <th>BRANCH / SEC</th>
                                     <th>TIMING</th>
+                                    <th>TIME TAKEN</th>
                                     <th>PROGRESS</th>
                                     <th>PERFORMANCE</th>
                                     <th style={{ textAlign: 'right' }}>SCORE</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {getFilteredResponses().sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken).map((r, i) => {
+                                {getFilteredResponses().sort((a, b) => (b.totalScore - a.totalScore) || (a.totalTimeTaken - b.totalTimeTaken)).map((r, i) => {
                                     const s = r.student || r.userId || {};
-                                    // Global rank from full responses list
-                                    const sortedResponses = [...responses].sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken);
-                                    const rank = sortedResponses.findIndex(res => (res.student?._id || res.userId?._id) === (s._id || s.id)) + 1;
+
+                                    // Use leaderboard as source of truth for rank
+                                    let rank = 0;
+                                    if (data.leaderboard) {
+                                        rank = data.leaderboard.findIndex(le =>
+                                            String(le.student?._id || le.userId?._id || le.student?.id || le.userId?.id) === String(s._id || s.id)
+                                        ) + 1;
+                                    }
+
+                                    // Fallback to sorting if not in leaderboard yet
+                                    if (!rank || rank === 0) {
+                                        const sorted = [...responses].sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken);
+                                        rank = sorted.findIndex(res => String(res.student?._id || res.userId) === String(s._id || s.id)) + 1;
+                                    }
+
                                     const totalQs = quiz.totalQuestions || 1;
                                     const attempted = r.answers?.filter(a => a.answer || a.studentAnswer)?.length || 0;
                                     const accuracy = attempted > 0 ? Math.round((r.correctCount / attempted) * 100) : 0;
@@ -831,28 +746,33 @@ const QuizResults = () => {
                                         (r.status === 'terminated' ? 'Terminated' : 'In Progress');
 
                                     return (
-                                        <tr key={r._id || i} className={`live-row ${rank <= 3 ? `rank-${rank}-row` : ''}`}>
+                                        <tr key={r._id || i} className={`live-row ${rank <= 3 && rank > 0 ? `rank-${rank}-row` : ''}`}>
                                             <td>
                                                 <div className="rank-display">
-                                                    {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`}
+                                                    {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank > 0 ? `#${rank}` : '---'}
                                                 </div>
                                             </td>
                                             <td>
                                                 <div className="student-profile-info">
-                                                    <span className="name-bold">{s.name}</span>
-                                                    <span className="roll-mono">{s.rollNumber}</span>
+                                                    <span className="name-bold">{s.name || 'Anonymous'}</span>
+                                                    <span className="roll-mono">{s.rollNumber || 'N/A'}</span>
                                                 </div>
                                             </td>
                                             <td>
                                                 <div className="dept-sec-info">
-                                                    <span className="dept-tag">{s.department}</span>
-                                                    <span className="sec-tag">Section {s.section}</span>
+                                                    <span className="dept-tag">{s.department || '-'}</span>
+                                                    <span className="sec-tag">Section {s.section || '-'}</span>
                                                 </div>
                                             </td>
                                             <td>
                                                 <div className="timing-info">
                                                     <div className="time-item"><FiClock /> {joinTime} <span className="lbl">Joined</span></div>
                                                     <div className="time-item"><FiStopCircle /> {endTime} <span className="lbl">Ended</span></div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div className="duration-info">
+                                                    <span className="duration-val">{formatTime(r.totalTimeTaken || 0)}</span>
                                                 </div>
                                             </td>
                                             <td>

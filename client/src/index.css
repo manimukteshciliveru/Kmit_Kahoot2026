@@ -89,6 +89,8 @@
   --bg-card: #0F172A;
   /* Solid dark background */
   --bg-glass: rgba(15, 23, 42, 0.98);
+  --bg-navbar: #0F172A;
+  /* Match secondary for seamless dark mode */
 
   --text-primary: #F8FAFC;
   --text-secondary: #94A3B8;
