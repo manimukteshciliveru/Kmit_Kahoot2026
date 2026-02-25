@@ -9,6 +9,8 @@ import {
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import KmitLogo from '../../components/common/KmitLogo';
+import StudentVisualReport from '../../components/student/StudentVisualReport';
+import '../../components/student/StudentVisualReport.css';
 import '../common/Profile.css';
 
 const QuizReport = () => {
@@ -339,6 +341,14 @@ const QuizReport = () => {
                     </div>
                 </div>
             </section>
+
+            {/* Visual Analytics Dashboard (NEW) */}
+            <StudentVisualReport
+                report={report}
+                analytics={analytics}
+                leaderboard={leaderboard}
+                user={user}
+            />
 
             <section className="dashboard-grid">
                 <div className="dashboard-card summary-box">

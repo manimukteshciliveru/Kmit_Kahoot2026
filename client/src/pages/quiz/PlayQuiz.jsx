@@ -391,37 +391,67 @@ const PlayQuiz = () => {
     }
 
     if (status === 'finished' || status === 'done') {
+        const myRank = leaderboard.findIndex(l => String(l.userId?._id || l.studentId) === String(user?._id)) + 1;
+        const top3 = leaderboard.slice(0, 3);
+
         return (
             <div className="quiz-finished-premium animate-fadeIn">
                 <div className="results-hero-card">
                     <div className="hero-glow"></div>
-                    <h1>Victory & Glory!</h1>
-                    <div className="glory-stats-grid">
-                        <div className="glory-stat-card primary"><FiZap /> <span className="stat-val">{score}</span> <span className="stat-lbl">FINAL SCORE</span></div>
-                        <div className="glory-stat-card gold"><FiUsers /> <span className="stat-val">#{leaderboard.findIndex(l => String(l.userId?._id || l.studentId) === String(user?._id)) + 1 || '-'}</span> <span className="stat-lbl">YOUR RANK</span></div>
+                    <div className="victory-crown">👑</div>
+                    <h1 className="victory-title">Quiz Concluded!</h1>
+
+                    {/* Visual Podium for Students */}
+                    <div className="podium-display-mini">
+                        {top3[1] && (
+                            <div className="podium-step step-2">
+                                <div className="step-label">2nd</div>
+                                <div className="step-name">{top3[1].userId?.name?.split(' ')[0]}</div>
+                            </div>
+                        )}
+                        {top3[0] && (
+                            <div className="podium-step step-1">
+                                <div className="step-crown">👑</div>
+                                <div className="step-label">1st</div>
+                                <div className="step-name">{top3[0].userId?.name?.split(' ')[0]}</div>
+                            </div>
+                        )}
+                        {top3[2] && (
+                            <div className="podium-step step-3">
+                                <div className="step-label">3rd</div>
+                                <div className="step-name">{top3[2].userId?.name?.split(' ')[0]}</div>
+                            </div>
+                        )}
                     </div>
-                    <div className="podium-area">
-                        <h3>Leaderboard Standings</h3>
-                        <div className="leaderboard-premium-list">
-                            {leaderboard.slice(0, 5).map((l, idx) => (
-                                <div key={idx} className={`leaderboard-row ${String(l.userId?._id || l.studentId) === String(user?._id) ? 'is-me' : ''}`}>
-                                    <div className="rank-disk">{idx + 1}</div>
-                                    <div className="player-info">{l.userId?.name || l.studentName}</div>
-                                    <div className="p-score">{l.totalScore || l.score}</div>
-                                </div>
-                            ))}
+
+                    <div className="glory-stats-grid">
+                        <div className="glory-stat-card primary">
+                            <FiZap />
+                            <span className="stat-val">{score}</span>
+                            <span className="stat-lbl">YOUR SCORE</span>
+                        </div>
+                        <div className="glory-stat-card gold">
+                            <FiAward />
+                            <span className="stat-val">#{myRank || '-'}</span>
+                            <span className="stat-lbl">FINAL RANK</span>
                         </div>
                     </div>
+
                     <div className="action-buttons-stack">
-                        {responseId && (
+                        {responseId ? (
                             <>
-                                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                                    ⏳ Redirecting to detailed results in a few seconds...
-                                </p>
-                                <button className="btn-premium primary" style={{ marginBottom: '1rem' }} onClick={() => navigate(`/history/report/${responseId}`)}>REVIEW DETAILED ANALYTICS</button>
+                                <button className="btn-premium primary pulse-button" onClick={() => navigate(`/history/report/${responseId}`)}>
+                                    VIEW DETAILED ANALYTICS 📊
+                                </button>
+                                <p className="auto-redirect-hint">Report generated. Full analysis available.</p>
                             </>
+                        ) : (
+                            <div className="processing-report">
+                                <div className="spinner-sm"></div>
+                                <span>Generating your detailed report...</span>
+                            </div>
                         )}
-                        <button className="btn-premium secondary" onClick={() => navigate('/dashboard')}>EXIT ARENA</button>
+                        <button className="btn-premium secondary" onClick={() => navigate('/dashboard')}>EXIT TO DASHBOARD</button>
                     </div>
                 </div>
             </div>
