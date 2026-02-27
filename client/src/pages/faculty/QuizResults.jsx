@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     FiArrowLeft,
@@ -350,7 +350,6 @@ const QuizResults = () => {
                     />
                 </div>
             )}
-
             {activeTab === 'overview' && (
                 <div className="tab-content">
                     {/* Stats Grid */}
