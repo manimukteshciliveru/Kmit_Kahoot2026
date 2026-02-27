@@ -613,11 +613,11 @@ const QuizResults = () => {
                             <table className="analysis-table">
                                 <thead>
                                     <tr>
-                                        <th>Rank</th>
+                                        <th className="text-center">Rank</th>
                                         <th>Student</th>
                                         <th>Branch/Sec</th>
-                                        <th className="text-center">Score / {quiz.totalPoints}</th>
-                                        <th className="text-center">Progress</th>
+                                        <th className="text-center">Marks / {quiz.totalPoints}</th>
+                                        <th className="text-center">Time Taken</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -625,9 +625,12 @@ const QuizResults = () => {
                                         const s = entry.userId || entry.student || {};
                                         return (
                                             <tr key={entry._id || idx} className={`rank-row-${idx}`}>
-                                                <td>
+                                                <td className="text-center">
                                                     <span className="rank-display">
-                                                        {idx === 0 ? <FiAward size={20} /> : idx === 1 ? <FiAward size={18} /> : idx === 2 ? <FiAward size={16} /> : `#${idx + 1}`}
+                                                        {idx === 0 ? <><FiAward size={16} style={{ marginRight: '2px', marginBottom: '2px' }} /> 1</>
+                                                            : idx === 1 ? <><FiAward size={14} style={{ marginRight: '2px', marginBottom: '2px' }} /> 2</>
+                                                                : idx === 2 ? <><FiAward size={14} style={{ marginRight: '2px', marginBottom: '2px' }} /> 3</>
+                                                                    : `${idx + 1}`}
                                                     </span>
                                                 </td>
                                                 <td>
@@ -642,10 +645,10 @@ const QuizResults = () => {
                                                     </span>
                                                 </td>
                                                 <td className="text-center">
-                                                    <span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{entry.totalScore}</span> pts
+                                                    <span style={{ fontWeight: 'bold', color: 'var(--success)', fontSize: '1.05rem' }}>{entry.totalScore}</span>
                                                 </td>
-                                                <td className="text-center">
-                                                    {entry.answers?.filter(a => a.answer || a.answeredAt)?.length || 0} / {quiz.totalQuestions}
+                                                <td className="text-center" style={{ color: 'var(--text-muted)', fontWeight: '500' }}>
+                                                    {formatTime(entry.totalTimeTaken)}
                                                 </td>
                                             </tr>
                                         );
