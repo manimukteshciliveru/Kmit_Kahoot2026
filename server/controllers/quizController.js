@@ -1,6 +1,7 @@
 const Quiz = require('../models/Quiz');
 const Response = require('../models/Response');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 const excel = require('exceljs');
 
 // @desc    Create a new quiz
@@ -1181,7 +1182,8 @@ exports.getQuizResults = async (req, res) => {
                     settings: quiz.settings,
                     accessControl: quiz.accessControl,
                     totalQuestions: quiz.questions.length,
-                    totalPoints: quiz.totalPoints
+                    totalPoints: quiz.totalPoints,
+                    questions: quiz.questions // Include full questions for analytics charts
                 },
                 analytics: {
                     totalParticipants: attemptedCount, // Frontend expects totalParticipants

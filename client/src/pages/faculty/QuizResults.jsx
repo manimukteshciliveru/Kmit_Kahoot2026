@@ -121,8 +121,8 @@ const QuizResults = () => {
     }, [socket, quizId]);
 
     const formatTime = (ms) => {
-        if (!ms) return '0s';
-        const seconds = Math.round(Math.abs(ms) / 1000);
+        if (!ms || ms < 0) return '0s';
+        const seconds = Math.round(ms / 1000);
         if (seconds < 60) return `${seconds}s`;
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -299,12 +299,7 @@ const QuizResults = () => {
                 >
                     <FiTrendingUp /> Analytics Report
                 </button>
-                <button
-                    className={`tab ${activeTab === 'students' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('students')}
-                >
-                    <FiUsers /> Students
-                </button>
+
                 <button
                     className={`tab ${activeTab === 'questions' ? 'active' : ''}`}
                     onClick={() => setActiveTab('questions')}
@@ -533,116 +528,6 @@ const QuizResults = () => {
                     )}
                 </div>
             )}
-
-            {/* Students Tab */}
-            {activeTab === 'students' && (
-                <div className="tab-content">
-                    <div className="students-table-container leaderboard-table-container">
-                        <table className="leaderboard-table">
-                            <thead>
-                                <tr>
-                                    <th>Rank</th>
-                                    <th>Student Details</th>
-                                    <th>Branch/Section</th>
-                                    <th>Score</th>
-                                    <th>Time</th>
-                                    <th>Status</th>
-                                    <th>Details</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {responses.map((r, idx) => {
-                                    const s = r.student || {};
-                                    return (
-                                        <>
-                                            <tr key={s.id || idx} className={r.passed ? 'passed' : 'failed'}>
-                                                <td className="rank-col">
-                                                    {r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank || idx + 1}`}
-                                                </td>
-                                                <td className="student-col">
-                                                    <div className="student-meta">
-                                                        <span className="name">{s.name || 'Unknown User'}</span>
-                                                        <span className="roll">{s.rollNumber || 'N/A'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="branch-col">
-                                                    <div className="branch-meta">
-                                                        <span className="dept">{s.department || '-'}</span>
-                                                        <span className="sec">Section {s.section || '-'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="score-col">
-                                                    <div className="score-meta">
-                                                        <span className="marks">{r.percentage}%</span>
-                                                        <span className="info-tag" style={{ fontSize: '0.7rem', padding: '2px 6px', marginTop: '4px' }}>
-                                                            {r.totalScore}/{r.maxPossibleScore} pts
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="time-col">{formatTime(r.totalTimeTaken)}</td>
-                                                <td>
-                                                    <span className={`status-badge ${r.status}`}>
-                                                        {r.status}
-                                                        {(r.tabSwitchCount || 0) > 0 && <FiAlertTriangle title={`${r.tabSwitchCount} tab switches`} />}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <button
-                                                        className="btn btn-sm btn-ghost"
-                                                        onClick={() => setExpandedStudent(expandedStudent === s.id ? null : s.id)}
-                                                        disabled={!s.id}
-                                                    >
-                                                        {expandedStudent === s.id ? <FiChevronUp /> : <FiChevronDown />}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                            {expandedStudent === s.id && (
-                                                <tr className="expanded-row">
-                                                    <td colSpan="8">
-                                                        <div className="student-answers">
-                                                            <h4>Answer Details for {s.name}</h4>
-                                                            <div className="answers-grid">
-                                                                {r.answers && r.answers.map((a, aIdx) => (
-                                                                    <div key={aIdx} className={`answer-card ${a.isCorrect ? 'correct' : 'incorrect'}`}>
-                                                                        <div className="answer-header">
-                                                                            <span className="q-num">Q{aIdx + 1}</span>
-                                                                            <span className={`answer-status ${a.isCorrect ? 'correct' : 'incorrect'}`}>
-                                                                                {a.isCorrect ? <FiCheckCircle /> : <FiXCircle />}
-                                                                                {a.pointsEarned}/{a.points || 0} pts
-                                                                            </span>
-                                                                        </div>
-                                                                        <p className="q-text">{a.questionText}</p>
-                                                                        <div className="answer-details">
-                                                                            <div className={`answer-row ${a.isCorrect ? 'correct' : 'student'}`}>
-                                                                                <span className="answer-label">Student's Answer:</span>
-                                                                                <span className="answer-value">{a.studentAnswer || '(No answer)'}</span>
-                                                                            </div>
-                                                                            {!a.isCorrect && (
-                                                                                <div className="answer-row correct">
-                                                                                    <span className="answer-label">Correct Answer:</span>
-                                                                                    <span className="answer-value">{a.correctAnswer}</span>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="answer-time">
-                                                                            <FiClock /> {formatTime(a.timeTaken)}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-
             {/* Questions Tab */}
             {activeTab === 'questions' && (
                 <div className="tab-content">
@@ -705,169 +590,174 @@ const QuizResults = () => {
                         ))}
                     </div>
                 </div>
-            )}
+            )
+            }
 
 
 
             {/* Live Dashboard Tab (Enhanced Metrics) */}
-            {activeTab === 'dashboard' && (
-                <div className="tab-content live-dashboard-view">
-                    <div className="dashboard-head-section">
-                        <h2 className="section-title">⚡ Detailed Performance Board</h2>
-                        <div className="live-status-pills">
-                            <span className="live-count-pill"><FiUsers /> {getFilteredResponses().length} Results</span>
-                            <span className="live-count-pill success"><FiCheckCircle /> {getFilteredResponses().filter(r => r.status === 'completed').length} Completed</span>
+            {
+                activeTab === 'dashboard' && (
+                    <div className="tab-content live-dashboard-view">
+                        <div className="dashboard-head-section">
+                            <h2 className="section-title">⚡ Detailed Performance Board</h2>
+                            <div className="live-status-pills">
+                                <span className="live-count-pill"><FiUsers /> {getFilteredResponses().length} Results</span>
+                                <span className="live-count-pill success"><FiCheckCircle /> {getFilteredResponses().filter(r => r.status === 'completed').length} Completed</span>
+                            </div>
+                        </div>
+
+                        <FilterControls />
+
+                        <div className="attendance-table-container leaderboard-table-scroll live-dashboard-table">
+                            <table className="attendance-table leaderboard-styled-table">
+                                <thead>
+                                    <tr>
+                                        <th>RANK</th>
+                                        <th>STUDENT</th>
+                                        <th>BRANCH / SEC</th>
+                                        <th>TIMING</th>
+                                        <th>TIME TAKEN</th>
+                                        <th>PROGRESS</th>
+                                        <th>PERFORMANCE</th>
+                                        <th style={{ textAlign: 'right' }}>SCORE</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {getFilteredResponses().sort((a, b) => (b.totalScore - a.totalScore) || (a.totalTimeTaken - b.totalTimeTaken)).map((r, i) => {
+                                        const s = r.student || r.userId || {};
+
+                                        // Use leaderboard as source of truth for rank
+                                        let rank = 0;
+                                        if (data.leaderboard) {
+                                            rank = data.leaderboard.findIndex(le =>
+                                                String(le.student?._id || le.userId?._id || le.student?.id || le.userId?.id) === String(s._id || s.id)
+                                            ) + 1;
+                                        }
+
+                                        // Fallback to sorting if not in leaderboard yet
+                                        if (!rank || rank === 0) {
+                                            const sorted = [...responses].sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken);
+                                            rank = sorted.findIndex(res => String(res.student?._id || res.userId) === String(s._id || s.id)) + 1;
+                                        }
+
+                                        const totalQs = quiz.totalQuestions || 1;
+                                        const attempted = r.answers?.filter(a => a.answer || a.studentAnswer)?.length || 0;
+                                        const accuracy = attempted > 0 ? Math.round((r.correctCount / attempted) * 100) : 0;
+                                        const avgSpeed = r.averageTimePerQuestion ? (r.averageTimePerQuestion / 1000).toFixed(1) : '0';
+
+                                        const joinTime = r.startedAt ? new Date(r.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---';
+                                        const endTime = r.completedAt ? new Date(r.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
+                                            (r.status === 'terminated' ? 'Terminated' : 'In Progress');
+
+                                        return (
+                                            <tr key={r._id || i} className={`live-row ${rank <= 3 && rank > 0 ? `rank-${rank}-row` : ''}`}>
+                                                <td>
+                                                    <div className="rank-display">
+                                                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank > 0 ? `#${rank}` : '---'}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="student-profile-info">
+                                                        <span className="name-bold">{s.name || 'Anonymous'}</span>
+                                                        <span className="roll-mono">{s.rollNumber || 'N/A'}</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="dept-sec-info">
+                                                        <span className="dept-tag">{s.department || '-'}</span>
+                                                        <span className="sec-tag">Section {s.section || '-'}</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="timing-info">
+                                                        <div className="time-item"><FiClock /> {joinTime} <span className="lbl">Joined</span></div>
+                                                        <div className="time-item"><FiStopCircle /> {endTime} <span className="lbl">Ended</span></div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="duration-info">
+                                                        <span className="duration-val">{formatTime(r.totalTimeTaken || 0)}</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="progress-metrics">
+                                                        <div className="progress-mini-bar" style={{ width: '100px' }}>
+                                                            <div className="bar-fill" style={{ width: `${(attempted / totalQs) * 100}%` }}></div>
+                                                        </div>
+                                                        <span className="progress-txt">{attempted}/{totalQs} Questions</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="live-stats-metrics">
+                                                        <div className="stat-pill accuracy">
+                                                            <FiCheckCircle /> {accuracy}%
+                                                        </div>
+                                                        <div className="stat-pill speed">
+                                                            <FiZap /> {avgSpeed}s
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td style={{ textAlign: 'right' }}>
+                                                    <div className="score-badge-live">
+                                                        {r.totalScore} <span className="pts">pts</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-
-                    <FilterControls />
-
-                    <div className="attendance-table-container leaderboard-table-scroll live-dashboard-table">
-                        <table className="attendance-table leaderboard-styled-table">
-                            <thead>
-                                <tr>
-                                    <th>RANK</th>
-                                    <th>STUDENT</th>
-                                    <th>BRANCH / SEC</th>
-                                    <th>TIMING</th>
-                                    <th>TIME TAKEN</th>
-                                    <th>PROGRESS</th>
-                                    <th>PERFORMANCE</th>
-                                    <th style={{ textAlign: 'right' }}>SCORE</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {getFilteredResponses().sort((a, b) => (b.totalScore - a.totalScore) || (a.totalTimeTaken - b.totalTimeTaken)).map((r, i) => {
-                                    const s = r.student || r.userId || {};
-
-                                    // Use leaderboard as source of truth for rank
-                                    let rank = 0;
-                                    if (data.leaderboard) {
-                                        rank = data.leaderboard.findIndex(le =>
-                                            String(le.student?._id || le.userId?._id || le.student?.id || le.userId?.id) === String(s._id || s.id)
-                                        ) + 1;
-                                    }
-
-                                    // Fallback to sorting if not in leaderboard yet
-                                    if (!rank || rank === 0) {
-                                        const sorted = [...responses].sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken);
-                                        rank = sorted.findIndex(res => String(res.student?._id || res.userId) === String(s._id || s.id)) + 1;
-                                    }
-
-                                    const totalQs = quiz.totalQuestions || 1;
-                                    const attempted = r.answers?.filter(a => a.answer || a.studentAnswer)?.length || 0;
-                                    const accuracy = attempted > 0 ? Math.round((r.correctCount / attempted) * 100) : 0;
-                                    const avgSpeed = r.averageTimePerQuestion ? (r.averageTimePerQuestion / 1000).toFixed(1) : '0';
-
-                                    const joinTime = r.startedAt ? new Date(r.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---';
-                                    const endTime = r.completedAt ? new Date(r.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
-                                        (r.status === 'terminated' ? 'Terminated' : 'In Progress');
-
-                                    return (
-                                        <tr key={r._id || i} className={`live-row ${rank <= 3 && rank > 0 ? `rank-${rank}-row` : ''}`}>
-                                            <td>
-                                                <div className="rank-display">
-                                                    {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank > 0 ? `#${rank}` : '---'}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div className="student-profile-info">
-                                                    <span className="name-bold">{s.name || 'Anonymous'}</span>
-                                                    <span className="roll-mono">{s.rollNumber || 'N/A'}</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div className="dept-sec-info">
-                                                    <span className="dept-tag">{s.department || '-'}</span>
-                                                    <span className="sec-tag">Section {s.section || '-'}</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div className="timing-info">
-                                                    <div className="time-item"><FiClock /> {joinTime} <span className="lbl">Joined</span></div>
-                                                    <div className="time-item"><FiStopCircle /> {endTime} <span className="lbl">Ended</span></div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div className="duration-info">
-                                                    <span className="duration-val">{formatTime(r.totalTimeTaken || 0)}</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div className="progress-metrics">
-                                                    <div className="progress-mini-bar" style={{ width: '100px' }}>
-                                                        <div className="bar-fill" style={{ width: `${(attempted / totalQs) * 100}%` }}></div>
-                                                    </div>
-                                                    <span className="progress-txt">{attempted}/{totalQs} Questions</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div className="live-stats-metrics">
-                                                    <div className="stat-pill accuracy">
-                                                        <FiCheckCircle /> {accuracy}%
-                                                    </div>
-                                                    <div className="stat-pill speed">
-                                                        <FiZap /> {avgSpeed}s
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td style={{ textAlign: 'right' }}>
-                                                <div className="score-badge-live">
-                                                    {r.totalScore} <span className="pts">pts</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Absent Tab */}
-            {activeTab === 'absent' && absentStudents && (
-                <div className="tab-content">
-                    <div className="leaderboard-table-container">
-                        <div className="section-card danger" style={{ margin: '20px', border: 'none', background: 'rgba(226, 27, 60, 0.05)' }}>
-                            <h3 style={{ color: 'var(--danger)', marginBottom: '5px' }}><FiUserMinus /> Absent Students</h3>
-                            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>These students were eligible but did not attempt the quiz.</p>
-                        </div>
-                        <table className="leaderboard-table">
-                            <thead>
-                                <tr>
-                                    <th>Student Details</th>
-                                    <th>Branch/Section</th>
-                                    <th>Roll Number</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {absentStudents.map((s, idx) => (
-                                    <tr key={s.id || idx} className="failed">
-                                        <td className="student-col">
-                                            <div className="student-meta">
-                                                <span className="name">{s.name}</span>
-                                                <span className="roll" style={{ opacity: 0.7 }}>{s.email}</span>
-                                            </div>
-                                        </td>
-                                        <td className="branch-col">
-                                            <div className="branch-meta">
-                                                <span className="dept">{s.department} - Section {s.section}</span>
-                                            </div>
-                                        </td>
-                                        <td><span className="roll">{s.rollNumber}</span></td>
-                                        <td>
-                                            <span className="status-badge terminated">Absent</span>
-                                        </td>
+            {
+                activeTab === 'absent' && absentStudents && (
+                    <div className="tab-content">
+                        <div className="leaderboard-table-container">
+                            <div className="section-card danger" style={{ margin: '20px', border: 'none', background: 'rgba(226, 27, 60, 0.05)' }}>
+                                <h3 style={{ color: 'var(--danger)', marginBottom: '5px' }}><FiUserMinus /> Absent Students</h3>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>These students were eligible but did not attempt the quiz.</p>
+                            </div>
+                            <table className="leaderboard-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student Details</th>
+                                        <th>Branch/Section</th>
+                                        <th>Roll Number</th>
+                                        <th>Status</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {absentStudents.map((s, idx) => (
+                                        <tr key={s.id || idx} className="failed">
+                                            <td className="student-col">
+                                                <div className="student-meta">
+                                                    <span className="name">{s.name}</span>
+                                                    <span className="roll" style={{ opacity: 0.7 }}>{s.email}</span>
+                                                </div>
+                                            </td>
+                                            <td className="branch-col">
+                                                <div className="branch-meta">
+                                                    <span className="dept">{s.department} - Section {s.section}</span>
+                                                </div>
+                                            </td>
+                                            <td><span className="roll">{s.rollNumber}</span></td>
+                                            <td>
+                                                <span className="status-badge terminated">Absent</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

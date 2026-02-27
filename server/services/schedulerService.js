@@ -1,15 +1,17 @@
-const cron = require('node-cron'); // I'll use setInterval instead if I don't want to install, but I can install it
 const Quiz = require('../models/Quiz');
 const Response = require('../models/Response');
 
+/**
+ * Checks for quizzes that are scheduled to start but haven't yet.
+ * Starts them automatically "at any cost".
+ */
 const checkScheduledQuizzes = async (io) => {
     try {
         const now = new Date();
-        // Find scheduled quizzes that should have started
+        // Find quizzes that should have started (ignore autoStart setting to ensure it starts "at any cost")
         const quizzesToStart = await Quiz.find({
-            status: 'scheduled',
-            scheduledAt: { $lte: now },
-            'settings.autoStart': true
+            status: { $in: ['scheduled', 'draft'] },
+            scheduledAt: { $ne: null, $lte: now }
         });
 
         for (const quiz of quizzesToStart) {
@@ -36,23 +38,28 @@ const checkScheduledQuizzes = async (io) => {
 
             // Emit socket event if io is provided
             if (io) {
-                io.to(String(quiz._id)).emit('quiz:started', {
+                const room = String(quiz._id);
+                io.to(room).emit('quiz:started', {
                     quizId: quiz._id,
                     startedAt: quiz.startedAt,
                     expiresAt: quiz.expiresAt,
                     currentQuestionIndex: 0,
                     totalQuestions: quiz.questions.length,
-                    questions: quiz.questions.map(q => ({
-                        ...q.toObject(),
-                        correctAnswer: undefined,
-                        explanation: undefined
-                    })),
+                    questions: quiz.questions.map(q => {
+                        const obj = q.toObject();
+                        delete obj.correctAnswer;
+                        delete obj.explanation;
+                        return obj;
+                    }),
                     settings: {
                         questionTimer: quiz.settings.questionTimer,
                         showInstantFeedback: quiz.settings.showInstantFeedback,
                         allowTabSwitch: quiz.settings.allowTabSwitch
                     }
                 });
+
+                // Also emit status update for faculty/others
+                io.to(room).emit('quizStatusUpdate', 'active');
             }
         }
     } catch (error) {
@@ -60,18 +67,18 @@ const checkScheduledQuizzes = async (io) => {
     }
 };
 
+/**
+ * Checks for active quizzes that have exceeded their expiresAt time.
+ * Ends them automatically and emits the quiz:ended event.
+ */
 const checkExpiredQuizzes = async (io) => {
     try {
         const now = new Date();
-        // Find active quizzes that have expired (check all active-like statuses)
+        // Find active quizzes that have expired
         const expiredQuizzes = await Quiz.find({
             status: { $in: ['active', 'live', 'question_active', 'leaderboard', 'started'] },
             expiresAt: { $ne: null, $lte: now }
         });
-
-        if (expiredQuizzes.length > 0) {
-            console.log(`[SCHEDULER] Found ${expiredQuizzes.length} expired quizzes.`);
-        }
 
         for (const quiz of expiredQuizzes) {
             console.log(`[SCHEDULER] Auto-ending expired quiz: ${quiz.title} (${quiz._id})`);
@@ -90,19 +97,18 @@ const checkExpiredQuizzes = async (io) => {
                 response.status = 'completed';
                 response.completedAt = now;
                 response.terminationReason = 'timeout';
-                // Hook will calculate final scores
                 return response.save();
             });
 
             await Promise.all(completionPromises);
 
-            // Update ranks
+            // Update ranks & static metrics
             await Response.updateRanks(quiz._id);
 
             // Get final leaderboard
             const leaderboard = await Response.getLeaderboard(quiz._id);
 
-            // Emit socket event
+            // Emit socket event to ensure everyone knows it ended
             if (io) {
                 io.to(String(quiz._id)).emit('quiz:ended', {
                     quizId: quiz._id,
@@ -117,17 +123,19 @@ const checkExpiredQuizzes = async (io) => {
     }
 };
 
+/**
+ * Main entry point for the scheduler service.
+ */
 const initScheduler = (io) => {
-    console.log('⏰ Quiz Scheduler Service Initialized (node-cron)');
+    console.log('⏰ Quiz Scheduler Service Initialized (Precision: 10s)');
 
-    // Check every minute
-    cron.schedule('* * * * *', () => {
-        // console.log('[SCHEDULER] Running periodic checks...');
+    // Check every 10 seconds for higher precision (at any cost)
+    setInterval(() => {
         checkScheduledQuizzes(io);
         checkExpiredQuizzes(io);
-    });
+    }, 10000);
 
-    // Also run immediately on start
+    // Initial run
     checkScheduledQuizzes(io);
     checkExpiredQuizzes(io);
 };

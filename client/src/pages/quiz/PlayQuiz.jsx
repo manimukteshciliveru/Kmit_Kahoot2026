@@ -98,11 +98,38 @@ const PlayQuiz = () => {
             setCurrentIndex(Math.max(0, data.currentQuestionIndex || 0));
             setScore(data.totalScore || 0);
 
-            const answersMap = {};
+            // Merge server answers with any locally cached answers (from localStorage)
+            // to prevent data loss when student goes offline
+            const serverAnswersMap = {};
             if (data.savedAnswers) {
-                data.savedAnswers.forEach(a => { if (a.answer) answersMap[a.questionId] = a.answer; });
+                data.savedAnswers.forEach(a => { if (a.answer) serverAnswersMap[a.questionId] = a.answer; });
             }
-            setAnswers(answersMap);
+
+            // Try to recover local answers saved before disconnect
+            let localAnswers = {};
+            try {
+                const cached = localStorage.getItem(`quiz_answers_${quizId}`);
+                if (cached) localAnswers = JSON.parse(cached);
+            } catch (e) { /* ignore parse errors */ }
+
+            // Merge: server answers take priority, but local answers fill gaps
+            const mergedAnswers = { ...localAnswers, ...serverAnswersMap };
+            setAnswers(mergedAnswers);
+
+            // Re-submit any local-only answers to server on reconnect
+            if (socket && data.status === 'in-progress') {
+                Object.entries(localAnswers).forEach(([qId, ans]) => {
+                    if (!serverAnswersMap[qId] && ans) {
+                        console.log('📤 [RESYNC] Re-submitting local answer for Q:', qId);
+                        socket.emit('answer:submit', {
+                            quizId,
+                            questionId: qId,
+                            answer: ans,
+                            timeTaken: 0 // Time is unknown for recovered answers
+                        });
+                    }
+                });
+            }
 
             const targetIndex = Math.max(0, data.currentQuestionIndex || 0);
             const currentQId = questions[targetIndex]?._id;
@@ -221,6 +248,60 @@ const PlayQuiz = () => {
         if (connected) requestSync();
     }, [connected, requestSync]);
 
+    // --- Persist answers to localStorage for offline recovery ---
+    useEffect(() => {
+        if (quizId && Object.keys(answers).length > 0) {
+            try {
+                localStorage.setItem(`quiz_answers_${quizId}`, JSON.stringify(answers));
+            } catch (e) { /* storage full, ignore */ }
+        }
+
+        // Cleanup localStorage when quiz is done
+        if (['done', 'finished', 'completed'].includes(status)) {
+            localStorage.removeItem(`quiz_answers_${quizId}`);
+        }
+    }, [answers, quizId, status]);
+
+    // --- Tab Switch / Visibility Detection for Security ---
+    useEffect(() => {
+        if (!socket || !quizId) return;
+
+        const handleVisibilityChange = () => {
+            if (document.hidden && ['active', 'question_active', 'live'].includes(status)) {
+                console.warn('🛡️ [SECURITY] Tab switch detected!');
+                socket.emit('tab:switched', { quizId });
+            }
+        };
+
+        const handleSecurityWarning = (data) => {
+            toast.error(data.message, {
+                duration: 4000,
+                icon: '⚠️',
+                position: 'top-center'
+            });
+        };
+
+        const handleTermination = (data) => {
+            toast.error(data.message || 'You have been removed from this quiz.', {
+                duration: 8000,
+                icon: '🚫',
+                position: 'top-center'
+            });
+            setStatus('done');
+            setTimeout(() => navigate('/dashboard'), 3000);
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        socket.on('security:warning', handleSecurityWarning);
+        socket.on('quiz:terminated', handleTermination);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            socket.off('security:warning', handleSecurityWarning);
+            socket.off('quiz:terminated', handleTermination);
+        };
+    }, [socket, quizId, status, navigate]);
+
     // Per-question timer logic
     useEffect(() => {
         const qId = questions[currentIndex]?._id;
@@ -308,7 +389,7 @@ const PlayQuiz = () => {
             quizId,
             questionId,
             answer: option,
-            timeTaken: (quiz?.settings?.questionTimer - timeLeft) * 1000
+            timeTaken: Math.max(0, (quiz?.settings?.questionTimer - timeLeft) * 1000)
         });
     };
 
@@ -330,7 +411,7 @@ const PlayQuiz = () => {
             quizId,
             questionId: currentQ._id,
             answer,
-            timeTaken: (quiz?.settings?.questionTimer - timeLeft) * 1000
+            timeTaken: Math.max(0, (quiz?.settings?.questionTimer - timeLeft) * 1000)
         });
     };
 
@@ -391,38 +472,12 @@ const PlayQuiz = () => {
     }
 
     if (status === 'finished' || status === 'done') {
-        const myRank = leaderboard.findIndex(l => String(l.userId?._id || l.studentId) === String(user?._id)) + 1;
-        const top3 = leaderboard.slice(0, 3);
-
         return (
             <div className="quiz-finished-premium animate-fadeIn">
                 <div className="results-hero-card">
                     <div className="hero-glow"></div>
-                    <div className="victory-crown">👑</div>
+                    <div className="victory-crown">🎉</div>
                     <h1 className="victory-title">Quiz Concluded!</h1>
-
-                    {/* Visual Podium for Students */}
-                    <div className="podium-display-mini">
-                        {top3[1] && (
-                            <div className="podium-step step-2">
-                                <div className="step-label">2nd</div>
-                                <div className="step-name">{top3[1].userId?.name?.split(' ')[0]}</div>
-                            </div>
-                        )}
-                        {top3[0] && (
-                            <div className="podium-step step-1">
-                                <div className="step-crown">👑</div>
-                                <div className="step-label">1st</div>
-                                <div className="step-name">{top3[0].userId?.name?.split(' ')[0]}</div>
-                            </div>
-                        )}
-                        {top3[2] && (
-                            <div className="podium-step step-3">
-                                <div className="step-label">3rd</div>
-                                <div className="step-name">{top3[2].userId?.name?.split(' ')[0]}</div>
-                            </div>
-                        )}
-                    </div>
 
                     <div className="glory-stats-grid">
                         <div className="glory-stat-card primary">
@@ -431,9 +486,9 @@ const PlayQuiz = () => {
                             <span className="stat-lbl">YOUR SCORE</span>
                         </div>
                         <div className="glory-stat-card gold">
-                            <FiAward />
-                            <span className="stat-val">#{myRank || '-'}</span>
-                            <span className="stat-lbl">FINAL RANK</span>
+                            <FiCheckCircle />
+                            <span className="stat-val">{Object.keys(answers).length}/{questions.length}</span>
+                            <span className="stat-lbl">ANSWERED</span>
                         </div>
                     </div>
 

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, LineChart, Line, Legend, AreaChart, Area
+    PieChart, Pie, Cell, Legend, AreaChart, Area
 } from 'recharts';
 import {
     FiTrendingUp, FiClock, FiCheckCircle, FiUsers,
@@ -273,30 +273,57 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                 </div>
             </div>
 
-            {/* --- TIME ANALYSIS (LINE) --- */}
+            {/* --- AVERAGE TIME PER QUESTION (BAR CHART) --- */}
             <div className="analysis-card visual-card full-width">
                 <div className="card-header-visual">
-                    <FiClock className="icon-yellow" />
-                    <h3>Time Analysis (Average Seconds per Question)</h3>
+                    <FiClock className="icon-amber" />
+                    <div className="header-text">
+                        <h3>Average Time Per Question (Bar Graph)</h3>
+                        <p className="subtitle">Class-wide average response time trend</p>
+                    </div>
                 </div>
                 <div className="chart-container">
                     <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={questionAnalysis}>
+                        <BarChart data={questionAnalysis} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                            <defs>
+                                <linearGradient id="timeBarGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.9} />
+                                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.4} />
+                                </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
-                            <XAxis dataKey="name" />
-                            <YAxis unit="s" />
-                            <Tooltip />
-                            <Legend />
-                            <Line
-                                name="Avg Time (s)"
-                                type="monotone"
-                                dataKey="avgTime"
-                                stroke="#F59E0B"
-                                strokeWidth={3}
-                                dot={{ r: 6, fill: '#F59E0B' }}
-                                activeDot={{ r: 8 }}
+                            <XAxis
+                                dataKey="name"
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fill: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}
                             />
-                        </LineChart>
+                            <YAxis
+                                unit="s"
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                            />
+                            <Tooltip
+                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                formatter={(value) => [`${value}s`, 'Avg Time']}
+                                contentStyle={{
+                                    borderRadius: '12px',
+                                    border: 'none',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                                    background: 'var(--bg-card, #fff)',
+                                    color: 'var(--text-primary, #333)'
+                                }}
+                            />
+                            <Legend verticalAlign="top" height={36} />
+                            <Bar
+                                dataKey="avgTime"
+                                name="Average Time (s)"
+                                fill="url(#timeBarGrad)"
+                                radius={[6, 6, 0, 0]}
+                                barSize={40}
+                            />
+                        </BarChart>
                     </ResponsiveContainer>
                 </div>
             </div>
@@ -322,5 +349,3 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
         </div>
     );
 };
-
-export default FacultyLiveAnalysis;

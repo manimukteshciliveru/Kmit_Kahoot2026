@@ -154,12 +154,17 @@ responseSchema.index({ quizId: 1, totalScore: -1, totalTimeTaken: 1 });
 responseSchema.pre('save', async function () {
     try {
         if (this.answers && this.answers.length > 0) {
+            // Clamp individual answer timeTaken to prevent negative values
+            this.answers.forEach(a => {
+                if (a.timeTaken < 0) a.timeTaken = 0;
+            });
+
             this.correctCount = this.answers.filter(a => a.isCorrect).length;
             this.wrongCount = this.answers.filter(a => !a.isCorrect && a.answer).length;
             this.unansweredCount = this.answers.filter(a => !a.answer).length;
 
             this.totalScore = this.answers.reduce((sum, a) => sum + (Number(a.scoreAwarded) || 0), 0);
-            this.totalTimeTaken = this.answers.reduce((sum, a) => sum + (Number(a.timeTaken) || 0), 0);
+            this.totalTimeTaken = Math.max(0, this.answers.reduce((sum, a) => sum + (Number(a.timeTaken) || 0), 0));
 
             if (this.maxPossibleScore > 0) {
                 this.percentage = Math.round((this.totalScore / this.maxPossibleScore) * 100);
@@ -169,7 +174,7 @@ responseSchema.pre('save', async function () {
 
             const answeredQuestions = this.answers.filter(a => (Number(a.timeTaken) || 0) > 0).length;
             if (answeredQuestions > 0) {
-                this.averageTimePerQuestion = Math.round(this.totalTimeTaken / answeredQuestions);
+                this.averageTimePerQuestion = Math.max(0, Math.round(this.totalTimeTaken / answeredQuestions));
             } else {
                 this.averageTimePerQuestion = 0;
             }

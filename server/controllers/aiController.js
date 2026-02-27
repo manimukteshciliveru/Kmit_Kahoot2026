@@ -99,16 +99,22 @@ exports.generateFromFile = async (req, res) => {
             }
         }
 
+        // Helper to cleanup files
+        const cleanup = () => {
+            req.files.forEach(f => {
+                if (fs.existsSync(f.path)) {
+                    try { fs.unlinkSync(f.path); } catch (e) { console.error('Cleanup Fail:', e); }
+                }
+            });
+        };
+
         // Add accumulated text as the first part if it exists
         if (combinedTextContent.trim()) {
             parts.unshift(combinedTextContent);
         }
 
         if (parts.length === 0) {
-            // Clean up
-            req.files.forEach(f => {
-                if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-            });
+            cleanup();
             return res.status(400).json({
                 success: false,
                 message: 'No valid content extracted from files.'
@@ -116,16 +122,13 @@ exports.generateFromFile = async (req, res) => {
         }
 
         // Generate questions using Multimodal
-        // Generate questions using Multimodal
         const questions = await aiGenerator.generateFromMultimodal(parts, options, req.user._id);
 
         // If quizId provided, add questions to existing quiz
         if (quizId) {
             const quiz = await Quiz.findById(quizId);
             if (!quiz) {
-                req.files.forEach(f => {
-                    if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-                });
+                cleanup();
                 return res.status(404).json({
                     success: false,
                     message: 'Quiz not found'
@@ -134,9 +137,7 @@ exports.generateFromFile = async (req, res) => {
 
             if (quiz.createdBy.toString() !== req.user._id.toString()) {
                 console.warn(`🔒 [AUTH] Ownership Mismatch: User ${req.user._id} (${req.user.role}) attempted to modify Quiz ${quiz._id} owned by ${quiz.createdBy}`);
-                req.files.forEach(f => {
-                    if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-                });
+                cleanup();
                 return res.status(401).json({
                     success: false,
                     message: 'Not authorized to modify this quiz'
@@ -154,24 +155,16 @@ exports.generateFromFile = async (req, res) => {
             };
 
             await quiz.save();
-
-            // Clean up uploaded files
-            req.files.forEach(f => {
-                if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-            });
+            cleanup();
 
             return res.status(200).json({
                 success: true,
                 message: `${questions.length} questions generated and added to quiz`,
-                data: { quiz, generatedCount: questions.length }
+                data: { quiz, generatedCount: questions.length, questions }
             });
         }
 
-        // Clean up uploaded files
-        req.files.forEach(f => {
-            if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-        });
-
+        cleanup();
         res.status(200).json({
             success: true,
             message: `${questions.length} questions generated successfully`,

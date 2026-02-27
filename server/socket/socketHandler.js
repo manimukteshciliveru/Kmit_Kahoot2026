@@ -50,16 +50,15 @@ module.exports = (io) => {
                 const leaderboard = await Response.getLeaderboard(quizId, 500);
                 const roomName = `quiz_${quizId}`;
 
-                // PART 2: Use proper room and event name as requested
-                io.to(roomName).emit('leaderboardUpdate', leaderboard);
+                // RESTRICTED: Only send leaderboard updates to faculty host room
+                // Students should NOT see the leaderboard (faculty-only feature)
+                io.to(`${roomName}:host`).emit('leaderboardUpdate', leaderboard);
+                io.to(`${roomName}:host`).emit('leaderboard:update', { leaderboard });
 
-                // Keep the old one for compatibility if any other pages use it
-                io.to(String(quizId)).emit('leaderboard:update', { leaderboard });
-
-                logger.info(`📊 [LEADERBOARD] Broadcast to room: ${roomName} | Count: ${leaderboard.length}`);
+                logger.info(`📊 [LEADERBOARD] Broadcast to HOST ONLY: ${roomName}:host | Count: ${leaderboard.length}`);
                 rankUpdateDebounces.delete(quizId);
             } catch (err) { logger.error('Debounce Rank Update Error:', err); }
-        }, 1500); // Reduced delay for better real-time feel
+        }, 1500);
         rankUpdateDebounces.set(quizId, timeout);
     };
 
@@ -167,7 +166,7 @@ module.exports = (io) => {
                     currentQuestionIndex: quiz.currentQuestionIndex || 0,
                     remainingTime: remaining,
                     totalScore: response?.totalScore || 0,
-                    rank: response?.rank || '-',
+                    rank: userRole === 'student' ? '-' : (response?.rank || '-'),
                     savedAnswers: response?.answers || [],
                     isTerminated: response?.status === 'terminated',
                     isCompleted: response?.status === 'completed',
@@ -334,7 +333,7 @@ module.exports = (io) => {
                     answer: String(answer),
                     isCorrect,
                     scoreAwarded,
-                    timeTaken: timeTaken || 0,
+                    timeTaken: Math.max(0, timeTaken || 0),
                     answeredAt: new Date(),
                     questionIndex: quiz.currentQuestionIndex
                 };
@@ -366,6 +365,86 @@ module.exports = (io) => {
 
         socket.on('answerSelected', handleAnswerSubmit);
         socket.on('answer:submit', handleAnswerSubmit);
+
+        // --- 4.5 SECURITY: TAB SWITCH DETECTION ---
+        socket.on('tab:switched', async (data) => {
+            if (userRole !== 'student') return;
+            const { quizId } = data;
+            const roomName = `quiz_${quizId}`;
+            try {
+                const quiz = await Quiz.findById(quizId).select('settings');
+                if (!quiz) return;
+
+                const response = await Response.findOne({ quizId, userId: socket.user._id });
+                if (!response || response.status === 'completed' || response.status === 'terminated') return;
+
+                // Increment tab switch count
+                response.tabSwitchCount = (response.tabSwitchCount || 0) + 1;
+                response.focusLostCount = (response.focusLostCount || 0) + 1;
+
+                // Decrease trust score
+                response.trustScore = Math.max(0, (response.trustScore || 100) - 15);
+
+                // Log security incident
+                response.securityIncidents.push({
+                    event: 'TAB_SWITCH',
+                    ip: socket.handshake.address,
+                    userAgent: socket.handshake.headers?.['user-agent'] || 'unknown',
+                    timestamp: new Date(),
+                    details: `Tab switch #${response.tabSwitchCount}`
+                });
+
+                const maxSwitches = quiz.settings?.maxTabSwitches || 0;
+                const shouldTerminate = maxSwitches > 0 && response.tabSwitchCount >= maxSwitches;
+
+                if (shouldTerminate) {
+                    response.status = 'terminated';
+                    response.terminationReason = 'tab-switch';
+                    response.completedAt = new Date();
+                    await response.save();
+
+                    socket.emit('quiz:terminated', {
+                        reason: 'tab-switch',
+                        message: `You have been removed from the quiz for switching tabs ${maxSwitches} times.`
+                    });
+
+                    // Notify faculty
+                    io.to(`${roomName}:host`).emit('security:alert', {
+                        type: 'TERMINATED',
+                        studentId: socket.user._id,
+                        studentName: socket.user.name,
+                        reason: 'tab-switch',
+                        tabSwitchCount: response.tabSwitchCount
+                    });
+
+                    logger.warn(`🚫 [SECURITY] ${socket.user.name} terminated for ${response.tabSwitchCount} tab switches in quiz ${quizId}`);
+                } else {
+                    await response.save();
+
+                    // Warn the student
+                    const remaining = maxSwitches > 0 ? maxSwitches - response.tabSwitchCount : 'unlimited';
+                    socket.emit('security:warning', {
+                        type: 'TAB_SWITCH',
+                        count: response.tabSwitchCount,
+                        remaining,
+                        message: maxSwitches > 0
+                            ? `Warning: Tab switch detected (${response.tabSwitchCount}/${maxSwitches}). ${remaining} remaining before termination.`
+                            : `Tab switch detected. Your activity is being monitored.`
+                    });
+
+                    // Notify faculty
+                    io.to(`${roomName}:host`).emit('security:alert', {
+                        type: 'TAB_SWITCH',
+                        studentId: socket.user._id,
+                        studentName: socket.user.name,
+                        tabSwitchCount: response.tabSwitchCount,
+                        trustScore: response.trustScore
+                    });
+
+                    logger.warn(`⚠️ [SECURITY] ${socket.user.name} tab switch #${response.tabSwitchCount} in quiz ${quizId}`);
+                }
+            } catch (err) { logger.error('Tab Switch Handler Error:', err); }
+        });
 
         // --- 5. QUIZ COMPLETION ---
         socket.on('quiz:complete', async (data) => {
@@ -491,6 +570,15 @@ module.exports = (io) => {
                 activeUserConnections.delete(connectionKey);
             }
             logger.info(`🔌 [DISCONNECT] ${socket.user.name} | Reason: ${reason} | SocketID: ${socket.id}`);
+
+            // Update last activity timestamp for student responses on disconnect
+            // This helps preserve data on signal loss
+            if (userRole === 'student') {
+                Response.updateMany(
+                    { userId: socket.user._id, status: 'in-progress' },
+                    { $set: { lastActivityAt: new Date() } }
+                ).catch(err => logger.error('Disconnect activity update error:', err));
+            }
         });
     });
 };

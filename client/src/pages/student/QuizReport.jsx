@@ -134,14 +134,14 @@ const QuizReport = () => {
         const scoresBelow = lbData.filter(p => p.totalScore < myScore).length;
         const percentile = lbData.length > 1 ? ((scoresBelow / (lbData.length - 1)) * 100).toFixed(1) : 100;
 
-        // Time usage (Student)
-        const myTotalTime = data.totalTimeTaken || 0;
-        const avgTimePerQ = myTotalTime / (attempted || 1);
+        // Time usage (Student) - clamp to zero to prevent negative display
+        const myTotalTime = Math.max(0, data.totalTimeTaken || 0);
+        const avgTimePerQ = Math.max(0, myTotalTime / (attempted || 1));
 
-        // Time usage (Class Average)
-        const classTotalTime = lbData.reduce((acc, curr) => acc + (curr.totalTimeTaken || 0), 0);
+        // Time usage (Class Average) - clamp to zero
+        const classTotalTime = lbData.reduce((acc, curr) => acc + Math.max(0, curr.totalTimeTaken || 0), 0);
         const classAvgTimePerQuiz = classTotalTime / (lbData.length || 1);
-        const classAvgTimePerQ = classAvgTimePerQuiz / (totalQ || 1);
+        const classAvgTimePerQ = Math.max(0, classAvgTimePerQuiz / (totalQ || 1));
 
         setAnalytics({
             totalQuestions: totalQ,
@@ -150,8 +150,8 @@ const QuizReport = () => {
             correct,
             incorrect,
             accuracy: attempted > 0 ? ((correct / attempted) * 100).toFixed(1) : 0,
-            avgTime: (avgTimePerQ / 1000).toFixed(1),
-            classAvgTime: (classAvgTimePerQ / 1000).toFixed(1),
+            avgTime: Math.max(0, avgTimePerQ / 1000).toFixed(1),
+            classAvgTime: Math.max(0, classAvgTimePerQ / 1000).toFixed(1),
             percentile,
             rank: data.rank || '-',
             classAvgScore: (lbData.reduce((acc, curr) => acc + curr.totalScore, 0) / (lbData.length || 1)).toFixed(1),
@@ -496,70 +496,7 @@ const QuizReport = () => {
                 </div>
             </section>
 
-            <section className="leaderboard-snapshot">
-                <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                    <h3><FiAward /> Quiz Leaderboard</h3>
-                    <button className="btn-text" onClick={() => setShowAllLeaderboard(!showAllLeaderboard)}>
-                        {showAllLeaderboard ? 'Show Top 5' : 'Show All Participants'}
-                    </button>
-                </div>
-
-                <FilterControls />
-
-                <div className="leaderboard-table-wrapper professional-leaderboard">
-                    <table className="analysis-table leaderboard-table">
-                        <thead>
-                            <tr><th>RANK</th><th>STUDENT DETAILS</th><th>BRANCH/SECTION</th><th>PERFORMANCE</th><th>TIME</th></tr>
-                        </thead>
-                        <tbody>
-                            {(showAllLeaderboard ? getFilteredLeaderboard() : getFilteredLeaderboard().slice(0, 5)).map((lb, idx) => {
-                                const s = lb.userId || {};
-                                // Find global rank from full leaderboard using robust ID comparison
-                                const currentRank = leaderboard.findIndex(p =>
-                                    String(p.userId?._id || p.userId?.id || '') === String(s._id || s.id || '')
-                                ) + 1;
-
-                                const maxPossible = report.maxPossibleScore || 100;
-                                const performancePercent = Math.round((lb.totalScore / maxPossible) * 100);
-                                const totalParticipants = leaderboard.length;
-
-                                // Determine highlight class
-                                let highlights = [];
-                                if (totalParticipants > 65) {
-                                    if (currentRank <= 5) highlights.push('top-5-highlight');
-                                } else {
-                                    if (currentRank === 1) highlights.push('top-1-special');
-                                }
-
-                                if (String(user?._id || user?.id) === String(s._id || s.id)) {
-                                    highlights.push('row-highlight');
-                                }
-
-                                return (
-                                    <tr key={idx} className={highlights.join(' ')}>
-                                        <td className="rank-col">
-                                            {currentRank <= 3 ? (
-                                                <span className={`rank-emoji rank-${currentRank}`}>
-                                                    {['🥇', '🥈', '🥉'][currentRank - 1]}
-                                                </span>
-                                            ) : (
-                                                <span className="rank-number">#{currentRank}</span>
-                                            )}
-                                        </td>
-                                        <td className="student-col"><div className="student-meta"><span className="name">{s.name}</span><span className="roll">{s.rollNumber || 'N/A'}</span></div></td>
-                                        <td className="branch-col"><div className="branch-meta"><span className="dept">{s.department || 'CSE'}</span><span className="sec">Section {s.section || 'E'}</span></div></td>
-                                        <td className="performance-col"><div className="perf-meta"><span className="score-text"><strong>{lb.totalScore}</strong>/{maxPossible}</span><div className="perf-progress-bar"><div className="perf-progress-fill" style={{ width: `${performancePercent}%` }}></div></div></div></td>
-                                        <td className="time-col font-bold">{Math.round((lb.totalTimeTaken || 0) / 1000)}s</td>
-                                    </tr>
-                                );
-                            })}
-                            {getFilteredLeaderboard().length === 0 && (
-                                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No participants match the selected filters.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+            {/* Leaderboard intentionally hidden from students - only visible to faculty in QuizResults */}
 
             <div className="footer-actions" style={{ display: 'flex', gap: '1rem', marginTop: '3rem', paddingBottom: '2rem', borderTop: '1px solid var(--border)', paddingTop: '2rem' }}>
                 <button
