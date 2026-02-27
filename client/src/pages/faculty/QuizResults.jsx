@@ -43,6 +43,23 @@ const QuizResults = () => {
     const reportRef = useRef(null);
     const { socket } = useSocket();
 
+    // --- Performance Calculations ---
+    const topPerformers = useMemo(() => {
+        if (!data || !data.responses) return [];
+        return [...data.responses]
+            .filter(r => r.percentage >= 75)
+            .sort((a, b) => b.percentage - a.percentage)
+            .slice(0, 3);
+    }, [data]);
+
+    const laggingStudents = useMemo(() => {
+        if (!data || !data.responses) return [];
+        return [...data.responses]
+            .filter(r => r.percentage < 60)
+            .sort((a, b) => a.percentage - b.percentage)
+            .slice(0, 5);
+    }, [data]);
+
     const BRANCH_CONFIG = {
         'CSE': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'],
         'CSM': ['A', 'B', 'C', 'D', 'E']
@@ -329,7 +346,7 @@ const QuizResults = () => {
                             return branchMatch && sectionMatch;
                         })}
                         totalQuestions={quiz.totalQuestions}
-                        quiz={{ ...quiz, questions: data.questions || quiz.questions }}
+                        quiz={quiz}
                     />
                 </div>
             )}
@@ -380,28 +397,25 @@ const QuizResults = () => {
                         <div className="section-card">
                             <h3>Top Performers</h3>
                             <div className="performers-list">
-                                {[...responses].sort((a, b) => b.percentage - a.percentage)
-                                    .filter(r => r.percentage >= 75)
-                                    .slice(0, 3)
-                                    .map((r, i) => {
-                                        const s = r.student || {};
-                                        const getLabel = (p) => p >= 90 ? 'O - Outstanding' : 'Distinction';
-                                        return (
-                                            <div key={i} className="performer-item">
-                                                <div className="perf-info">
-                                                    <span className="perf-name">{s.name || 'Unknown'}</span>
-                                                    <span className="perf-meta">
-                                                        {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
-                                                    </span>
-                                                </div>
-                                                <div className="perf-stats">
-                                                    <span className="perf-val success">{r.percentage}%</span>
-                                                    <span className="perf-lbl success">{getLabel(r.percentage)}</span>
-                                                </div>
+                                {topPerformers.map((r, i) => {
+                                    const s = r.student || {};
+                                    const getLabel = (p) => p >= 90 ? 'O - Outstanding' : 'Distinction';
+                                    return (
+                                        <div key={r._id || i} className="performer-item">
+                                            <div className="perf-info">
+                                                <span className="perf-name">{s.name || 'Unknown'}</span>
+                                                <span className="perf-meta">
+                                                    {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
+                                                </span>
                                             </div>
-                                        );
-                                    })}
-                                {[...responses].filter(r => r.percentage >= 75).length === 0 && (
+                                            <div className="perf-stats">
+                                                <span className="perf-val success">{r.percentage}%</span>
+                                                <span className="perf-lbl success">{getLabel(r.percentage)}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {topPerformers.length === 0 && (
                                     <div className="empty-mini-alert">
                                         <p>No students scored above 75% in this attempt.</p>
                                     </div>
@@ -411,27 +425,24 @@ const QuizResults = () => {
                         <div className="section-card">
                             <h3>Needs Attention ({'<'} 60%)</h3>
                             <div className="performers-list">
-                                {[...responses].sort((a, b) => a.percentage - b.percentage)
-                                    .filter(r => r.percentage < 60)
-                                    .slice(0, 5) // Show more for attention
-                                    .map((r, i) => {
-                                        const s = r.student || {};
-                                        return (
-                                            <div key={i} className="performer-item">
-                                                <div className="perf-info">
-                                                    <span className="perf-name">{s.name || 'Unknown'}</span>
-                                                    <span className="perf-meta">
-                                                        {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
-                                                    </span>
-                                                </div>
-                                                <div className="perf-stats">
-                                                    <span className="perf-val danger">{r.percentage}%</span>
-                                                    <span className="perf-lbl danger">Review Needed</span>
-                                                </div>
+                                {laggingStudents.map((r, i) => {
+                                    const s = r.student || {};
+                                    return (
+                                        <div key={r._id || i} className="performer-item">
+                                            <div className="perf-info">
+                                                <span className="perf-name">{s.name || 'Unknown'}</span>
+                                                <span className="perf-meta">
+                                                    {s.rollNumber || 'N/A'} • {s.department || '-'}-{s.section || '-'}
+                                                </span>
                                             </div>
-                                        );
-                                    })}
-                                {[...responses].filter(r => r.percentage < 60).length === 0 && (
+                                            <div className="perf-stats">
+                                                <span className="perf-val danger">{r.percentage}%</span>
+                                                <span className="perf-lbl danger">Review Needed</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {laggingStudents.length === 0 && (
                                     <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                         <FiCheckCircle style={{ fontSize: '1.5rem', color: 'var(--success)', marginBottom: '0.5rem' }} />
                                         <p>All students are performing well above 60%</p>
@@ -588,20 +599,6 @@ const QuizResults = () => {
             }
 
 
-
-            {/* Analytics Tab (Graphs) */}
-            {activeTab === 'analytics' && (
-                <div className="tab-content">
-                    <FacultyLiveAnalysis
-                        quiz={quiz}
-                        responses={responses}
-                        absentStudents={absentStudents}
-                        totalQuestions={quiz.totalQuestions}
-                        leaderboard={data.leaderboard || []}
-                    />
-                </div>
-            )}
-
             {/* Absent Tab */}
             {
                 activeTab === 'absent' && absentStudents && (
@@ -646,7 +643,7 @@ const QuizResults = () => {
                     </div>
                 )
             }
-        </div >
+        </div>
     );
 };
 
