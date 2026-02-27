@@ -1535,3 +1535,129 @@ td.wrong {
 .animate-slideInRight {
     animation: slideInRight 0.3s ease-out forwards;
 }
+
+/* Stunning Leaderboard */
+.analysis-table {
+    width: 100%;
+    border-collapse: separate !important;
+    border-spacing: 0 10px !important;
+    margin-top: 10px;
+}
+
+.analysis-table th {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 20px;
+    border: none !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.analysis-table td {
+    padding: 16px 20px;
+    background: var(--bg-card);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none !important;
+}
+
+.analysis-table tr {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+}
+
+.analysis-table tr:hover td {
+    background: var(--bg-secondary);
+    transform: translateY(-2px);
+}
+
+.analysis-table td:first-child {
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+}
+
+.analysis-table td:last-child {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+/* Beautiful Ranks */
+.rank-display {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-weight: 800;
+    font-size: 1rem;
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.rank-row-0 .rank-display {
+    /* Rank 1 */
+    background: linear-gradient(135deg, #FFD700, #F59E0B);
+    color: #fff;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+    transform: scale(1.1);
+}
+
+.rank-row-1 .rank-display {
+    /* Rank 2 */
+    background: linear-gradient(135deg, #E2E8F0, #94A3B8);
+    color: #1e293b;
+    box-shadow: 0 0 15px rgba(148, 163, 184, 0.4);
+}
+
+.rank-row-2 .rank-display {
+    /* Rank 3 */
+    background: linear-gradient(135deg, #FDB931, #CD7F32);
+    color: #fff;
+    box-shadow: 0 0 15px rgba(205, 127, 50, 0.4);
+}
+
+/* Subtle Highlights for Top 3 Rows */
+.rank-row-0 td {
+    border-top: 1px solid rgba(255, 215, 0, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.1) !important;
+    background: rgba(255, 215, 0, 0.03);
+}
+
+.rank-row-1 td {
+    border-top: 1px solid rgba(148, 163, 184, 0.1) !important;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1) !important;
+    background: rgba(148, 163, 184, 0.03);
+}
+
+.rank-row-2 td {
+    border-top: 1px solid rgba(205, 127, 50, 0.1) !important;
+    border-bottom: 1px solid rgba(205, 127, 50, 0.1) !important;
+    background: rgba(205, 127, 50, 0.03);
+}
+
+/* Apply border to first and last elements for top ranks to make it a full box */
+.rank-row-0 td:first-child {
+    border-left: 1px solid rgba(255, 215, 0, 0.1) !important;
+}
+
+.rank-row-0 td:last-child {
+    border-right: 1px solid rgba(255, 215, 0, 0.1) !important;
+}
+
+.rank-row-1 td:first-child {
+    border-left: 1px solid rgba(148, 163, 184, 0.1) !important;
+}
+
+.rank-row-1 td:last-child {
+    border-right: 1px solid rgba(148, 163, 184, 0.1) !important;
+}
+
+.rank-row-2 td:first-child {
+    border-left: 1px solid rgba(205, 127, 50, 0.1) !important;
+}
+
+.rank-row-2 td:last-child {
+    border-right: 1px solid rgba(205, 127, 50, 0.1) !important;
+}

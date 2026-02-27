@@ -111,12 +111,13 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
             return (
-                <div style={{ background: 'var(--bg-card)', padding: '10px', border: '1px solid var(--border)', borderRadius: '8px' }}>
-                    <p style={{ margin: 0, fontWeight: 'bold' }}>{label}</p>
+                <div className="premium-tooltip">
+                    <p className="pt-title">{label}</p>
                     {payload.map((p, i) => (
-                        <p key={i} style={{ color: p.color, margin: 0 }}>
-                            {p.name}: {p.value} {p.name.includes('Pct') || p.name.includes('Accuracy') ? '%' : ''}
-                        </p>
+                        <div key={i} className="pt-item">
+                            <span className="pt-dot" style={{ background: p.color }}></span>
+                            <span>{p.name}: <strong style={{ color: 'white' }}>{p.value} {p.name.includes('%') || p.name.includes('Accuracy') ? '%' : ''}</strong></span>
+                        </div>
                     ))}
                 </div>
             );
@@ -125,94 +126,100 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div className="faculty-analysis-dashboard">
             {/* Top Metrics Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
-                <div className="stat-card" style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderLeft: '4px solid var(--primary)' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Eligible Students</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.5rem' }}>{metrics.totalEligible}</div>
+            <div className="modern-stats-grid">
+                <div className="modern-stat-card c-blue">
+                    <div className="stat-header">Eligible Students</div>
+                    <div className="stat-value">{metrics.totalEligible}</div>
                 </div>
-                <div className="stat-card" style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderLeft: '4px solid var(--success)' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Total Attempted</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.5rem' }}>{metrics.attempted}</div>
+                <div className="modern-stat-card c-green">
+                    <div className="stat-header">Total Attempted</div>
+                    <div className="stat-value">{metrics.attempted}</div>
                 </div>
-                <div className="stat-card" style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderLeft: '4px solid var(--warning)' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Participation %</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.5rem' }}>{metrics.participationRate}%</div>
+                <div className="modern-stat-card c-orange">
+                    <div className="stat-header">Participation %</div>
+                    <div className="stat-value">{metrics.participationRate}%</div>
                 </div>
-                <div className="stat-card" style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderLeft: '4px solid var(--accent)' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Average Score</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.5rem' }}>{metrics.avgScore} <span style={{ fontSize: '1rem', fontWeight: 'normal' }}>/ {quiz?.totalPoints || 100}</span></div>
+                <div className="modern-stat-card c-purple">
+                    <div className="stat-header">Average Score</div>
+                    <div className="stat-value">{metrics.avgScore} <span className="stat-sub">/ {quiz?.totalPoints || 100}</span></div>
                 </div>
-                <div className="stat-card" style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderLeft: '4px solid #10B981' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Highest Score</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.5rem' }}>{metrics.highest}</div>
+                <div className="modern-stat-card c-cyan">
+                    <div className="stat-header">Highest Score</div>
+                    <div className="stat-value">{metrics.highest}</div>
                 </div>
-                <div className="stat-card" style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderLeft: '4px solid #F43F5E' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase' }}>Lowest Score</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.5rem' }}>{metrics.lowest}</div>
+                <div className="modern-stat-card c-rose">
+                    <div className="stat-header">Lowest Score</div>
+                    <div className="stat-value">{metrics.lowest}</div>
                 </div>
             </div>
 
             {/* Middle Graphs Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
+            <div className="modern-graphs-grid">
 
                 {/* Score Distribution */}
-                <div className="analysis-card" style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px' }}>
-                    <h3 style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}><FiBarChart2 style={{ marginRight: '8px', color: 'var(--primary)' }} /> Score Distribution</h3>
-                    <div style={{ height: '300px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={scoreDistribution}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                                <XAxis dataKey="range" tick={{ fill: 'var(--text-secondary)' }} />
-                                <YAxis tick={{ fill: 'var(--text-secondary)' }} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="students" name="Students" fill="var(--primary)" radius={[4, 4, 0, 0]} animationDuration={1000} />
+                <div className="modern-graph-card">
+                    <div className="graph-header">
+                        <FiBarChart2 style={{ color: '#3B82F6', fontSize: '1.4rem' }} /> <h3>Score Distribution</h3>
+                    </div>
+                    <div className="graph-container-box">
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={scoreDistribution} margin={{ left: -20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="range" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Bar dataKey="students" name="Students" fill="#3B82F6" radius={[6, 6, 0, 0]} barSize={40} animationDuration={1500} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
                 {/* Section/Topic Accuracy */}
-                <div className="analysis-card" style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px' }}>
-                    <h3 style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}><FiPieChart style={{ marginRight: '8px', color: 'var(--warning)' }} /> Section Analysis</h3>
-                    <div style={{ height: '300px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={sectionAnalysis} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
-                                <XAxis type="number" domain={[0, 100]} tick={{ fill: 'var(--text-secondary)' }} />
-                                <YAxis dataKey="topic" type="category" width={100} tick={{ fill: 'var(--text-secondary)' }} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="avgAccuracy" name="Avg Accuracy %" fill="var(--warning)" radius={[0, 4, 4, 0]} animationDuration={1000} />
+                <div className="modern-graph-card">
+                    <div className="graph-header">
+                        <FiPieChart style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Section Analysis</h3>
+                    </div>
+                    <div className="graph-container-box">
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={sectionAnalysis} layout="vertical" margin={{ left: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                <YAxis dataKey="topic" type="category" width={90} tick={{ fill: '#E2E8F0', fontWeight: '600' }} tickLine={false} axisLine={false} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Bar dataKey="avgAccuracy" name="Accuracy" fill="#F59E0B" radius={[0, 6, 6, 0]} barSize={25} animationDuration={1500} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
                 {/* Question Difficulty */}
-                <div className="analysis-card" style={{ gridColumn: '1 / -1', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px' }}>
-                    <h3 style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}><FiTrendingUp style={{ marginRight: '8px', color: 'var(--accent)' }} /> Question-wise Performance</h3>
-                    <div style={{ height: '350px' }}>
+                <div className="modern-graph-card graph-card-full">
+                    <div className="graph-header">
+                        <FiTrendingUp style={{ color: '#8B5CF6', fontSize: '1.4rem' }} /> <h3>Question-wise Performance</h3>
+                    </div>
+                    <div className="graph-container-box" style={{ height: '350px' }}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={questionAnalysis}>
-                                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)' }} />
-                                <YAxis domain={[0, 100]} tick={{ fill: 'var(--text-secondary)' }} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend />
-                                <Bar dataKey="correctPct" name="% Answered Correctly" fill="var(--accent)" radius={[4, 4, 0, 0]} animationDuration={1000}>
+                            <ComposedChart data={questionAnalysis} margin={{ top: 10, left: -20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} animationDuration={1500}>
                                     {questionAnalysis.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.correctPct < 30 ? '#F43F5E' : entry.correctPct > 80 ? '#10B981' : 'var(--accent)'} />
+                                        <Cell key={`cell-${index}`} fill={entry.correctPct < 30 ? '#F43F5E' : entry.correctPct > 80 ? '#10B981' : '#8B5CF6'} />
                                     ))}
                                 </Bar>
-                                <Line type="monotone" dataKey="correctPct" stroke="var(--primary)" strokeWidth={2} dot={{ r: 4 }} />
+                                <Line type="monotone" dataKey="correctPct" name="Trend" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5, fill: '#0F172A', strokeWidth: 2 }} animationDuration={1500} />
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'center', fontSize: '0.85rem' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: 12, height: 12, background: '#10B981', display: 'inline-block', borderRadius: 2 }}></span> Very Easy (&gt;80%)</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: 12, height: 12, background: 'var(--accent)', display: 'inline-block', borderRadius: 2 }}></span> Moderate</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: 12, height: 12, background: '#F43F5E', display: 'inline-block', borderRadius: 2 }}></span> Hard (&lt;30%)</span>
+                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.5rem', justifyContent: 'center', fontSize: '0.9rem', color: '#94A3B8', fontWeight: 500 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#10B981', display: 'inline-block', borderRadius: 3 }}></span> Very Easy (&gt;80%)</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#8B5CF6', display: 'inline-block', borderRadius: 3 }}></span> Moderate</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#F43F5E', display: 'inline-block', borderRadius: 3 }}></span> Hard (&lt;30%)</span>
                     </div>
                 </div>
 

@@ -624,8 +624,12 @@ const QuizResults = () => {
                                     {getFilteredLeaderboard().map((entry, idx) => {
                                         const s = entry.userId || entry.student || {};
                                         return (
-                                            <tr key={entry._id || idx}>
-                                                <td><span className={`rank-display rank-${idx + 1}`} style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>#{idx + 1}</span></td>
+                                            <tr key={entry._id || idx} className={`rank-row-${idx}`}>
+                                                <td>
+                                                    <span className="rank-display">
+                                                        {idx === 0 ? <FiAward size={20} /> : idx === 1 ? <FiAward size={18} /> : idx === 2 ? <FiAward size={16} /> : `#${idx + 1}`}
+                                                    </span>
+                                                </td>
                                                 <td>
                                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                                         <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{s.name || entry.studentName}</span>
@@ -633,7 +637,7 @@ const QuizResults = () => {
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <span style={{ background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>
+                                                    <span style={{ background: 'var(--bg-tertiary)', padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600' }}>
                                                         {s.department || 'N/A'} - {s.section || 'N/A'}
                                                     </span>
                                                 </td>
