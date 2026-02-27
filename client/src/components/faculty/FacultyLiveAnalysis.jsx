@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import {
     FiUsers, FiCheckCircle, FiPercent, FiTrendingUp,
-    FiAward, FiAlertCircle, FiBarChart2
+    FiPieChart, FiAward, FiAlertCircle, FiBarChart2
 } from 'react-icons/fi';
 
 const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents = [], totalQuestions, quiz }) => {
