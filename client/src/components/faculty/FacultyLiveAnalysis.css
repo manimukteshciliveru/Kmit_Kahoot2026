@@ -146,8 +146,9 @@
 
 .graph-container-box {
     width: 100%;
+    height: 300px;
     min-height: 300px;
-    /* Ensure strictly min-height for rendering */
+    position: relative;
 }
 
 /* Beautiful Tooltips */
