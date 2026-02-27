@@ -9,11 +9,13 @@ const responseValidation = {
     }),
 
     reportTabSwitch: Joi.object({
-        quizId: Joi.string().required()
+        quizId: Joi.string().required(),
+        switchCount: Joi.number().optional()
     }),
 
     completeQuiz: Joi.object({
-        quizId: Joi.string().required()
+        quizId: Joi.string().required(),
+        answers: Joi.object().optional().unknown(true)
     })
 };
 

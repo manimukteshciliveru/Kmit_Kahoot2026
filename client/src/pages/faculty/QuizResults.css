@@ -254,12 +254,23 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-sm) 0;
+    padding: var(--space-md);
     border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-bottom: 10px;
+    transition: all 0.2s ease;
+}
+
+.performer-item:hover {
+    transform: translateX(8px);
+    background: var(--bg-tertiary);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--primary-glow);
 }
 
 .performer-item:last-child {
-    border-bottom: none;
+    margin-bottom: 0;
 }
 
 .perf-info {

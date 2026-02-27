@@ -306,12 +306,6 @@ const QuizResults = () => {
                 >
                     <FiFileText /> Questions
                 </button>
-                <button
-                    className={`tab ${activeTab === 'dashboard' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('dashboard')}
-                >
-                    <FiZap /> Live Dashboard
-                </button>
 
                 {absentStudents && absentStudents.length > 0 && (
                     <button
@@ -595,123 +589,18 @@ const QuizResults = () => {
 
 
 
-            {/* Live Dashboard Tab (Enhanced Metrics) */}
-            {
-                activeTab === 'dashboard' && (
-                    <div className="tab-content live-dashboard-view">
-                        <div className="dashboard-head-section">
-                            <h2 className="section-title">⚡ Detailed Performance Board</h2>
-                            <div className="live-status-pills">
-                                <span className="live-count-pill"><FiUsers /> {getFilteredResponses().length} Results</span>
-                                <span className="live-count-pill success"><FiCheckCircle /> {getFilteredResponses().filter(r => r.status === 'completed').length} Completed</span>
-                            </div>
-                        </div>
-
-                        <FilterControls />
-
-                        <div className="attendance-table-container leaderboard-table-scroll live-dashboard-table">
-                            <table className="attendance-table leaderboard-styled-table">
-                                <thead>
-                                    <tr>
-                                        <th>RANK</th>
-                                        <th>STUDENT</th>
-                                        <th>BRANCH / SEC</th>
-                                        <th>TIMING</th>
-                                        <th>TIME TAKEN</th>
-                                        <th>PROGRESS</th>
-                                        <th>PERFORMANCE</th>
-                                        <th style={{ textAlign: 'right' }}>SCORE</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {getFilteredResponses().sort((a, b) => (b.totalScore - a.totalScore) || (a.totalTimeTaken - b.totalTimeTaken)).map((r, i) => {
-                                        const s = r.student || r.userId || {};
-
-                                        // Use leaderboard as source of truth for rank
-                                        let rank = 0;
-                                        if (data.leaderboard) {
-                                            rank = data.leaderboard.findIndex(le =>
-                                                String(le.student?._id || le.userId?._id || le.student?.id || le.userId?.id) === String(s._id || s.id)
-                                            ) + 1;
-                                        }
-
-                                        // Fallback to sorting if not in leaderboard yet
-                                        if (!rank || rank === 0) {
-                                            const sorted = [...responses].sort((a, b) => b.totalScore - a.totalScore || a.totalTimeTaken - b.totalTimeTaken);
-                                            rank = sorted.findIndex(res => String(res.student?._id || res.userId) === String(s._id || s.id)) + 1;
-                                        }
-
-                                        const totalQs = quiz.totalQuestions || 1;
-                                        const attempted = r.answers?.filter(a => a.answer || a.studentAnswer)?.length || 0;
-                                        const accuracy = attempted > 0 ? Math.round((r.correctCount / attempted) * 100) : 0;
-                                        const avgSpeed = r.averageTimePerQuestion ? (r.averageTimePerQuestion / 1000).toFixed(1) : '0';
-
-                                        const joinTime = r.startedAt ? new Date(r.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---';
-                                        const endTime = r.completedAt ? new Date(r.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
-                                            (r.status === 'terminated' ? 'Terminated' : 'In Progress');
-
-                                        return (
-                                            <tr key={r._id || i} className={`live-row ${rank <= 3 && rank > 0 ? `rank-${rank}-row` : ''}`}>
-                                                <td>
-                                                    <div className="rank-display">
-                                                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank > 0 ? `#${rank}` : '---'}
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div className="student-profile-info">
-                                                        <span className="name-bold">{s.name || 'Anonymous'}</span>
-                                                        <span className="roll-mono">{s.rollNumber || 'N/A'}</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div className="dept-sec-info">
-                                                        <span className="dept-tag">{s.department || '-'}</span>
-                                                        <span className="sec-tag">Section {s.section || '-'}</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div className="timing-info">
-                                                        <div className="time-item"><FiClock /> {joinTime} <span className="lbl">Joined</span></div>
-                                                        <div className="time-item"><FiStopCircle /> {endTime} <span className="lbl">Ended</span></div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div className="duration-info">
-                                                        <span className="duration-val">{formatTime(r.totalTimeTaken || 0)}</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div className="progress-metrics">
-                                                        <div className="progress-mini-bar" style={{ width: '100px' }}>
-                                                            <div className="bar-fill" style={{ width: `${(attempted / totalQs) * 100}%` }}></div>
-                                                        </div>
-                                                        <span className="progress-txt">{attempted}/{totalQs} Questions</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div className="live-stats-metrics">
-                                                        <div className="stat-pill accuracy">
-                                                            <FiCheckCircle /> {accuracy}%
-                                                        </div>
-                                                        <div className="stat-pill speed">
-                                                            <FiZap /> {avgSpeed}s
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td style={{ textAlign: 'right' }}>
-                                                    <div className="score-badge-live">
-                                                        {r.totalScore} <span className="pts">pts</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )
-            }
+            {/* Analytics Tab (Graphs) */}
+            {activeTab === 'analytics' && (
+                <div className="tab-content">
+                    <FacultyLiveAnalysis
+                        quiz={quiz}
+                        responses={responses}
+                        absentStudents={absentStudents}
+                        totalQuestions={quiz.totalQuestions}
+                        leaderboard={data.leaderboard || []}
+                    />
+                </div>
+            )}
 
             {/* Absent Tab */}
             {
