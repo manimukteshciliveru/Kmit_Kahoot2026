@@ -350,37 +350,6 @@ const QuizReport = () => {
                 user={user}
             />
 
-            <section className="dashboard-grid">
-                <div className="dashboard-card summary-box">
-                    <h3><FiActivity /> Performance Summary</h3>
-                    <div className="metrics-grid-compact">
-                        <div className="m-item"><span className="m-val">{analytics.totalQuestions}</span><span className="m-lbl">Questions</span></div>
-                        <div className="m-item"><span className="m-val text-success">{analytics.correct}</span><span className="m-lbl">Correct</span></div>
-                        <div className="m-item"><span className="m-val text-danger">{analytics.incorrect}</span><span className="m-lbl">Incorrect</span></div>
-                        <div className="m-item"><span className="m-val text-warning">{analytics.unattempted}</span><span className="m-lbl">Skipped</span></div>
-                    </div>
-                </div>
-
-                <div className="dashboard-card insights-box">
-                    <h3><FiTrendingUp /> Analytical Insights</h3>
-                    <div className="insights-list">
-                        <div className="insight-row">
-                            <span className="i-label">Accuracy Rate</span>
-                            <div className="progress-bar-wrapper">
-                                <div className="progress-fill" style={{ width: `${analytics.accuracy}%`, background: 'var(--primary)' }}></div>
-                            </div>
-                            <span className="i-val">{analytics.accuracy}%</span>
-                        </div>
-                        <div className="insight-row">
-                            <span className="i-label">Avg Time/Q</span>
-                            <span className="i-val-text">{analytics.avgTime}s <small>(Class: {analytics.classAvgTime}s)</small></span>
-                        </div>
-                        <div className={`performance-badge ${analytics.performanceCategory.color}`}>
-                            {analytics.performanceCategory.label} Performance
-                        </div>
-                    </div>
-                </div>
-            </section>
 
             {/* AI Review Section */}
             <section className="ai-review-section">

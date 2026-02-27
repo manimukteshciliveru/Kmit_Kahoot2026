@@ -314,24 +314,20 @@ const QuizResults = () => {
                     className={`tab ${activeTab === 'analytics' ? 'active' : ''}`}
                     onClick={() => setActiveTab('analytics')}
                 >
-                    <FiTrendingUp /> Analytics Report
+                    <FiTrendingUp /> Faculty Analytics Dashboard
                 </button>
-
                 <button
                     className={`tab ${activeTab === 'questions' ? 'active' : ''}`}
                     onClick={() => setActiveTab('questions')}
                 >
-                    <FiFileText /> Questions
+                    <FiFileText /> Question Analysis
                 </button>
-
-                {absentStudents && absentStudents.length > 0 && (
-                    <button
-                        className={`tab ${activeTab === 'absent' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('absent')}
-                    >
-                        <FiUserMinus /> Absent ({absentStudents.length})
-                    </button>
-                )}
+                <button
+                    className={`tab ${activeTab === 'leaderboard' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('leaderboard')}
+                >
+                    <FiAward /> Leaderboard
+                </button>
             </div>
 
             {/* Analytics Tab */}
@@ -598,50 +594,67 @@ const QuizResults = () => {
             }
 
 
-            {/* Absent Tab */}
-            {
-                activeTab === 'absent' && absentStudents && (
-                    <div className="tab-content">
-                        <div className="leaderboard-table-container">
-                            <div className="section-card danger" style={{ margin: '20px', border: 'none', background: 'rgba(226, 27, 60, 0.05)' }}>
-                                <h3 style={{ color: 'var(--danger)', marginBottom: '5px' }}><FiUserMinus /> Absent Students</h3>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>These students were eligible but did not attempt the quiz.</p>
+            {/* Leaderboard Tab Content */}
+            {activeTab === 'leaderboard' && (
+                <div className="tab-content animate-fadeIn">
+                    <div className="section-card">
+                        <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3><FiAward /> Final Leaderboard</h3>
+                            <div className="live-status-pills">
+                                <span className="live-count-pill" style={{ background: 'var(--primary)', color: 'white', padding: '5px 10px', borderRadius: '20px', fontSize: '0.85rem' }}>
+                                    <FiUsers /> {getFilteredLeaderboard().length} Ranked
+                                </span>
                             </div>
-                            <table className="leaderboard-table">
+                        </div>
+
+                        <FilterControls />
+
+                        <div className="table-responsive">
+                            <table className="analysis-table">
                                 <thead>
                                     <tr>
-                                        <th>Student Details</th>
-                                        <th>Branch/Section</th>
-                                        <th>Roll Number</th>
-                                        <th>Status</th>
+                                        <th>Rank</th>
+                                        <th>Student</th>
+                                        <th>Branch/Sec</th>
+                                        <th className="text-center">Score / {quiz.totalPoints}</th>
+                                        <th className="text-center">Progress</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {absentStudents.map((s, idx) => (
-                                        <tr key={s.id || idx} className="failed">
-                                            <td className="student-col">
-                                                <div className="student-meta">
-                                                    <span className="name">{s.name}</span>
-                                                    <span className="roll" style={{ opacity: 0.7 }}>{s.email}</span>
-                                                </div>
-                                            </td>
-                                            <td className="branch-col">
-                                                <div className="branch-meta">
-                                                    <span className="dept">{s.department} - Section {s.section}</span>
-                                                </div>
-                                            </td>
-                                            <td><span className="roll">{s.rollNumber}</span></td>
-                                            <td>
-                                                <span className="status-badge terminated">Absent</span>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {getFilteredLeaderboard().map((entry, idx) => {
+                                        const s = entry.userId || entry.student || {};
+                                        return (
+                                            <tr key={entry._id || idx}>
+                                                <td><span className={`rank-display rank-${idx + 1}`} style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>#{idx + 1}</span></td>
+                                                <td>
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{s.name || entry.studentName}</span>
+                                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{s.rollNumber || 'N/A'}</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span style={{ background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>
+                                                        {s.department || 'N/A'} - {s.section || 'N/A'}
+                                                    </span>
+                                                </td>
+                                                <td className="text-center">
+                                                    <span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{entry.totalScore}</span> pts
+                                                </td>
+                                                <td className="text-center">
+                                                    {entry.answers?.filter(a => a.answer || a.answeredAt)?.length || 0} / {quiz.totalQuestions}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {getFilteredLeaderboard().length === 0 && (
+                                        <tr><td colSpan="5" className="text-center">No students matched the criteria.</td></tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                )
-            }
+                </div>
+            )}
         </div>
     );
 };

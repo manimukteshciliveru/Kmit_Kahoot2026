@@ -1,221 +1,240 @@
 import React, { useMemo } from 'react';
 import {
-    Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, PieChart, Pie, Legend
+    PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+    BarChart, Bar, XAxis, YAxis, CartesianGrid,
+    LineChart, Line, ReferenceLine
 } from 'recharts';
-import { FiAward, FiZap, FiTarget, FiClock, FiCheckCircle, FiBarChart2 } from 'react-icons/fi';
-import './StudentVisualReport.css';
+import {
+    FiTarget, FiAward, FiClock, FiActivity, FiPieChart,
+    FiBarChart2, FiTrendingUp
+} from 'react-icons/fi';
 
-const StudentVisualReport = ({ report, analytics, user }) => {
+const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
 
-    // 1. Topic Mastery (Radar Chart)
-    const topicData = useMemo(() => {
+    // 1. Performance Summary Cards handled in QuizReport, but let's build the visual top row
+
+    // 2. Accuracy Pie Chart Data
+    const accuracyData = useMemo(() => {
+        return [
+            { name: 'Correct', value: analytics.correct || 0, color: '#10B981' },
+            { name: 'Wrong', value: analytics.incorrect || 0, color: '#F43F5E' },
+            { name: 'Unattempted', value: analytics.unattempted || 0, color: '#94A3B8' }
+        ].filter(d => d.value > 0);
+    }, [analytics]);
+
+    // 3. Section-wise Performance
+    const sectionData = useMemo(() => {
         const topics = {};
         (report.quizId?.questions || []).forEach(q => {
             const topic = q.topic || 'General';
-            if (!topics[topic]) topics[topic] = { topic, total: 0, correct: 0 };
+            if (!topics[topic]) topics[topic] = { topic, total: 0, correct: 0, wrong: 0 };
             topics[topic].total++;
         });
 
         (report.answers || []).forEach(ans => {
             const q = (report.quizId?.questions || []).find(q => q._id === ans.questionId);
             const topic = q?.topic || 'General';
-            if (topics[topic] && ans.isCorrect) topics[topic].correct++;
+            if (topics[topic]) {
+                if (ans.isCorrect) topics[topic].correct++;
+                else topics[topic].wrong++;
+            }
         });
 
         return Object.values(topics).map(t => ({
-            subject: t.topic,
-            A: t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0,
-            fullMark: 100
+            name: t.topic,
+            Accuracy: t.total > 0 ? Number(((t.correct / t.total) * 100).toFixed(1)) : 0,
+            Correct: t.correct,
+            Wrong: t.wrong,
+            Total: t.total
         }));
     }, [report]);
 
-    // 2. Comparison Data
-    const comparisonData = [
-        { name: 'You', score: report.percentage, fill: 'var(--primary)' },
-        { name: 'Class Avg', score: parseFloat(analytics.classAvgScore) / (report.maxPossibleScore || 1) * 100, fill: 'var(--text-muted)' }
-    ];
-
-    // 3. Average Timer Per Question (Bar Graph)
-    const avgTimerData = useMemo(() => {
+    // 4. Time Spent Per Question (Line Chart)
+    const timeData = useMemo(() => {
         const questions = report.quizId?.questions || [];
         const answers = report.answers || [];
 
-        return questions.map((q, idx) => {
+        // Calculate average time to find spikes
+        let totalTime = 0;
+        const validTimes = [];
+
+        const mapped = questions.map((q, idx) => {
             const ans = answers.find(a => String(a.questionId) === String(q._id));
-            const timeTaken = ans && ans.timeTaken ? Math.max(0, ans.timeTaken) : 0;
+            const timeSeconds = ans && ans.timeTaken ? Number((ans.timeTaken / 1000).toFixed(1)) : 0;
+            if (timeSeconds > 0) validTimes.push(timeSeconds);
             return {
                 name: `Q${idx + 1}`,
-                "Time Taken (s)": Number((timeTaken / 1000).toFixed(1)),
+                time: timeSeconds,
                 isCorrect: ans?.isCorrect || false
             };
         });
+
+        const avgGlobalTime = validTimes.length ? validTimes.reduce((a, b) => a + b, 0) / validTimes.length : 0;
+
+        return { data: mapped, averageLine: Number(avgGlobalTime.toFixed(1)) };
     }, [report]);
 
-    return (
-        <div className="student-visual-dashboard">
-            {/* Top Row: Performance Highlights & Mastery */}
-            <div className="visual-row">
-                {/* Score Summary Metrics */}
-                <div className="visual-card stats-summary-card">
-                    <div className="card-header-visual">
-                        <FiTarget className="icon-blue" />
-                        <h3>Performance Snapshot</h3>
-                    </div>
-                    <div className="stats-grid-visual">
-                        <div className="stat-box-visual primary">
-                            <span className="val">{report.percentage}%</span>
-                            <span className="lab">Overall Score</span>
-                        </div>
-                        <div className="stat-box-visual success">
-                            <span className="val">{report.correctCount}</span>
-                            <span className="lab">Correct</span>
-                        </div>
-                        <div className="stat-box-visual warning">
-                            <span className="val">{Math.round((report.averageTimePerQuestion || 0) / 1000)}s</span>
-                            <span className="lab">Avg Pace</span>
-                        </div>
-                        <div className="stat-box-visual info">
-                            <span className="val">{report.totalScore}</span>
-                            <span className="lab">Points Earnt</span>
-                        </div>
-                    </div>
+    const CustomTooltipPie = ({ active, payload }) => {
+        if (active && payload && payload.length) {
+            return (
+                <div style={{ background: 'var(--bg-card)', padding: '10px 15px', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    <p style={{ margin: 0, color: payload[0].payload.color, fontWeight: 'bold' }}>
+                        {payload[0].name}: {payload[0].value} Questions
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {((payload[0].value / analytics.totalQuestions) * 100).toFixed(1)}% of total
+                    </p>
                 </div>
+            );
+        }
+        return null;
+    };
 
-                {/* Radar Mastery Chart */}
-                <div className="visual-card mastery-card">
-                    <div className="card-header-visual">
-                        <FiZap className="icon-emerald" />
-                        <h3>Topic Mastery Radar</h3>
-                    </div>
-                    <div className="chart-container-radar">
-                        <ResponsiveContainer width="100%" height={250}>
-                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={topicData}>
-                                <PolarGrid stroke="var(--border)" />
-                                <PolarAngleAxis dataKey="subject" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} />
-                                <Radar
-                                    name="Proficiency"
-                                    dataKey="A"
-                                    stroke="var(--primary)"
-                                    fill="var(--primary)"
-                                    fillOpacity={0.5}
-                                />
-                            </RadarChart>
+    const CustomTooltipBar = ({ active, payload, label }) => {
+        if (active && payload && payload.length) {
+            const data = payload[0].payload;
+            return (
+                <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: 'var(--text-primary)' }}>{label}</p>
+                    <p style={{ margin: '3px 0', color: 'var(--primary)', fontSize: '0.9rem' }}>Accuracy: {data.Accuracy}%</p>
+                    <p style={{ margin: '3px 0', color: '#10B981', fontSize: '0.9rem' }}>Correct: {data.Correct}</p>
+                    <p style={{ margin: '3px 0', color: '#F43F5E', fontSize: '0.9rem' }}>Wrong: {data.Wrong}</p>
+                    <p style={{ margin: '3px 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Total: {data.Total}</p>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    // Time Chart Spike Dots
+    const CustomizedDot = (props) => {
+        const { cx, cy, value, payload } = props;
+        const isSpike = value > timeData.averageLine * 2; // Arbitrary spike logic > 2x average
+
+        if (isSpike) {
+            return (
+                <svg x={cx - 5} y={cy - 5} width={10} height={10} fill="#F59E0B" viewBox="0 0 10 10">
+                    <circle cx="5" cy="5" r="5" />
+                </svg>
+            );
+        }
+        return (
+            <svg x={cx - 3} y={cy - 3} width={6} height={6} fill={payload.isCorrect ? '#10B981' : '#F43F5E'} viewBox="0 0 6 6">
+                <circle cx="3" cy="3" r="3" />
+            </svg>
+        );
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', margin: '2rem 0' }}>
+
+            {/* Top Row: Performance Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderBottom: '4px solid var(--primary)', textAlign: 'center' }}>
+                    <FiTarget style={{ fontSize: '1.5rem', color: 'var(--primary)', marginBottom: '0.5rem' }} />
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)' }}>{report.totalScore}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Score</div>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderBottom: '4px solid #10B981', textAlign: 'center' }}>
+                    <FiActivity style={{ fontSize: '1.5rem', color: '#10B981', marginBottom: '0.5rem' }} />
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)' }}>{analytics.accuracy}%</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Accuracy %</div>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderBottom: '4px solid #F59E0B', textAlign: 'center' }}>
+                    <FiAward style={{ fontSize: '1.5rem', color: '#F59E0B', marginBottom: '0.5rem' }} />
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)' }}>#{analytics.rank}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Global Rank</div>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderBottom: '4px solid var(--accent)', textAlign: 'center' }}>
+                    <FiClock style={{ fontSize: '1.5rem', color: 'var(--accent)', marginBottom: '0.5rem' }} />
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)' }}>{Math.max(0, (report.totalTimeTaken || 0) / 1000).toFixed(0)}s</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Time</div>
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', borderBottom: '4px solid #F43F5E', textAlign: 'center' }}>
+                    <FiPieChart style={{ fontSize: '1.5rem', color: '#F43F5E', marginBottom: '0.5rem' }} />
+                    <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)' }}>{analytics.attempted}/{analytics.totalQuestions}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Attempted</div>
+                </div>
+            </div>
+
+            {/* Middle Row: Graphs */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
+
+                {/* Accuracy Pie Chart */}
+                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
+                        <FiPieChart color="var(--primary)" /> Overall Accuracy
+                    </h3>
+                    <div style={{ width: '100%', height: '250px' }}>
+                        <ResponsiveContainer>
+                            <PieChart>
+                                <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                    {accuracyData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip content={<CustomTooltipPie />} />
+                                <Legend verticalAlign="bottom" height={36} />
+                            </PieChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
-            </div>
 
-            {/* Middle Row: Average Timer Per Question (NEW) */}
-            <div className="visual-card avg-timer-card full-width-card">
-                <div className="card-header-visual">
-                    <FiBarChart2 className="icon-blue" />
-                    <h3>Time Taken Per Question</h3>
-                </div>
-                <div className="chart-container-timer">
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={avgTimerData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
-                            <defs>
-                                <linearGradient id="correctGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.9} />
-                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0.5} />
-                                </linearGradient>
-                                <linearGradient id="incorrectGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.9} />
-                                    <stop offset="95%" stopColor="#F43F5E" stopOpacity={0.5} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
-                            <XAxis
-                                dataKey="name"
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fill: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}
-                            />
-                            <YAxis
-                                unit="s"
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
-                            />
-                            <Tooltip
-                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                contentStyle={{
-                                    borderRadius: '12px',
-                                    border: 'none',
-                                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                                    background: 'var(--bg-card)',
-                                    color: 'var(--text-primary)'
-                                }}
-                            />
-                            <Legend verticalAlign="top" height={36} />
-                            <Bar dataKey="Time Taken (s)" radius={[4, 4, 0, 0]} barSize={36}>
-                                {avgTimerData.map((entry, index) => (
-                                    <Cell
-                                        key={`cell-${index}`}
-                                        fill={entry.isCorrect ? 'url(#correctGrad)' : 'url(#incorrectGrad)'}
-                                    />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                    <div className="timer-legend">
-                        <span className="legend-dot correct"></span> Correct
-                        <span className="legend-dot incorrect"></span> Incorrect / Unanswered
-                    </div>
-                </div>
-            </div>
-
-            {/* Bottom Row: Speed & Comparison */}
-            <div className="visual-row">
-                <div className="visual-card speed-card">
-                    <div className="card-header-visual">
-                        <FiClock className="icon-rose" />
-                        <h3>Speed vs Accuracy</h3>
-                    </div>
-                    <div className="speed-metrics-visual">
-                        <div className="v-metric">
-                            <span className="v-label">Personal Time</span>
-                            <span className="v-value">{Math.max(0, parseFloat(analytics.avgTime || 0)).toFixed(1)}s <small>/ q</small></span>
-                        </div>
-                        <div className="v-metric">
-                            <span className="v-label">Class Avg</span>
-                            <span className="v-value">{Math.max(0, parseFloat(analytics.classAvgTime || 0)).toFixed(1)}s <small>/ q</small></span>
-                        </div>
-                        <div className="speed-comparer">
-                            {parseFloat(analytics.avgTime) < parseFloat(analytics.classAvgTime) ? (
-                                <span className="badge-fresh success">Faster than Avg ⚡</span>
-                            ) : (
-                                <span className="badge-fresh warning">Steady & Careful 🐢</span>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="visual-card comparison-card">
-                    <div className="card-header-visual">
-                        <FiCheckCircle className="icon-blue" />
-                        <h3>Score vs Class</h3>
-                    </div>
-                    <div className="chart-container-bar">
-                        <ResponsiveContainer width="100%" height={150}>
-                            <BarChart data={comparisonData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
-                                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                <YAxis hide domain={[0, 100]} />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                />
-                                <Bar dataKey="score" radius={[8, 8, 0, 0]} barSize={40}>
-                                    {comparisonData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                                    ))}
-                                </Bar>
+                {/* Section-wise Performance Bar Chart */}
+                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
+                        <FiBarChart2 color="var(--primary)" /> Section Performance
+                    </h3>
+                    <div style={{ width: '100%', height: '250px' }}>
+                        <ResponsiveContainer>
+                            <BarChart data={sectionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="barColor" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.2} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                                <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+                                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
+                                <Tooltip content={<CustomTooltipBar />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Bar dataKey="Accuracy" fill="url(#barColor)" radius={[4, 4, 0, 0]} animationDuration={1000} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
             </div>
+
+            {/* Bottom Row: Time Analysis Line Chart */}
+            <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
+                    <FiTrendingUp color="var(--primary)" /> Time Analysis (Speed)
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Spikes indicate unexpectedly long time spent on a question (orange outline).</p>
+                <div style={{ width: '100%', height: '300px' }}>
+                    <ResponsiveContainer>
+                        <LineChart data={timeData.data} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                            <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+                            <YAxis unit="s" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+                            <Tooltip
+                                contentStyle={{ background: 'var(--bg-card)', border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+                                itemStyle={{ color: 'var(--text-primary)' }}
+                            />
+                            <ReferenceLine y={timeData.averageLine} stroke="var(--text-muted)" strokeDasharray="3 3" label={{ position: 'top', value: `Avg: ${timeData.averageLine}s`, fill: 'var(--text-muted)', fontSize: 10 }} />
+                            <Line
+                                type="monotone"
+                                dataKey="time"
+                                stroke="var(--primary)"
+                                strokeWidth={3}
+                                dot={<CustomizedDot />}
+                                animationDuration={1500}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
         </div>
     );
 };
