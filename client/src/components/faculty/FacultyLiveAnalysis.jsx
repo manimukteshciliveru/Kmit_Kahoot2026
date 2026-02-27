@@ -57,14 +57,14 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
     const questionAnalysis = useMemo(() => {
         const qStats = {};
 
-        // Initialize
+        // Use the backend provided questionAnalytics directly if available (best)
         if (quiz?.questions) {
             quiz.questions.forEach((q, idx) => {
                 qStats[String(q._id)] = {
                     number: `Q${idx + 1}`,
                     correct: 0,
                     totalAttempts: 0,
-                    topic: q.topic || 'General'
+                    topic: q.topic || 'General' // fallback to General if no topic
                 };
             });
         }
@@ -72,9 +72,13 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
         responses.forEach(r => {
             if (r.answers) {
                 r.answers.forEach(a => {
-                    if (qStats[String(a.questionId)]) {
-                        qStats[String(a.questionId)].totalAttempts++;
-                        if (a.isCorrect) qStats[String(a.questionId)].correct++;
+                    const qIdStr = String(a.questionId || (a.question && a.question._id));
+                    if (qIdStr && qStats[qIdStr]) {
+                        qStats[qIdStr].totalAttempts++;
+                        // Sometimes field is isCorrect (boolean), sometimes it relies on scoreAwarded
+                        if (a.isCorrect || a.scoreAwarded > 0) {
+                            qStats[qIdStr].correct++;
+                        }
                     }
                 });
             }

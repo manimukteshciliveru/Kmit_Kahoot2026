@@ -32,10 +32,11 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
         });
 
         (report.answers || []).forEach(ans => {
-            const q = (report.quizId?.questions || []).find(q => q._id === ans.questionId);
+            const qIdStr = String(ans.questionId || (ans.question && ans.question._id));
+            const q = (report.quizId?.questions || []).find(q => String(q._id) === qIdStr);
             const topic = q?.topic || 'General';
             if (topics[topic]) {
-                if (ans.isCorrect) topics[topic].correct++;
+                if (ans.isCorrect || ans.scoreAwarded > 0) topics[topic].correct++;
                 else topics[topic].wrong++;
             }
         });
@@ -59,8 +60,8 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
         const validTimes = [];
 
         const mapped = questions.map((q, idx) => {
-            const ans = answers.find(a => String(a.questionId) === String(q._id));
-            const timeSeconds = ans && ans.timeTaken ? Number((ans.timeTaken / 1000).toFixed(1)) : 0;
+            const ans = answers.find(a => String(a.questionId || (a.question && a.question._id)) === String(q._id));
+            const timeSeconds = ans && ans.timeTaken ? Number((Math.max(0, ans.timeTaken) / 1000).toFixed(1)) : 0;
             if (timeSeconds > 0) validTimes.push(timeSeconds);
             return {
                 name: `Q${idx + 1}`,
