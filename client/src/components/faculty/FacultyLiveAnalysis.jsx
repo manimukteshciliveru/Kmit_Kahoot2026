@@ -124,32 +124,44 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
         return result;
     }, [responses, quiz]);
 
-    // 4. Section/Topic wise average (Stacked Bar for Class-level Accuracy)
+    // 4. Section-wise Performance Analysis (Avg Score per Section)
     const sectionAnalysis = useMemo(() => {
-        const topics = {};
-        responses.forEach(r => {
-            if (r.answers) {
-                r.answers.forEach(a => {
-                    const qIdStr = String(a.questionId || (a.question && a.question._id));
-                    const q = quiz?.questions?.find(que => String(que._id) === qIdStr);
-                    const topic = q?.topic || 'General';
-                    if (!topics[topic]) topics[topic] = { topic, correct: 0, wrong: 0, total: 0 };
+        const stats = {};
 
-                    topics[topic].total++;
-                    if (a.isCorrect || a.scoreAwarded > 0) topics[topic].correct++;
-                    else if (a.answer && String(a.answer).trim() !== '') topics[topic].wrong++;
-                    // Note: unattempted may be skipped or logged independently based on requirements,
-                    // but we will simply track Correct and Incorrect for the stacked bar
-                });
+        // 1. Initialize with eligible sections from quiz configuration if present
+        if (quiz?.accessControl?.allowedBranches) {
+            quiz.accessControl.allowedBranches.forEach(branch => {
+                if (branch.sections && branch.sections.length > 0) {
+                    branch.sections.forEach(sec => {
+                        const key = `${branch.name}-${sec}`;
+                        stats[key] = { section: key, totalScore: 0, count: 0 };
+                    });
+                }
+            });
+        }
+
+        // 2. Aggregate actual scores from responses
+        responses.forEach(r => {
+            const student = r.student || r.userId;
+            const dept = student?.department;
+            const sec = student?.section;
+
+            if (dept && sec) {
+                const key = `${dept.toUpperCase()}-${sec.toUpperCase()}`;
+                if (!stats[key]) {
+                    stats[key] = { section: key, totalScore: 0, count: 0 };
+                }
+                stats[key].totalScore += (r.totalScore || 0);
+                stats[key].count++;
             }
         });
 
-        const result = Object.values(topics).map(t => ({
-            topic: t.topic,
-            Correct: t.correct,
-            Incorrect: t.wrong,
-            avgAccuracy: t.total > 0 ? Number(((t.correct / t.total) * 100).toFixed(1)) : 0
-        }));
+        const result = Object.values(stats).map(s => ({
+            section: s.section,
+            avgScore: s.count > 0 ? Number((s.totalScore / s.count).toFixed(1)) : 0,
+            fill: '#6366F1'
+        })).sort((a, b) => a.section.localeCompare(b.section));
+
         console.log('[DEBUG] FacultyLiveAnalysis - sectionAnalysis:', result);
         return result;
     }, [responses, quiz]);
@@ -251,25 +263,23 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     </div>
                 </div>
 
-                {/* Section/Topic Accuracy (Stacked Bar) */}
+                {/* Section-wise Performance */}
                 <div className="modern-graph-card">
                     <div className="graph-header">
-                        <FiPieChart style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Section Analysis</h3>
+                        <FiPieChart style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Section Performance (Avg)</h3>
                     </div>
                     <div className="graph-container-box" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                         {sectionAnalysis && sectionAnalysis.length > 0 ? (
-                            <BarChart width={chartWidth} height={300} data={sectionAnalysis} layout="vertical" margin={{ left: 0, top: 20, right: 20, bottom: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                <XAxis type="number" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <YAxis dataKey="topic" type="category" width={90} tick={{ fill: '#E2E8F0', fontWeight: '600' }} tickLine={false} axisLine={false} />
+                            <BarChart width={chartWidth} height={300} data={sectionAnalysis} margin={{ left: -20, top: 20, right: 20, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="section" tick={{ fill: '#94A3B8', fontSize: 10 }} tickLine={false} axisLine={false} />
+                                <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Legend />
-                                <Bar dataKey="Correct" stackId="a" fill="#10B981" isAnimationActive={false} />
-                                <Bar dataKey="Incorrect" stackId="a" fill="#F43F5E" radius={[0, 6, 6, 0]} isAnimationActive={false} />
+                                <Bar dataKey="avgScore" name="Avg Score" fill="#6366F1" radius={[6, 6, 0, 0]} barSize={Math.max(20, 150 / sectionAnalysis.length)} isAnimationActive={false} />
                             </BarChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
-                                No section analysis available
+                                No section performance data available
                             </div>
                         )}
                     </div>
