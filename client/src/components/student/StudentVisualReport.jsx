@@ -258,7 +258,8 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                                 <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
                                 <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
                                 <RechartsTooltip content={CustomTooltipBar} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Bar dataKey="Accuracy" fill="url(#barColor)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                                <Legend verticalAlign="top" height={36} />
+                                <Bar dataKey="Accuracy" name="Performance Accuracy %" fill="url(#barColor)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                             </BarChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
@@ -289,6 +290,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                                     itemStyle={{ color: 'var(--text-primary)' }}
                                     cursor={{ stroke: 'rgba(255,255,255,0.1)' }}
                                 />
+                                <Legend verticalAlign="top" height={36} />
                                 <Line
                                     type="monotone"
                                     dataKey="score"
@@ -297,7 +299,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                                     dot={{ r: 5, fill: '#0F172A', strokeWidth: 2, stroke: '#8B5CF6' }}
                                     activeDot={{ r: 7 }}
                                     isAnimationActive={false}
-                                    name="Score %"
+                                    name="Quiz Score %"
                                 />
                             </LineChart>
                         ) : (
@@ -331,6 +333,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                                     itemStyle={{ color: 'var(--text-primary)' }}
                                 />
                                 <ReferenceLine y={timeData.averageLine} stroke="var(--text-muted)" strokeDasharray="3 3" label={{ position: 'top', value: `Avg: ${timeData.averageLine} s`, fill: 'var(--text-muted)', fontSize: 10 }} />
+                                <Legend verticalAlign="top" height={36} />
                                 <Area
                                     type="monotone"
                                     dataKey="time"
@@ -340,7 +343,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                                     strokeWidth={3}
                                     dot={CustomizedDot}
                                     isAnimationActive={false}
-                                    name="Time Taken"
+                                    name="Time Spent (Seconds)"
                                 />
                             </AreaChart>
                         ) : (

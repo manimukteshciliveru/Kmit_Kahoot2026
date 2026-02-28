@@ -254,7 +254,8 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 <XAxis dataKey="range" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} allowDecimals={false} />
                                 <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Bar dataKey="students" name="Students" fill="#3B82F6" radius={[6, 6, 0, 0]} barSize={40} isAnimationActive={false} />
+                                <Legend verticalAlign="top" height={36} />
+                                <Bar dataKey="students" name="Count of Students" fill="#3B82F6" radius={[6, 6, 0, 0]} barSize={40} isAnimationActive={false} />
                             </BarChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
@@ -276,7 +277,8 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 <XAxis dataKey="section" tick={{ fill: '#94A3B8', fontSize: 10 }} tickLine={false} axisLine={false} />
                                 <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Bar dataKey="avgScore" name="Avg Score" fill="#6366F1" radius={[6, 6, 0, 0]} barSize={Math.max(20, 150 / sectionAnalysis.length)} isAnimationActive={false} />
+                                <Legend verticalAlign="top" height={36} />
+                                <Bar dataKey="avgScore" name="Average Marks" fill="#6366F1" radius={[6, 6, 0, 0]} barSize={Math.max(20, 150 / sectionAnalysis.length)} isAnimationActive={false} />
                             </BarChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
@@ -347,7 +349,8 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#E2E8F0', fontWeight: '500' }} tickLine={false} axisLine={false} />
                                 <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Bar dataKey="score" name="Score %" radius={[0, 6, 6, 0]} barSize={20} isAnimationActive={false} />
+                                <Legend verticalAlign="top" height={36} />
+                                <Bar dataKey="score" name="Performance Score %" radius={[0, 6, 6, 0]} barSize={20} isAnimationActive={false} />
                             </BarChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
