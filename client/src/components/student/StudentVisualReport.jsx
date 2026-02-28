@@ -15,11 +15,13 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
 
     // 2. Accuracy Pie Chart Data
     const accuracyData = useMemo(() => {
-        return [
+        const data = [
             { name: 'Correct', value: analytics.correct || 0, color: '#10B981' },
             { name: 'Wrong', value: analytics.incorrect || 0, color: '#F43F5E' },
             { name: 'Unattempted', value: analytics.unattempted || 0, color: '#94A3B8' }
         ].filter(d => d.value > 0);
+        console.log('[DEBUG] StudentVisualReport - accuracyData:', data);
+        return data;
     }, [analytics]);
 
     // 3. Section-wise Performance
@@ -41,13 +43,16 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
             }
         });
 
-        return Object.values(topics).map(t => ({
+        const result = Object.values(topics).map(t => ({
             name: t.topic,
             Accuracy: t.total > 0 ? Number(((t.correct / t.total) * 100).toFixed(1)) : 0,
             Correct: t.correct,
             Wrong: t.wrong,
             Total: t.total
         }));
+
+        console.log('[DEBUG] StudentVisualReport - sectionData:', result);
+        return result;
     }, [report]);
 
     // 4. Time Spent Per Question (Line Chart)
@@ -72,7 +77,9 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
 
         const avgGlobalTime = validTimes.length ? validTimes.reduce((a, b) => a + b, 0) / validTimes.length : 0;
 
-        return { data: mapped, averageLine: Number(avgGlobalTime.toFixed(1)) };
+        const result = { data: mapped, averageLine: Number(avgGlobalTime.toFixed(1)) };
+        console.log('[DEBUG] StudentVisualReport - timeData:', result);
+        return result;
     }, [report]);
 
     const CustomTooltipPie = ({ active, payload }) => {
@@ -167,17 +174,23 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                         <FiPieChart color="var(--primary)" /> Overall Accuracy
                     </h3>
                     <div style={{ width: '100%', height: '250px' }}>
-                        <ResponsiveContainer>
-                            <PieChart>
-                                <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                                    {accuracyData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip content={<CustomTooltipPie />} />
-                                <Legend verticalAlign="bottom" height={36} />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        {accuracyData && accuracyData.length > 0 ? (
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                        {accuracyData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip content={<CustomTooltipPie />} />
+                                    <Legend verticalAlign="bottom" height={36} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                                No accuracy data available
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -187,21 +200,27 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                         <FiBarChart2 color="var(--primary)" /> Section Performance
                     </h3>
                     <div style={{ width: '100%', height: '250px' }}>
-                        <ResponsiveContainer>
-                            <BarChart data={sectionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="barColor" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.2} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
-                                <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
-                                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
-                                <Tooltip content={<CustomTooltipBar />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Bar dataKey="Accuracy" fill="url(#barColor)" radius={[4, 4, 0, 0]} animationDuration={1000} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        {sectionData && sectionData.length > 0 ? (
+                            <ResponsiveContainer>
+                                <BarChart data={sectionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="barColor" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
+                                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.2} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                                    <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+                                    <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
+                                    <Tooltip content={<CustomTooltipBar />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                    <Bar dataKey="Accuracy" fill="url(#barColor)" radius={[4, 4, 0, 0]} animationDuration={1000} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                                No section data available
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -213,26 +232,32 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Spikes indicate unexpectedly long time spent on a question (orange outline).</p>
                 <div style={{ width: '100%', height: '300px' }}>
-                    <ResponsiveContainer>
-                        <LineChart data={timeData.data} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
-                            <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
-                            <YAxis unit="s" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
-                            <Tooltip
-                                contentStyle={{ background: 'var(--bg-card)', border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
-                                itemStyle={{ color: 'var(--text-primary)' }}
-                            />
-                            <ReferenceLine y={timeData.averageLine} stroke="var(--text-muted)" strokeDasharray="3 3" label={{ position: 'top', value: `Avg: ${timeData.averageLine}s`, fill: 'var(--text-muted)', fontSize: 10 }} />
-                            <Line
-                                type="monotone"
-                                dataKey="time"
-                                stroke="var(--primary)"
-                                strokeWidth={3}
-                                dot={<CustomizedDot />}
-                                animationDuration={1500}
-                            />
-                        </LineChart>
-                    </ResponsiveContainer>
+                    {timeData.data && timeData.data.length > 0 ? (
+                        <ResponsiveContainer>
+                            <LineChart data={timeData.data} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                                <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+                                <YAxis unit="s" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+                                <Tooltip
+                                    contentStyle={{ background: 'var(--bg-card)', border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+                                    itemStyle={{ color: 'var(--text-primary)' }}
+                                />
+                                <ReferenceLine y={timeData.averageLine} stroke="var(--text-muted)" strokeDasharray="3 3" label={{ position: 'top', value: `Avg: ${timeData.averageLine}s`, fill: 'var(--text-muted)', fontSize: 10 }} />
+                                <Line
+                                    type="monotone"
+                                    dataKey="time"
+                                    stroke="var(--primary)"
+                                    strokeWidth={3}
+                                    dot={<CustomizedDot />}
+                                    animationDuration={1500}
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                            No timing data available
+                        </div>
+                    )}
                 </div>
             </div>
 

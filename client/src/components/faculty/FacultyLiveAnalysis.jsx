@@ -33,7 +33,9 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
 
         const avgScore = attempted > 0 ? (totalScore / attempted).toFixed(1) : 0;
 
-        return { totalEligible, attempted, participationRate, avgScore, highest, lowest };
+        const result = { totalEligible, attempted, participationRate, avgScore, highest, lowest };
+        console.log('[DEBUG] FacultyLiveAnalysis - metrics:', result);
+        return result;
     }, [responses, absentStudents]);
 
     // 2. Score Distribution Histogram (Bins: 0-20%, 21-40%, etc.)
@@ -50,7 +52,9 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
             else bins['81-100%']++;
         });
 
-        return Object.keys(bins).map(key => ({ range: key, students: bins[key] }));
+        const result = Object.keys(bins).map(key => ({ range: key, students: bins[key] }));
+        console.log('[DEBUG] FacultyLiveAnalysis - scoreDistribution:', result);
+        return result;
     }, [responses, quiz]);
 
     // 3. Question Difficulty Analysis
@@ -84,7 +88,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
             }
         });
 
-        return Object.values(qStats).map(q => {
+        const result = Object.values(qStats).map(q => {
             const correctPct = q.totalAttempts > 0 ? (q.correct / q.totalAttempts) * 100 : 0;
             return {
                 name: q.number,
@@ -92,6 +96,8 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                 topic: q.topic
             };
         });
+        console.log('[DEBUG] FacultyLiveAnalysis - questionAnalysis:', result);
+        return result;
     }, [responses, quiz]);
 
     // 4. Section/Topic wise average
@@ -103,10 +109,12 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
             topics[q.topic].count++;
         });
 
-        return Object.keys(topics).map(t => ({
+        const result = Object.keys(topics).map(t => ({
             topic: t,
             avgAccuracy: Number((topics[t].totalPct / topics[t].count).toFixed(1))
         }));
+        console.log('[DEBUG] FacultyLiveAnalysis - sectionAnalysis:', result);
+        return result;
     }, [questionAnalysis]);
 
     const COLORS = ['#6366F1', '#10B981', '#F43F5E', '#F59E0B', '#0EA5E9'];
@@ -168,15 +176,21 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                         <FiBarChart2 style={{ color: '#3B82F6', fontSize: '1.4rem' }} /> <h3>Score Distribution</h3>
                     </div>
                     <div className="graph-container-box">
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={scoreDistribution} margin={{ left: -20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="range" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Bar dataKey="students" name="Students" fill="#3B82F6" radius={[6, 6, 0, 0]} barSize={40} animationDuration={1500} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        {scoreDistribution && scoreDistribution.length > 0 && scoreDistribution.some(d => d.students > 0) ? (
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={scoreDistribution} margin={{ left: -20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="range" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                    <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                    <Bar dataKey="students" name="Students" fill="#3B82F6" radius={[6, 6, 0, 0]} barSize={40} animationDuration={1500} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
+                                No score data available
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -186,15 +200,21 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                         <FiPieChart style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Section Analysis</h3>
                     </div>
                     <div className="graph-container-box">
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={sectionAnalysis} layout="vertical" margin={{ left: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <YAxis dataKey="topic" type="category" width={90} tick={{ fill: '#E2E8F0', fontWeight: '600' }} tickLine={false} axisLine={false} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Bar dataKey="avgAccuracy" name="Accuracy" fill="#F59E0B" radius={[0, 6, 6, 0]} barSize={25} animationDuration={1500} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        {sectionAnalysis && sectionAnalysis.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={sectionAnalysis} layout="vertical" margin={{ left: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                    <YAxis dataKey="topic" type="category" width={90} tick={{ fill: '#E2E8F0', fontWeight: '600' }} tickLine={false} axisLine={false} />
+                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                    <Bar dataKey="avgAccuracy" name="Accuracy" fill="#F59E0B" radius={[0, 6, 6, 0]} barSize={25} animationDuration={1500} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
+                                No section analysis available
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -204,21 +224,27 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                         <FiTrendingUp style={{ color: '#8B5CF6', fontSize: '1.4rem' }} /> <h3>Question-wise Performance</h3>
                     </div>
                     <div className="graph-container-box" style={{ height: '350px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={questionAnalysis} margin={{ top: 10, left: -20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} animationDuration={1500}>
-                                    {questionAnalysis.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.correctPct < 30 ? '#F43F5E' : entry.correctPct > 80 ? '#10B981' : '#8B5CF6'} />
-                                    ))}
-                                </Bar>
-                                <Line type="monotone" dataKey="correctPct" name="Trend" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5, fill: '#0F172A', strokeWidth: 2 }} animationDuration={1500} />
-                            </ComposedChart>
-                        </ResponsiveContainer>
+                        {questionAnalysis && questionAnalysis.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ComposedChart data={questionAnalysis} margin={{ top: 10, left: -20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="name" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                    <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                    <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} animationDuration={1500}>
+                                        {questionAnalysis.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.correctPct < 30 ? '#F43F5E' : entry.correctPct > 80 ? '#10B981' : '#8B5CF6'} />
+                                        ))}
+                                    </Bar>
+                                    <Line type="monotone" dataKey="correctPct" name="Trend" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5, fill: '#0F172A', strokeWidth: 2 }} animationDuration={1500} />
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
+                                No question analysis available
+                            </div>
+                        )}
                     </div>
                     <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.5rem', justifyContent: 'center', fontSize: '0.9rem', color: '#94A3B8', fontWeight: 500 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#10B981', display: 'inline-block', borderRadius: 3 }}></span> Very Easy (&gt;80%)</span>

@@ -1004,7 +1004,7 @@ exports.getQuizResults = async (req, res) => {
                     startedAt: 1,
                     completedAt: 1,
                     totalTimeTaken: 1,
-                    totalScore: { $sum: "$answers.scoreAwarded" }, // DB Level Summation
+                    totalScore: 1, // Use standard pre-calculated totalScore to prevent zeroing out
                     maxPossibleScore: 1,
                     percentage: 1,
                     tabSwitchCount: 1,
