@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
+```javascript
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -7,14 +8,39 @@ import {
 } from 'recharts';
 import {
     FiTarget, FiAward, FiClock, FiActivity, FiPieChart,
-    FiBarChart2, FiTrendingUp
+    FiBarChart2, FiTrendingUp, FiCrosshair, FiCheckCircle
 } from 'react-icons/fi';
 import { responseAPI } from '../../services/api';
 
-const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
+const StudentVisualReport = ({ report, analytics = {}, leaderboard, user }) => {
 
     const [historyData, setHistoryData] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
+
+    // --- BULLETPROOF RESPONSIVE CHART WIDTH HOOK ---
+    const gridRef = useRef(null);
+    const [chartWidth, setChartWidth] = useState(500);
+
+    useEffect(() => {
+        const updateWidth = () => {
+            if (gridRef.current) {
+                const padding = 60; // Card padding (1.5rem * 2 = 48px, plus some margin for safety)
+                const containerWidth = gridRef.current.clientWidth;
+                // If container is wide enough (e.g., for two columns), split into 2 columns
+                // This logic assumes the parent container for the two-column layout has a min-width for two columns.
+                // For the two-column layout, each chart card has flex: '1 1 400px', so if containerWidth > 800px + gap, it's two columns.
+                // Let's simplify: if the container is wide enough for two cards, calculate half. Otherwise, full width.
+                // The flex basis is 400px, so if containerWidth > 800px + gap, it's two columns.
+                const calculatedWidth = containerWidth > 850 ? (containerWidth / 2) - padding : containerWidth - padding;
+                setChartWidth(Math.max(300, calculatedWidth)); // Ensure a minimum width
+            }
+        };
+
+        updateWidth(); // Set initial width
+        window.addEventListener('resize', updateWidth);
+        return () => window.removeEventListener('resize', updateWidth);
+    }, []);
+    // -----------------------------------------------
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -24,7 +50,7 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                     // Extract data for line chart, sorted chronologically (oldest to newest)
                     const sortedResponses = [...res.data.data.responses].reverse();
                     const trendData = sortedResponses.map((r, idx) => ({
-                        quiz: r.quizId?.title || `Quiz ${idx + 1}`,
+                        quiz: r.quizId?.title || `Quiz ${ idx + 1 } `,
                         score: r.percentage || 0,
                         date: new Date(r.createdAt).toLocaleDateString()
                     }));
@@ -97,7 +123,7 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
             const timeSeconds = ans && ans.timeTaken ? Number((Math.max(0, ans.timeTaken) / 1000).toFixed(1)) : 0;
             if (timeSeconds > 0) validTimes.push(timeSeconds);
             return {
-                name: `Q${idx + 1}`,
+                name: `Q${ idx + 1 } `,
                 time: timeSeconds,
                 isCorrect: ans?.isCorrect || false
             };
@@ -193,27 +219,25 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                 </div>
             </div>
 
-            {/* Middle Row: Graphs */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
+            {/* Visual Analytics */}
+            <div className="analytics-graphs-container" ref={gridRef} style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '2rem' }}>
 
-                {/* Accuracy Pie Chart */}
-                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                {/* Accuracy Breakdown (Pie Chart) */}
+                <div className="graph-card" style={{ flex: '1 1 400px', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
-                        <FiPieChart color="var(--primary)" /> Overall Accuracy
+                        <FiCrosshair color="var(--primary)" /> Overall Accuracy
                     </h3>
                     <div style={{ width: '100%', height: '250px' }}>
                         {accuracyData && accuracyData.length > 0 ? (
-                            <ResponsiveContainer>
-                                <PieChart>
-                                    <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false}>
-                                        {accuracyData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip content={<CustomTooltipPie />} />
-                                    <Legend verticalAlign="bottom" height={36} />
-                                </PieChart>
-                            </ResponsiveContainer>
+                            <PieChart width={chartWidth} height={250}>
+                                <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false}>
+                                    {accuracyData.map((entry, index) => (
+                                        <Cell key={`cell - ${ index } `} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <RechartsTooltip content={<CustomTooltipPie />} />
+                                <Legend verticalAlign="bottom" height={36} />
+                            </PieChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
                                 No accuracy data available
@@ -222,28 +246,26 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                     </div>
                 </div>
 
-                {/* Section-wise Performance Bar Chart */}
-                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                {/* Section Performance (Bar Chart) */}
+                <div className="graph-card" style={{ flex: '1 1 400px', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
-                        <FiBarChart2 color="var(--primary)" /> Section Performance
+                        <FiCheckCircle color="var(--primary)" /> Section Performance
                     </h3>
                     <div style={{ width: '100%', height: '250px' }}>
                         {sectionData && sectionData.length > 0 ? (
-                            <ResponsiveContainer>
-                                <BarChart data={sectionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="barColor" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.2} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
-                                    <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
-                                    <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
-                                    <Tooltip content={<CustomTooltipBar />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                    <Bar dataKey="Accuracy" fill="url(#barColor)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                            <BarChart width={chartWidth} height={250} data={sectionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="barColor" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.2} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                                <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+                                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
+                                <RechartsTooltip content={<CustomTooltipBar />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Bar dataKey="Accuracy" fill="url(#barColor)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                            </BarChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
                                 No section data available
@@ -251,13 +273,11 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                         )}
                     </div>
                 </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '2rem' }}>
-                {/* Personal Score Trend Analysis Line Chart */}
-                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                {/* Personal Score Trend (Historical) */}
+                <div className="graph-card" style={{ flex: '1 1 100%', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
-                        <FiTrendingUp color="var(--primary)" /> Personal Score Trend
+                        <FiTrendingUp color="var(--primary)" /> Personal Score Trend (Last 10 Quizzes)
                     </h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Your score progression across recent quizzes.</p>
                     <div style={{ width: '100%', minWidth: 0, height: 300 }}>
@@ -266,28 +286,26 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                                 Loading historical data...
                             </div>
                         ) : historyData && historyData.length > 0 ? (
-                            <ResponsiveContainer width="99%" height={300}>
-                                <LineChart data={historyData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
-                                    <XAxis dataKey="quiz" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
-                                    <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
-                                    <RechartsTooltip
-                                        contentStyle={{ background: 'var(--bg-card)', border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
-                                        itemStyle={{ color: 'var(--text-primary)' }}
-                                        cursor={{ stroke: 'rgba(255,255,255,0.1)' }}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="score"
-                                        stroke="#8B5CF6"
-                                        strokeWidth={3}
-                                        dot={{ r: 5, fill: '#0F172A', strokeWidth: 2, stroke: '#8B5CF6' }}
-                                        activeDot={{ r: 7 }}
-                                        isAnimationActive={false}
-                                        name="Score %"
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
+                            <LineChart width={gridRef.current?.clientWidth ? gridRef.current.clientWidth - 48 : chartWidth * 2} height={300} data={historyData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                                <XAxis dataKey="quiz" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+                                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
+                                <RechartsTooltip
+                                    contentStyle={{ background: 'var(--bg-card)', border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+                                    itemStyle={{ color: 'var(--text-primary)' }}
+                                    cursor={{ stroke: 'rgba(255,255,255,0.1)' }}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="score"
+                                    stroke="#8B5CF6"
+                                    strokeWidth={3}
+                                    dot={{ r: 5, fill: '#0F172A', strokeWidth: 2, stroke: '#8B5CF6' }}
+                                    activeDot={{ r: 7 }}
+                                    isAnimationActive={false}
+                                    name="Score %"
+                                />
+                            </LineChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
                                 No historical data available
@@ -296,43 +314,41 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                     </div>
                 </div>
 
-                {/* Bottom Row: Time Analysis Area Chart */}
-                <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                {/* Time Analysis Area Chart */}
+                <div className="graph-card" style={{ flex: '1 1 100%', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
                         <FiClock color="var(--primary)" /> Time Spent per Question
                     </h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Time distribution across questions (orange dot indicates spike).</p>
                     <div style={{ width: '100%', minWidth: 0, height: 300 }}>
                         {timeData.data && timeData.data.length > 0 ? (
-                            <ResponsiveContainer width="99%" height={300}>
-                                <AreaChart data={timeData.data} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
-                                    <defs>
-                                        <linearGradient id="colorTime" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
-                                    <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
-                                    <YAxis unit="s" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
-                                    <RechartsTooltip
-                                        contentStyle={{ background: 'var(--bg-card)', border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
-                                        itemStyle={{ color: 'var(--text-primary)' }}
-                                    />
-                                    <ReferenceLine y={timeData.averageLine} stroke="var(--text-muted)" strokeDasharray="3 3" label={{ position: 'top', value: `Avg: ${timeData.averageLine}s`, fill: 'var(--text-muted)', fontSize: 10 }} />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="time"
-                                        stroke="var(--primary)"
-                                        fillOpacity={1}
-                                        fill="url(#colorTime)"
-                                        strokeWidth={3}
-                                        dot={<CustomizedDot />}
-                                        isAnimationActive={false}
-                                        name="Time Taken"
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                            <AreaChart width={gridRef.current?.clientWidth ? gridRef.current.clientWidth - 48 : chartWidth * 2} height={300} data={timeData.data} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                                <defs>
+                                    <linearGradient id="colorTime" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                                <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+                                <YAxis unit="s" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+                                <RechartsTooltip
+                                    contentStyle={{ background: 'var(--bg-card)', border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+                                    itemStyle={{ color: 'var(--text-primary)' }}
+                                />
+                                <ReferenceLine y={timeData.averageLine} stroke="var(--text-muted)" strokeDasharray="3 3" label={{ position: 'top', value: `Avg: ${ timeData.averageLine } s`, fill: 'var(--text-muted)', fontSize: 10 }} />
+                                <Area
+                                    type="monotone"
+                                    dataKey="time"
+                                    stroke="var(--primary)"
+                                    fillOpacity={1}
+                                    fill="url(#colorTime)"
+                                    strokeWidth={3}
+                                    dot={<CustomizedDot />}
+                                    isAnimationActive={false}
+                                    name="Time Taken"
+                                />
+                            </AreaChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
                                 No timing data available
