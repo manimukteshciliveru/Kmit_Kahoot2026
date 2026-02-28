@@ -11,7 +11,7 @@ import {
 } from 'react-icons/fi';
 import { responseAPI } from '../../services/api';
 
-const StudentVisualReport = ({ report, analytics = {}, leaderboard, user }) => {
+const StudentVisualReport = ({ report, analytics = {} }) => {
 
     const [historyData, setHistoryData] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
@@ -114,7 +114,6 @@ const StudentVisualReport = ({ report, analytics = {}, leaderboard, user }) => {
         const answers = report.answers || [];
 
         // Calculate average time to find spikes
-        let totalTime = 0;
         const validTimes = [];
 
         const mapped = questions.map((q, idx) => {
