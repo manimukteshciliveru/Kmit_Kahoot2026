@@ -239,7 +239,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="range" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                                 <Bar dataKey="students" name="Students" fill="#3B82F6" radius={[6, 6, 0, 0]} barSize={40} isAnimationActive={false} />
                             </BarChart>
                         ) : (
@@ -261,7 +261,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                 <XAxis type="number" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <YAxis dataKey="topic" type="category" width={90} tick={{ fill: '#E2E8F0', fontWeight: '600' }} tickLine={false} axisLine={false} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                                 <Legend />
                                 <Bar dataKey="Correct" stackId="a" fill="#10B981" isAnimationActive={false} />
                                 <Bar dataKey="Incorrect" stackId="a" fill="#F43F5E" radius={[0, 6, 6, 0]} isAnimationActive={false} />
@@ -287,7 +287,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                         <Cell key={`cell-${index}`} fill={entry.fill} />
                                     ))}
                                 </Pie>
-                                <Tooltip content={<CustomTooltip />} />
+                                <Tooltip content={CustomTooltip} />
                                 <Legend verticalAlign="bottom" height={36} />
                             </PieChart>
                         ) : (
@@ -309,7 +309,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="name" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                 <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} isAnimationActive={false}>
                                     {questionAnalysis.map((entry, index) => (
@@ -342,7 +342,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                 <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#E2E8F0', fontWeight: '500' }} tickLine={false} axisLine={false} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                                 <Bar dataKey="score" name="Score %" radius={[0, 6, 6, 0]} barSize={20} isAnimationActive={false}>
                                     {leaderboardData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={index < 3 ? '#F59E0B' : '#3B82F6'} />

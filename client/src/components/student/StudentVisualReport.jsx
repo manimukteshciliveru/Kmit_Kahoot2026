@@ -233,7 +233,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                                         <Cell key={`cell - ${index} `} fill={entry.color} />
                                     ))}
                                 </Pie>
-                                <RechartsTooltip content={<CustomTooltipPie />} />
+                                <RechartsTooltip content={CustomTooltipPie} />
                                 <Legend verticalAlign="bottom" height={36} />
                             </PieChart>
                         ) : (
@@ -261,7 +261,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
                                 <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
                                 <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
-                                <RechartsTooltip content={<CustomTooltipBar />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <RechartsTooltip content={CustomTooltipBar} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                                 <Bar dataKey="Accuracy" fill="url(#barColor)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                             </BarChart>
                         ) : (
@@ -342,7 +342,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                                     fillOpacity={1}
                                     fill="url(#colorTime)"
                                     strokeWidth={3}
-                                    dot={<CustomizedDot />}
+                                    dot={CustomizedDot}
                                     isAnimationActive={false}
                                     name="Time Taken"
                                 />
