@@ -116,7 +116,8 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
             return {
                 name: q.number,
                 correctPct: Number(correctPct.toFixed(1)),
-                topic: q.topic
+                topic: q.topic,
+                fill: correctPct < 30 ? '#F43F5E' : correctPct > 80 ? '#10B981' : '#8B5CF6'
             };
         });
         console.log('[DEBUG] FacultyLiveAnalysis - questionAnalysis:', result);
@@ -165,13 +166,13 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
         return validData;
     }, [responses, absentStudents]);
 
-    // 6. Leaderboard (Horizontal Bar Chart)
     const leaderboardData = useMemo(() => {
         if (!leaderboard || leaderboard.length === 0) return [];
         return leaderboard.slice(0, 10).map((entry, idx) => ({
             rank: entry.rank || idx + 1,
             name: (entry.student?.name || entry.userId?.name || 'Unknown').split(' ')[0], // First name for compact display
-            score: entry.percentage || ((entry.totalScore / (quiz?.totalPoints || 100)) * 100) || 0
+            score: entry.percentage || ((entry.totalScore / (quiz?.totalPoints || 100)) * 100) || 0,
+            fill: idx < 3 ? '#F59E0B' : '#3B82F6'
         }));
     }, [leaderboard, quiz]);
 
@@ -282,11 +283,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     <div className="graph-container-box" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                         {participationData && participationData.length > 0 ? (
                             <PieChart width={chartWidth} height={300}>
-                                <Pie data={participationData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false}>
-                                    {participationData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                                    ))}
-                                </Pie>
+                                <Pie data={participationData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false} />
                                 <Tooltip content={CustomTooltip} />
                                 <Legend verticalAlign="bottom" height={36} />
                             </PieChart>
@@ -311,11 +308,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} isAnimationActive={false}>
-                                    {questionAnalysis.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.correctPct < 30 ? '#F43F5E' : entry.correctPct > 80 ? '#10B981' : '#8B5CF6'} />
-                                    ))}
-                                </Bar>
+                                <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} isAnimationActive={false} />
                                 <Line type="monotone" dataKey="correctPct" name="Trend" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5, fill: '#0F172A', strokeWidth: 2 }} isAnimationActive={false} />
                             </ComposedChart>
                         ) : (
@@ -343,11 +336,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                 <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#E2E8F0', fontWeight: '500' }} tickLine={false} axisLine={false} />
                                 <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Bar dataKey="score" name="Score %" radius={[0, 6, 6, 0]} barSize={20} isAnimationActive={false}>
-                                    {leaderboardData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={index < 3 ? '#F59E0B' : '#3B82F6'} />
-                                    ))}
-                                </Bar>
+                                <Bar dataKey="score" name="Score %" radius={[0, 6, 6, 0]} barSize={20} isAnimationActive={false} />
                             </BarChart>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>

@@ -69,9 +69,9 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
     // 2. Accuracy Pie Chart Data
     const accuracyData = useMemo(() => {
         const data = [
-            { name: 'Correct', value: analytics.correct || 0, color: '#10B981' },
-            { name: 'Wrong', value: analytics.incorrect || 0, color: '#F43F5E' },
-            { name: 'Unattempted', value: analytics.unattempted || 0, color: '#94A3B8' }
+            { name: 'Correct', value: analytics.correct || 0, fill: '#10B981', color: '#10B981' },
+            { name: 'Wrong', value: analytics.incorrect || 0, fill: '#F43F5E', color: '#F43F5E' },
+            { name: 'Unattempted', value: analytics.unattempted || 0, fill: '#94A3B8', color: '#94A3B8' }
         ].filter(d => d.value > 0);
         console.log('[DEBUG] StudentVisualReport - accuracyData:', data);
         return data;
@@ -228,11 +228,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                     <div style={{ width: '100%', height: '250px' }}>
                         {accuracyData && accuracyData.length > 0 ? (
                             <PieChart width={chartWidth} height={250}>
-                                <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false}>
-                                    {accuracyData.map((entry, index) => (
-                                        <Cell key={`cell - ${index} `} fill={entry.color} />
-                                    ))}
-                                </Pie>
+                                <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false} />
                                 <RechartsTooltip content={CustomTooltipPie} />
                                 <Legend verticalAlign="bottom" height={36} />
                             </PieChart>
