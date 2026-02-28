@@ -100,22 +100,57 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
         return result;
     }, [responses, quiz]);
 
-    // 4. Section/Topic wise average
+    // 4. Section/Topic wise average (Stacked Bar for Class-level Accuracy)
     const sectionAnalysis = useMemo(() => {
         const topics = {};
-        questionAnalysis.forEach(q => {
-            if (!topics[q.topic]) topics[q.topic] = { totalPct: 0, count: 0 };
-            topics[q.topic].totalPct += q.correctPct;
-            topics[q.topic].count++;
+        responses.forEach(r => {
+            if (r.answers) {
+                r.answers.forEach(a => {
+                    const qIdStr = String(a.questionId || (a.question && a.question._id));
+                    const q = quiz?.questions?.find(que => String(que._id) === qIdStr);
+                    const topic = q?.topic || 'General';
+                    if (!topics[topic]) topics[topic] = { topic, correct: 0, wrong: 0, total: 0 };
+
+                    topics[topic].total++;
+                    if (a.isCorrect || a.scoreAwarded > 0) topics[topic].correct++;
+                    else if (a.answer && String(a.answer).trim() !== '') topics[topic].wrong++;
+                    // Note: unattempted may be skipped or logged independently based on requirements,
+                    // but we will simply track Correct and Incorrect for the stacked bar
+                });
+            }
         });
 
-        const result = Object.keys(topics).map(t => ({
-            topic: t,
-            avgAccuracy: Number((topics[t].totalPct / topics[t].count).toFixed(1))
+        const result = Object.values(topics).map(t => ({
+            topic: t.topic,
+            Correct: t.correct,
+            Incorrect: t.wrong,
+            avgAccuracy: t.total > 0 ? Number(((t.correct / t.total) * 100).toFixed(1)) : 0
         }));
         console.log('[DEBUG] FacultyLiveAnalysis - sectionAnalysis:', result);
         return result;
-    }, [questionAnalysis]);
+    }, [responses, quiz]);
+
+    // 5. Participation Rate (Donut Chart)
+    const participationData = useMemo(() => {
+        const attempted = responses.length;
+        const absent = absentStudents.length;
+        // Don't render pie segments if completely 0 to avoid Recharts warnings
+        const validData = [];
+        if (attempted > 0) validData.push({ name: 'Attempted', value: attempted, fill: '#10B981' });
+        if (absent > 0) validData.push({ name: 'Absent', value: absent, fill: '#F43F5E' });
+
+        return validData;
+    }, [responses, absentStudents]);
+
+    // 6. Leaderboard (Horizontal Bar Chart)
+    const leaderboardData = useMemo(() => {
+        if (!leaderboard || leaderboard.length === 0) return [];
+        return leaderboard.slice(0, 10).map((entry, idx) => ({
+            rank: entry.rank || idx + 1,
+            name: (entry.student?.name || entry.userId?.name || 'Unknown').split(' ')[0], // First name for compact display
+            score: entry.percentage || ((entry.totalScore / (quiz?.totalPoints || 100)) * 100) || 0
+        }));
+    }, [leaderboard, quiz]);
 
     const COLORS = ['#6366F1', '#10B981', '#F43F5E', '#F59E0B', '#0EA5E9'];
 
@@ -194,7 +229,7 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     </div>
                 </div>
 
-                {/* Section/Topic Accuracy */}
+                {/* Section/Topic Accuracy (Stacked Bar) */}
                 <div className="modern-graph-card">
                     <div className="graph-header">
                         <FiPieChart style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Section Analysis</h3>
@@ -204,15 +239,43 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                             <ResponsiveContainer width="99%" height={300}>
                                 <BarChart data={sectionAnalysis} layout="vertical" margin={{ left: 0, top: 20, right: 20, bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                    <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                    <XAxis type="number" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                     <YAxis dataKey="topic" type="category" width={90} tick={{ fill: '#E2E8F0', fontWeight: '600' }} tickLine={false} axisLine={false} />
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                    <Bar dataKey="avgAccuracy" name="Accuracy" fill="#F59E0B" radius={[0, 6, 6, 0]} barSize={25} animationDuration={1000} />
+                                    <Legend />
+                                    <Bar dataKey="Correct" stackId="a" fill="#10B981" animationDuration={1000} />
+                                    <Bar dataKey="Incorrect" stackId="a" fill="#F43F5E" radius={[0, 6, 6, 0]} animationDuration={1000} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
                                 No section analysis available
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Participation Rate (Donut Chart) */}
+                <div className="modern-graph-card">
+                    <div className="graph-header">
+                        <FiUsers style={{ color: '#0EA5E9', fontSize: '1.4rem' }} /> <h3>Participation Rate</h3>
+                    </div>
+                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 300 }}>
+                        {participationData && participationData.length > 0 ? (
+                            <ResponsiveContainer width="99%" height={300}>
+                                <PieChart>
+                                    <Pie data={participationData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                        {participationData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Legend verticalAlign="bottom" height={36} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
+                                No participation data available
                             </div>
                         )}
                     </div>
@@ -250,6 +313,34 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#10B981', display: 'inline-block', borderRadius: 3 }}></span> Very Easy (&gt;80%)</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#8B5CF6', display: 'inline-block', borderRadius: 3 }}></span> Moderate</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#F43F5E', display: 'inline-block', borderRadius: 3 }}></span> Hard (&lt;30%)</span>
+                    </div>
+                </div>
+
+                {/* Top 10 Leaderboard (Horizontal Bar Chart) */}
+                <div className="modern-graph-card graph-card-full">
+                    <div className="graph-header">
+                        <FiAward style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Top 10 Students</h3>
+                    </div>
+                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 400 }}>
+                        {leaderboardData && leaderboardData.length > 0 ? (
+                            <ResponsiveContainer width="99%" height={400}>
+                                <BarChart data={leaderboardData} layout="vertical" margin={{ left: 20, right: 20, top: 20, bottom: 20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                    <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#E2E8F0', fontWeight: '500' }} tickLine={false} axisLine={false} />
+                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                    <Bar dataKey="score" name="Score %" radius={[0, 6, 6, 0]} barSize={20} animationDuration={1000}>
+                                        {leaderboardData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={index < 3 ? '#F59E0B' : '#3B82F6'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
+                                No leaderboard data available
+                            </div>
+                        )}
                     </div>
                 </div>
 
