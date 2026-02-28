@@ -1,4 +1,3 @@
-```javascript
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
@@ -50,7 +49,7 @@ const StudentVisualReport = ({ report, analytics = {}, leaderboard, user }) => {
                     // Extract data for line chart, sorted chronologically (oldest to newest)
                     const sortedResponses = [...res.data.data.responses].reverse();
                     const trendData = sortedResponses.map((r, idx) => ({
-                        quiz: r.quizId?.title || `Quiz ${ idx + 1 } `,
+                        quiz: r.quizId?.title || `Quiz ${idx + 1} `,
                         score: r.percentage || 0,
                         date: new Date(r.createdAt).toLocaleDateString()
                     }));
@@ -123,7 +122,7 @@ const StudentVisualReport = ({ report, analytics = {}, leaderboard, user }) => {
             const timeSeconds = ans && ans.timeTaken ? Number((Math.max(0, ans.timeTaken) / 1000).toFixed(1)) : 0;
             if (timeSeconds > 0) validTimes.push(timeSeconds);
             return {
-                name: `Q${ idx + 1 } `,
+                name: `Q${idx + 1} `,
                 time: timeSeconds,
                 isCorrect: ans?.isCorrect || false
             };
@@ -232,7 +231,7 @@ const StudentVisualReport = ({ report, analytics = {}, leaderboard, user }) => {
                             <PieChart width={chartWidth} height={250}>
                                 <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false}>
                                     {accuracyData.map((entry, index) => (
-                                        <Cell key={`cell - ${ index } `} fill={entry.color} />
+                                        <Cell key={`cell - ${index} `} fill={entry.color} />
                                     ))}
                                 </Pie>
                                 <RechartsTooltip content={<CustomTooltipPie />} />
@@ -336,7 +335,7 @@ const StudentVisualReport = ({ report, analytics = {}, leaderboard, user }) => {
                                     contentStyle={{ background: 'var(--bg-card)', border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
                                     itemStyle={{ color: 'var(--text-primary)' }}
                                 />
-                                <ReferenceLine y={timeData.averageLine} stroke="var(--text-muted)" strokeDasharray="3 3" label={{ position: 'top', value: `Avg: ${ timeData.averageLine } s`, fill: 'var(--text-muted)', fontSize: 10 }} />
+                                <ReferenceLine y={timeData.averageLine} stroke="var(--text-muted)" strokeDasharray="3 3" label={{ position: 'top', value: `Avg: ${timeData.averageLine} s`, fill: 'var(--text-muted)', fontSize: 10 }} />
                                 <Area
                                     type="monotone"
                                     dataKey="time"
