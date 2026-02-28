@@ -210,15 +210,15 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     <div className="graph-header">
                         <FiBarChart2 style={{ color: '#3B82F6', fontSize: '1.4rem' }} /> <h3>Score Distribution</h3>
                     </div>
-                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 300 }}>
+                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 300, minHeight: 300 }}>
                         {scoreDistribution && scoreDistribution.length > 0 && scoreDistribution.some(d => d.students > 0) ? (
-                            <ResponsiveContainer width="99%" height={300}>
+                            <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={scoreDistribution} margin={{ left: -20, top: 20, right: 20, bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="range" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                     <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} allowDecimals={false} />
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                    <Bar dataKey="students" name="Students" fill="#3B82F6" radius={[6, 6, 0, 0]} barSize={40} animationDuration={1000} />
+                                    <Bar dataKey="students" name="Students" fill="#3B82F6" radius={[6, 6, 0, 0]} barSize={40} isAnimationActive={false} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
@@ -234,17 +234,17 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     <div className="graph-header">
                         <FiPieChart style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Section Analysis</h3>
                     </div>
-                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 300 }}>
+                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 300, minHeight: 300 }}>
                         {sectionAnalysis && sectionAnalysis.length > 0 ? (
-                            <ResponsiveContainer width="99%" height={300}>
+                            <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={sectionAnalysis} layout="vertical" margin={{ left: 0, top: 20, right: 20, bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                     <XAxis type="number" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                     <YAxis dataKey="topic" type="category" width={90} tick={{ fill: '#E2E8F0', fontWeight: '600' }} tickLine={false} axisLine={false} />
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                                     <Legend />
-                                    <Bar dataKey="Correct" stackId="a" fill="#10B981" animationDuration={1000} />
-                                    <Bar dataKey="Incorrect" stackId="a" fill="#F43F5E" radius={[0, 6, 6, 0]} animationDuration={1000} />
+                                    <Bar dataKey="Correct" stackId="a" fill="#10B981" isAnimationActive={false} />
+                                    <Bar dataKey="Incorrect" stackId="a" fill="#F43F5E" radius={[0, 6, 6, 0]} isAnimationActive={false} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
@@ -260,11 +260,11 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     <div className="graph-header">
                         <FiUsers style={{ color: '#0EA5E9', fontSize: '1.4rem' }} /> <h3>Participation Rate</h3>
                     </div>
-                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 300 }}>
+                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 300, minHeight: 300 }}>
                         {participationData && participationData.length > 0 ? (
-                            <ResponsiveContainer width="99%" height={300}>
+                            <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={participationData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                    <Pie data={participationData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false}>
                                         {participationData.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.fill} />
                                         ))}
@@ -286,21 +286,21 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     <div className="graph-header">
                         <FiTrendingUp style={{ color: '#8B5CF6', fontSize: '1.4rem' }} /> <h3>Question-wise Performance</h3>
                     </div>
-                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 350 }}>
+                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 350, minHeight: 350 }}>
                         {questionAnalysis && questionAnalysis.length > 0 ? (
-                            <ResponsiveContainer width="99%" height={350}>
+                            <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={questionAnalysis} margin={{ top: 20, left: -20, right: 20, bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="name" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                     <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                    <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} animationDuration={1000}>
+                                    <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} isAnimationActive={false}>
                                         {questionAnalysis.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.correctPct < 30 ? '#F43F5E' : entry.correctPct > 80 ? '#10B981' : '#8B5CF6'} />
                                         ))}
                                     </Bar>
-                                    <Line type="monotone" dataKey="correctPct" name="Trend" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5, fill: '#0F172A', strokeWidth: 2 }} animationDuration={1000} />
+                                    <Line type="monotone" dataKey="correctPct" name="Trend" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5, fill: '#0F172A', strokeWidth: 2 }} isAnimationActive={false} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         ) : (
@@ -321,15 +321,15 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     <div className="graph-header">
                         <FiAward style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Top 10 Students</h3>
                     </div>
-                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 400 }}>
+                    <div className="graph-container-box" style={{ width: '100%', minWidth: 0, height: 400, minHeight: 400 }}>
                         {leaderboardData && leaderboardData.length > 0 ? (
-                            <ResponsiveContainer width="99%" height={400}>
+                            <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={leaderboardData} layout="vertical" margin={{ left: 20, right: 20, top: 20, bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                     <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
                                     <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#E2E8F0', fontWeight: '500' }} tickLine={false} axisLine={false} />
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                    <Bar dataKey="score" name="Score %" radius={[0, 6, 6, 0]} barSize={20} animationDuration={1000}>
+                                    <Bar dataKey="score" name="Score %" radius={[0, 6, 6, 0]} barSize={20} isAnimationActive={false}>
                                         {leaderboardData.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={index < 3 ? '#F59E0B' : '#3B82F6'} />
                                         ))}

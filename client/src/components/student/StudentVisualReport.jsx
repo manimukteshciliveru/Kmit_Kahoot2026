@@ -205,7 +205,7 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                         {accuracyData && accuracyData.length > 0 ? (
                             <ResponsiveContainer>
                                 <PieChart>
-                                    <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                    <Pie data={accuracyData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false}>
                                         {accuracyData.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                         ))}
@@ -241,7 +241,7 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                                     <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
                                     <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
                                     <Tooltip content={<CustomTooltipBar />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                    <Bar dataKey="Accuracy" fill="url(#barColor)" radius={[4, 4, 0, 0]} animationDuration={1000} />
+                                    <Bar dataKey="Accuracy" fill="url(#barColor)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
@@ -283,7 +283,7 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                                         strokeWidth={3}
                                         dot={{ r: 5, fill: '#0F172A', strokeWidth: 2, stroke: '#8B5CF6' }}
                                         activeDot={{ r: 7 }}
-                                        animationDuration={1500}
+                                        isAnimationActive={false}
                                         name="Score %"
                                     />
                                 </LineChart>
@@ -328,7 +328,7 @@ const StudentVisualReport = ({ report, analytics, leaderboard, user }) => {
                                         fill="url(#colorTime)"
                                         strokeWidth={3}
                                         dot={<CustomizedDot />}
-                                        animationDuration={1500}
+                                        isAnimationActive={false}
                                         name="Time Taken"
                                     />
                                 </AreaChart>
