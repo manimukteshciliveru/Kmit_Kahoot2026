@@ -182,7 +182,8 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
         if (!leaderboard || leaderboard.length === 0) return [];
         return leaderboard.slice(0, 10).map((entry, idx) => ({
             rank: entry.rank || idx + 1,
-            name: (entry.student?.name || entry.userId?.name || 'Unknown').split(' ')[0], // First name for compact display
+            // Use rollNumber if available, otherwise fallback to truncated name
+            name: entry.student?.rollNumber || entry.userId?.rollNumber || (entry.student?.name || entry.userId?.name || 'Unknown').split(' ')[0],
             score: entry.percentage || ((entry.totalScore / (quiz?.totalPoints || 100)) * 100) || 0,
             fill: idx < 3 ? '#F59E0B' : '#3B82F6'
         }));
