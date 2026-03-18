@@ -557,7 +557,6 @@ const PlayQuiz = () => {
                                     <FiClock /> {Math.floor(quizTimeLeft / 60)}:{String(quizTimeLeft % 60).padStart(2, '0')}
                                 </div>
                             )}
-                            <div className="stat-pill primary">Score: {score}</div>
                             <div className="stat-pill">Q{currentIndex + 1}/{questions.length}</div>
                         </div>
                     </div>

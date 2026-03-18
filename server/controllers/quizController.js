@@ -1141,21 +1141,34 @@ exports.getQuizResults = async (req, res) => {
 
         // Calculate Absent Students
         let absentStudents = [];
-        if (quiz.accessControl && !quiz.accessControl.isPublic && quiz.accessControl.allowedBranches?.length > 0) {
-            const criteria = quiz.accessControl.allowedBranches.map(b => ({
-                department: b.name,
-                ...(b.sections.length > 0 ? { section: { $in: b.sections } } : {})
-            }));
+        if (quiz.accessControl && !quiz.accessControl.isPublic) {
+            let allowedUsers = [];
 
-            if (criteria.length > 0) {
-                const allowedUsers = await User.find({
+            if (quiz.accessControl.mode === 'SPECIFIC' && quiz.accessControl.allowedStudents?.length > 0) {
+                // Only specific students are eligible
+                allowedUsers = await User.find({
+                    _id: { $in: quiz.accessControl.allowedStudents },
                     role: 'student',
-                    isActive: true,
-                    $or: criteria
+                    isActive: true
                 }).select('_id name email department section rollNumber');
+            } else if (quiz.accessControl.mode !== 'SPECIFIC' && quiz.accessControl.allowedBranches?.length > 0) {
+                // Branch/section based eligibility
+                const criteria = quiz.accessControl.allowedBranches.map(b => ({
+                    department: b.name,
+                    ...(b.sections.length > 0 ? { section: { $in: b.sections } } : {})
+                }));
 
-                // Helper to safely get ID string
-                const getUserIdStr = (r) => r.userId ? r.userId._id.toString() : null;
+                if (criteria.length > 0) {
+                    allowedUsers = await User.find({
+                        role: 'student',
+                        isActive: true,
+                        $or: criteria
+                    }).select('_id name email department section rollNumber');
+                }
+            }
+
+            if (allowedUsers.length > 0) {
+                const getUserIdStr = (r) => r.student ? r.student.id.toString() : (r.userId ? r.userId._id.toString() : null);
                 const respondedUserIds = new Set(mappedResponses.map(getUserIdStr).filter(Boolean));
 
                 absentStudents = allowedUsers
