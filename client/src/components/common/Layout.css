@@ -1,69 +1,66 @@
+/* ============================================================
+   Layout — Kahoot! Style
+   ============================================================ */
+
 .layout {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #1A0533;
+  background-image:
+    radial-gradient(ellipse at 15% 5%, rgba(123, 47, 190, 0.35) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 95%, rgba(46, 23, 143, 0.3) 0%, transparent 50%);
+  background-attachment: fixed;
 }
 
 .main-content {
-    flex: 1;
-    margin-top: 70px;
-    /* Navbar Offset */
-    padding: var(--space-xl) var(--space-lg);
-    width: 100%;
-    max-width: 1400px;
-    margin-left: auto;
-    margin-right: auto;
-    animation: fadeIn 0.4s ease-out;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xl);
-    /* Standardized gap between sections */
+  flex: 1;
+  padding: 2rem 1.5rem;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
+/* ===== Footer ===== */
 .footer {
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border);
-    padding: var(--space-lg) var(--space-xl);
-    margin-top: auto;
+  margin-top: auto;
+  background: rgba(10, 2, 22, 0.8);
+  border-top: 1px solid rgba(255, 204, 2, 0.12);
+  backdrop-filter: blur(10px);
+  padding: 1.25rem 1.5rem;
 }
 
 .footer-content {
-    max-width: 1400px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1400px;
+  margin: 0 auto;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .footer-content p {
-    font-size: 0.85rem;
-    color: var(--text-muted);
+  color: rgba(255,255,255,0.25);
+  font-size: 0.82rem;
+  margin: 0;
 }
 
 .footer-links {
-    display: flex;
-    gap: var(--space-lg);
+  display: flex;
+  gap: 1.25rem;
 }
 
 .footer-links a {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    text-decoration: none;
-    transition: color var(--transition-fast);
+  color: rgba(255,255,255,0.25);
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
 
-.footer-links a:hover {
-    color: var(--primary-light);
-}
+.footer-links a:hover { color: rgba(255, 204, 2, 0.7); }
 
 @media (max-width: 768px) {
-    .main-content {
-        padding: var(--space-md);
-    }
-
-    .footer-content {
-        flex-direction: column;
-        gap: var(--space-md);
-        text-align: center;
-    }
+  .main-content { padding: 1.25rem 1rem; }
+  .footer-content { flex-direction: column; align-items: flex-start; }
 }
