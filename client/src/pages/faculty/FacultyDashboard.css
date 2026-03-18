@@ -593,7 +593,7 @@
 }
 
 /* ===== Quick Grid (Faculty) ===== */
-.quick-section { }
+.quick-section { min-height: 0; }
 .quick-grid {
   padding: 1rem;
   display: grid;
@@ -628,14 +628,20 @@
   transform: scale(1.04);
 }
 
-/* ===== Responsive ===== */
+/* ===========================
+   RESPONSIVE — Faculty Dashboard
+   =========================== */
+
+/* Large tablet (≤ 1200px) */
 @media (max-width: 1200px) {
   .stats-grid-main { grid-template-columns: repeat(2, 1fr); }
   .analytics-row   { grid-template-columns: repeat(3, 1fr); }
   .bottom-row      { grid-template-columns: 1fr 1fr; }
   .quick-section   { grid-column: span 2; }
+  .quick-grid      { grid-template-columns: repeat(4, 1fr); }
 }
 
+/* Tablet (≤ 900px) */
 @media (max-width: 900px) {
   .analytics-row { grid-template-columns: repeat(2, 1fr); }
   .bottom-row    { grid-template-columns: 1fr; }
@@ -643,8 +649,42 @@
   .quick-grid    { grid-template-columns: repeat(4, 1fr); }
 }
 
-@media (max-width: 640px) {
-  .stats-grid-main { grid-template-columns: 1fr 1fr; }
-  .analytics-row   { grid-template-columns: 1fr 1fr; }
+/* Small tablet / Large phone (≤ 768px) */
+@media (max-width: 768px) {
+  .stats-grid-main { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .analytics-row   { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .bottom-row      { grid-template-columns: 1fr; gap: 1rem; }
+  .quick-grid      { grid-template-columns: repeat(2, 1fr); }
+
+  .stat-card { padding: 1.1rem; }
+  .stat-number { font-size: 1.8rem; }
+  .dash-header { flex-direction: column; align-items: flex-start; padding: 1.25rem; }
+  .dash-welcome h1 { font-size: 1.5rem; }
+
+  /* Tables — scroll horizontally on mobile */
+  .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .data-table { min-width: 600px; }
+  .data-table th, .data-table td { padding: 0.7rem 0.85rem; font-size: 0.82rem; }
+
+  .section-header { padding: 1rem 1.25rem; }
+  .active-banner { flex-direction: column; align-items: flex-start; }
+}
+
+/* Small phones (≤ 480px) */
+@media (max-width: 480px) {
+  .stats-grid-main  { grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+  .analytics-row    { grid-template-columns: 1fr; }
+  .quick-grid       { grid-template-columns: 1fr 1fr; }
+  .stat-number      { font-size: 1.6rem; }
+  .stat-card        { padding: 0.9rem; border-radius: 16px; }
+  .stat-icon        { width: 44px; height: 44px; border-radius: 12px; }
+  .dash-welcome h1  { font-size: 1.25rem; }
+  .analytics-value  { font-size: 1.7rem; }
+  .section-header h2, .section-header h3 { font-size: 0.9rem; }
+}
+
+/* Very small phones (≤ 360px) */
+@media (max-width: 360px) {
+  .stats-grid-main { grid-template-columns: 1fr; }
   .quick-grid      { grid-template-columns: 1fr 1fr; }
 }

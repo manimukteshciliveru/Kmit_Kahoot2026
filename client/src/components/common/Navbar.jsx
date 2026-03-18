@@ -1,18 +1,11 @@
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import {
-    FiHome,
-    FiLogOut,
-    FiUser,
-    FiSettings,
-    FiGrid,
-    FiUsers,
-    FiFileText,
-    FiPlusCircle,
-    FiActivity,
-    FiSun,
-    FiMoon
+    FiHome, FiLogOut, FiUser, FiSettings, FiGrid, FiUsers,
+    FiFileText, FiPlusCircle, FiActivity, FiSun, FiMoon,
+    FiMenu, FiX
 } from 'react-icons/fi';
 import { useTheme } from '../../context/ThemeContext';
 import KmitLogo from './KmitLogo';
@@ -24,35 +17,51 @@ const Navbar = () => {
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const location = useLocation();
+    const [menuOpen, setMenuOpen] = useState(false);
+
+    // Close mobile menu on route change
+    useEffect(() => {
+        setMenuOpen(false);
+    }, [location.pathname]);
+
+    // Close on outside click
+    useEffect(() => {
+        if (!menuOpen) return;
+        const close = (e) => {
+            if (!e.target.closest('.navbar')) setMenuOpen(false);
+        };
+        document.addEventListener('click', close);
+        return () => document.removeEventListener('click', close);
+    }, [menuOpen]);
 
     const handleLogout = () => {
         logout();
         navigate('/login');
+        setMenuOpen(false);
     };
 
     const getNavLinks = () => {
         if (!isAuthenticated || !user) return [];
-
         switch (user.role) {
             case 'student':
                 return [
-                    { path: '/dashboard', icon: <FiHome />, label: 'Dashboard' },
-                    { path: '/join-quiz', icon: <FiGrid />, label: 'Join Quiz' },
-                    { path: '/history', icon: <FiFileText />, label: 'History' }
+                    { path: '/dashboard',  icon: <FiHome />,     label: 'Dashboard' },
+                    { path: '/join-quiz',  icon: <FiGrid />,     label: 'Join Quiz' },
+                    { path: '/history',    icon: <FiFileText />, label: 'History' }
                 ];
             case 'faculty':
                 return [
-                    { path: '/dashboard', icon: <FiHome />, label: 'Dashboard' },
-                    { path: '/my-quizzes', icon: <FiGrid />, label: 'My Quizzes' },
+                    { path: '/dashboard',   icon: <FiHome />,       label: 'Dashboard' },
+                    { path: '/my-quizzes',  icon: <FiGrid />,       label: 'My Quizzes' },
                     { path: '/create-quiz', icon: <FiPlusCircle />, label: 'Create Quiz' }
                 ];
             case 'admin':
                 return [
-                    { path: '/dashboard', icon: <FiHome />, label: 'Dashboard' },
-                    { path: '/analytics', icon: <FiActivity />, label: 'Server Health' },
-                    { path: '/quiz-analytics', icon: <FiGrid />, label: 'Quiz Metrics' },
-                    { path: '/users', icon: <FiUsers />, label: 'Users' },
-                    { path: '/settings', icon: <FiSettings />, label: 'Settings' }
+                    { path: '/dashboard',      icon: <FiHome />,     label: 'Dashboard' },
+                    { path: '/analytics',      icon: <FiActivity />, label: 'Server Health' },
+                    { path: '/quiz-analytics', icon: <FiGrid />,     label: 'Quiz Metrics' },
+                    { path: '/users',          icon: <FiUsers />,    label: 'Users' },
+                    { path: '/settings',       icon: <FiSettings />, label: 'Settings' }
                 ];
             default:
                 return [];
@@ -64,41 +73,50 @@ const Navbar = () => {
     return (
         <nav className="navbar">
             <div className="navbar-container">
+                {/* Brand */}
                 <Link to="/" className="navbar-brand">
                     <div className="brand-logo-wrapper">
-                        <KmitLogo height="36px" />
+                        <KmitLogo height="34px" />
                     </div>
                 </Link>
 
+                {/* Desktop Nav Links */}
                 {isAuthenticated && (
-                    <>
-                        <ul className="navbar-links">
-                            {navLinks.map((link) => (
-                                <li key={link.path}>
-                                    <Link
-                                        to={link.path}
-                                        className={`nav-link ${location.pathname === link.path ? 'active' : ''}`}
-                                    >
-                                        {link.icon}
-                                        <span>{link.label}</span>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
+                    <ul className="navbar-links desktop-only">
+                        {navLinks.map((link) => (
+                            <li key={link.path}>
+                                <Link
+                                    to={link.path}
+                                    className={`nav-link ${location.pathname === link.path ? 'active' : ''}`}
+                                >
+                                    {link.icon}
+                                    <span>{link.label}</span>
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
-                        <div className="navbar-right">
-                            <button onClick={toggleTheme} className="theme-btn" title="Toggle Theme">
-                                {theme === 'dark' ? <FiSun /> : <FiMoon />}
-                            </button>
-                            <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
+                {/* Right Section */}
+                <div className="navbar-right">
+                    {/* Theme Toggle */}
+                    <button onClick={toggleTheme} className="theme-btn" title="Toggle Theme">
+                        {theme === 'dark' ? <FiSun /> : <FiMoon />}
+                    </button>
+
+                    {isAuthenticated && (
+                        <>
+                            {/* Connection Status — desktop only */}
+                            <div className={`connection-status desktop-only ${connected ? 'connected' : 'disconnected'}`}>
                                 <span className="status-dot"></span>
                                 <span className="status-text">{connected ? 'Live' : 'Offline'}</span>
                             </div>
 
-                            <div className="user-menu">
+                            {/* User Menu — desktop */}
+                            <div className="user-menu desktop-only">
                                 <div className="user-info">
                                     <img
-                                        src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.name}&background=FF7F11&color=fff`}
+                                        src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=7B2FBE&color=fff`}
                                         alt={user?.name}
                                         className="user-avatar"
                                     />
@@ -107,33 +125,84 @@ const Navbar = () => {
                                         <span className="user-role">{user?.role}</span>
                                     </div>
                                 </div>
-
                                 <div className="user-dropdown">
                                     <Link to="/profile" className="dropdown-item">
-                                        <FiUser />
-                                        <span>Profile</span>
+                                        <FiUser /><span>Profile</span>
                                     </Link>
                                     <button onClick={handleLogout} className="dropdown-item logout">
-                                        <FiLogOut />
-                                        <span>Logout</span>
+                                        <FiLogOut /><span>Logout</span>
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    </>
-                )}
 
-                {!isAuthenticated && (
-                    <div className="navbar-auth">
-                        <button onClick={toggleTheme} className="theme-btn" title="Toggle Theme">
-                            {theme === 'dark' ? <FiSun /> : <FiMoon />}
-                        </button>
-                        <Link to="/login" className="btn btn-primary">
-                            Log In
-                        </Link>
-                    </div>
-                )}
+                            {/* Mobile Hamburger */}
+                            <button
+                                className="hamburger-btn mobile-only"
+                                onClick={() => setMenuOpen(o => !o)}
+                                aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+                            >
+                                {menuOpen ? <FiX /> : <FiMenu />}
+                            </button>
+                        </>
+                    )}
+
+                    {!isAuthenticated && (
+                        <Link to="/login" className="btn btn-primary btn-sm">Log In</Link>
+                    )}
+                </div>
             </div>
+
+            {/* Mobile Slide-Down Menu */}
+            {isAuthenticated && (
+                <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
+                    {/* User info bar */}
+                    <div className="mobile-user-bar">
+                        <img
+                            src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=7B2FBE&color=fff`}
+                            alt={user?.name}
+                            className="user-avatar"
+                        />
+                        <div>
+                            <div className="user-name">{user?.name}</div>
+                            <div className="user-role">{user?.role}</div>
+                        </div>
+                        <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`} style={{ marginLeft: 'auto' }}>
+                            <span className="status-dot"></span>
+                            <span className="status-text">{connected ? 'Live' : 'Offline'}</span>
+                        </div>
+                    </div>
+
+                    {/* Mobile Nav Links */}
+                    <ul className="mobile-nav-links">
+                        {navLinks.map((link) => (
+                            <li key={link.path}>
+                                <Link
+                                    to={link.path}
+                                    className={`mobile-nav-link ${location.pathname === link.path ? 'active' : ''}`}
+                                    onClick={() => setMenuOpen(false)}
+                                >
+                                    {link.icon}
+                                    <span>{link.label}</span>
+                                </Link>
+                            </li>
+                        ))}
+                        <li>
+                            <Link
+                                to="/profile"
+                                className="mobile-nav-link"
+                                onClick={() => setMenuOpen(false)}
+                            >
+                                <FiUser /><span>Profile</span>
+                            </Link>
+                        </li>
+                        <li>
+                            <button className="mobile-nav-link logout-mobile" onClick={handleLogout}>
+                                <FiLogOut /><span>Logout</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            )}
         </nav>
     );
 };

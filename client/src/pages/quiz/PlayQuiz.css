@@ -1,4 +1,6 @@
 /* ============================================================
+   PlayQuiz — RESPONSIVE across Phone / Tablet / Desktop
+
    PlayQuiz — Kahoot!-Style Full-Screen Game Arena
    ============================================================ */
 
@@ -774,24 +776,61 @@
 }
 
 /* ===== Responsive ===== */
-@media (max-width: 768px) {
-  .mcq-options-layout { grid-template-columns: 1fr; }
-  .q-text-display { font-size: 1.2rem; }
-  .q-header { padding: 1.5rem 1.25rem 1rem; }
-  .options-grid-container { padding: 1.25rem; }
 
-  .controls-inner { flex-wrap: wrap; }
-  .control-btn { flex: 1; min-width: 100px; padding: 0.75rem 1rem; }
-
-  .waiting-glass-card { padding: 2.5rem 1.75rem; }
-  .results-hero-card  { padding: 2.5rem 1.75rem; }
-  .glory-stats-grid   { gap: 0.75rem; }
-  .victory-crown      { font-size: 4rem; }
-  .victory-title      { font-size: 1.6rem; }
+/* Tablet (≤ 900px) */
+@media (max-width: 900px) {
+  .question-play-arena { padding: 1.25rem 1rem; }
+  .q-text-display { font-size: 1.25rem; }
+  .mcq-option-btn { padding: 1rem 1.1rem; font-size: 0.95rem; }
+  .opt-marker { width: 30px; height: 30px; font-size: 0.85rem; }
 }
 
+/* Large phones / small tablets (≤ 768px) */
+@media (max-width: 768px) {
+  /* Stack answer options vertically on tablets */
+  .mcq-options-layout { grid-template-columns: 1fr !important; gap: 0.75rem; }
+
+  .q-header { padding: 1.25rem 1.1rem 1rem; }
+  .q-text-display { font-size: 1.15rem; }
+  .q-index-tag { font-size: 0.72rem; }
+  .options-grid-container { padding: 1rem 1.1rem 1.25rem; }
+
+  .mcq-option-btn { padding: 0.9rem 1rem; font-size: 0.9rem; min-height: 58px; }
+
+  /* Footer controls */
+  .quiz-controls-footer { padding: 0.75rem 1rem; }
+  .controls-inner { flex-wrap: wrap; gap: 0.6rem; }
+  .control-btn { flex: 1; min-width: 90px; padding: 0.7rem 0.85rem; font-size: 0.85rem; }
+  .control-btn.submit-btn { width: 100%; flex: unset; }
+
+  /* Top nav */
+  .top-nav-panel { padding: 0.6rem 0.85rem; gap: 0.75rem; flex-wrap: nowrap; }
+
+  /* Waiting / results screens */
+  .waiting-glass-card { padding: 2.25rem 1.5rem; }
+  .results-hero-card  { padding: 2.25rem 1.5rem; }
+  .glory-stats-grid   { gap: 0.65rem; }
+  .victory-crown      { font-size: 3.5rem; }
+  .victory-title      { font-size: 1.5rem; }
+  .quiz-stats-banner  { flex-wrap: wrap; gap: 0.5rem; }
+}
+
+/* Small phones (≤ 480px) */
 @media (max-width: 480px) {
-  .top-nav-panel { padding: 0.65rem 1rem; gap: 0.75rem; }
-  .nav-number-circle { width: 30px; height: 30px; font-size: 0.72rem; }
-  .stat-pill { padding: 0.35rem 0.65rem; font-size: 0.75rem; }
+  .top-nav-panel { padding: 0.5rem 0.75rem; gap: 0.5rem; }
+  .nav-number-circle { width: 28px; height: 28px; font-size: 0.68rem; }
+  .stat-pill { padding: 0.3rem 0.55rem; font-size: 0.72rem; }
+  .q-text-display { font-size: 1rem; }
+  .question-card-interactive { border-radius: 18px; }
+  .q-header { padding: 1rem 0.9rem 0.75rem; }
+  .options-grid-container { padding: 0.85rem 0.9rem 1rem; }
+  .mcq-option-btn { padding: 0.8rem 0.9rem; font-size: 0.85rem; border-radius: 10px; }
+  .opt-marker { width: 28px; height: 28px; font-size: 0.78rem; }
+  .control-btn { font-size: 0.8rem; padding: 0.65rem 0.75rem; }
+
+  .waiting-glass-card { padding: 1.75rem 1.1rem; }
+  .results-hero-card  { padding: 1.75rem 1.1rem; }
+  .victory-title { font-size: 1.3rem; }
+  .glory-stats-grid { grid-template-columns: 1fr 1fr; }
+  .stat-val { font-size: 1.6rem; }
 }

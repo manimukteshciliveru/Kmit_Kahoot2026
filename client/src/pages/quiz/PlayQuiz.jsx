@@ -133,8 +133,8 @@ const PlayQuiz = () => {
 
             const targetIndex = Math.max(0, data.currentQuestionIndex || 0);
             const currentQId = questions[targetIndex]?._id;
-            if (currentQId && answersMap[currentQId]) {
-                setLocalTextAnswer(answersMap[currentQId]);
+            if (currentQId && mergedAnswers[currentQId]) {
+                setLocalTextAnswer(mergedAnswers[currentQId]);
             } else {
                 setLocalTextAnswer('');
             }

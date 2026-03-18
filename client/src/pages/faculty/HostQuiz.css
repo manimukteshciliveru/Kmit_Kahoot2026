@@ -675,11 +675,66 @@ table tr.absent  td { border-left: 3px solid rgba(226,27,60,0.4) !important; }
 
 .loading-container p { color: rgba(255,255,255,0.5); font-weight: 600; }
 
-/* ===== Responsive ===== */
+/* ===========================
+   RESPONSIVE — HostQuiz
+   =========================== */
+
+/* Tablet (≤ 1024px) */
+@media (max-width: 1024px) {
+  .tab-content-area { padding: 1.25rem; }
+  .attendance-table-container { overflow-x: auto; }
+  .attendance-table { min-width: 580px; }
+}
+
+/* Small tablet / large phone (≤ 768px) */
 @media (max-width: 768px) {
-  .active-header { flex-direction: column; align-items: flex-start; padding: 0.75rem 1rem; }
-  .host-nav-tabs { flex-wrap: wrap; }
-  .tab-btn { padding: 0.45rem 0.75rem; font-size: 0.78rem; }
-  .pin-code { font-size: 2.5rem; letter-spacing: 0.25rem; }
+  /* Lobby */
+  .host-lobby { padding: 2rem 1rem; }
+  .lobby-header h1 { font-size: 1.8rem; }
   .pin-box { padding: 1.5rem 2.5rem; }
+  .pin-code { font-size: 2.75rem; letter-spacing: 0.35rem; }
+  .pin-title { font-size: 0.8rem; }
+  .lobby-actions .btn-primary { font-size: 1.1rem; padding: 1rem 2.5rem; }
+
+  /* Active panel */
+  .active-header { flex-direction: column; align-items: flex-start; padding: 0.85rem 1rem; gap: 0.6rem; }
+  .host-nav-tabs { flex-wrap: wrap; gap: 0.2rem; }
+  .tab-btn { padding: 0.4rem 0.75rem; font-size: 0.78rem; }
+  .quiz-info-pill { font-size: 0.8rem; flex-wrap: wrap; }
+  .tab-content-area { padding: 1rem; }
+
+  /* Tables */
+  .attendance-table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .attendance-table { min-width: 560px; }
+  .attendance-table th, .attendance-table td { padding: 0.7rem 0.85rem; font-size: 0.82rem; }
+
+  /* Filter */
+  .filter-system { padding: 0.85rem 1rem; gap: 0.65rem; }
+
+  /* Participants grid */
+  .participants-area { min-height: 150px; padding: 1rem; }
+  .participant-card { min-width: 75px; }
+  .participant-avatar { width: 38px; height: 38px; font-size: 1.1rem; }
+
+  .section-header-flex { flex-direction: column; align-items: flex-start; }
+  .attendance-stats { flex-wrap: wrap; }
+}
+
+/* Small phones (≤ 480px) */
+@media (max-width: 480px) {
+  .pin-code { font-size: 2.25rem; letter-spacing: 0.2rem; }
+  .pin-box  { padding: 1.25rem 2rem; border-radius: 18px; }
+  .lobby-header h1 { font-size: 1.5rem; }
+  .lobby-actions .btn-primary { width: 100%; text-align: center; }
+  .participant-card { min-width: 65px; padding: 0.65rem 0.65rem; }
+  .dashboard-head-section { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+  .filter-system { flex-direction: column; }
+  .filter-group { flex-wrap: wrap; }
+  .tab-btn { font-size: 0.72rem; padding: 0.35rem 0.6rem; }
+}
+
+/* Very small phones (≤ 360px) */
+@media (max-width: 360px) {
+  .pin-code { font-size: 2rem; letter-spacing: 0.1rem; }
+  .host-nav-tabs { gap: 0.1rem; }
 }
