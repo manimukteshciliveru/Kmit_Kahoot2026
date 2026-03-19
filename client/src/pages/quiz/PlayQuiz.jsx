@@ -57,6 +57,8 @@ const PlayQuiz = () => {
     const timerRef = useRef(null);
     const quizTimerRef = useRef(null);
     const autoSubmittedRef = useRef(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [scheduledCountdown, setScheduledCountdown] = useState('');
 
     // --- Core Synchronization ---
     const requestSync = useCallback(() => {
@@ -65,6 +67,28 @@ const PlayQuiz = () => {
             socket.emit('quiz:sync', { quizId });
         }
     }, [socket, connected, quizId]);
+
+    // Manual Refresh handler for student waiting screen
+    const handleManualSync = useCallback(async () => {
+        setIsSyncing(true);
+        try {
+            const response = await quizAPI.getById(quizId);
+            const data = response.data.data.quiz;
+            if (['active', 'live', 'question_active'].includes(data.status)) {
+                setStatus(data.status);
+                setQuestions(data.questions || []);
+                toast.success('✅ Quiz has started! Loading questions...');
+            } else {
+                // Also ping socket sync
+                requestSync();
+                toast('🔄 Still waiting for host to start...', { icon: '⏳' });
+            }
+        } catch (e) {
+            toast.error('Failed to sync. Check your connection.');
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [quizId, requestSync]);
 
     useEffect(() => {
         const fetchBaseData = async () => {
@@ -257,6 +281,50 @@ const PlayQuiz = () => {
     useEffect(() => {
         if (connected) requestSync();
     }, [connected, requestSync]);
+
+    // --- Auto-poll fallback for scheduled/waiting quizzes ---
+    // Silently checks every 15 seconds if quiz has started (catches missed socket events)
+    useEffect(() => {
+        const waitingStates = ['waiting', 'draft', 'scheduled'];
+        if (!waitingStates.includes(status) || !quizId) return;
+
+        const pollInterval = setInterval(async () => {
+            try {
+                const response = await quizAPI.getById(quizId);
+                const data = response.data.data.quiz;
+                if (['active', 'live', 'question_active'].includes(data.status)) {
+                    console.log('🟢 [POLL] Quiz started detected via poll!');
+                    setStatus(data.status);
+                    setQuestions(data.questions || []);
+                    if (data.expiresAt) {
+                        const diff = (new Date(data.expiresAt).getTime() - getServerTime()) / 1000;
+                        const secs = Math.max(0, Math.floor(diff));
+                        setTimeLeft(secs);
+                        setQuizTimeLeft(secs);
+                    }
+                    toast.success('🚀 Quiz has started! Good luck!');
+                    clearInterval(pollInterval);
+                }
+            } catch (e) { /* silent fail, retry next tick */ }
+        }, 15000);
+
+        return () => clearInterval(pollInterval);
+    }, [status, quizId, getServerTime]);
+
+    // --- Scheduled countdown ticker (updates every second) ---
+    useEffect(() => {
+        if (status !== 'scheduled' || !quiz?.scheduledAt) return;
+        const ticker = setInterval(() => {
+            const diff = new Date(quiz.scheduledAt) - new Date();
+            if (diff <= 0) {
+                clearInterval(ticker);
+                return;
+            }
+            // Force re-render to update countdown display
+            setScheduledCountdown(diff);
+        }, 1000);
+        return () => clearInterval(ticker);
+    }, [status, quiz?.scheduledAt]);
 
     // --- Persist answers to IndexedDB for offline multimedia recovery ---
     useEffect(() => {
@@ -493,16 +561,63 @@ const PlayQuiz = () => {
     }
 
     if (['waiting', 'draft', 'scheduled'].includes(status)) {
+        const isScheduled = status === 'scheduled' && quiz?.scheduledAt;
         return (
             <div className="quiz-waiting-modern">
                 <div className="waiting-glass-card animate-fadeInUp">
                     <div className="pulse-logo"><FiZap className="zap-icon" /></div>
                     <h1>Ready for Battle?</h1>
-                    <p>The host is preparing the arena. Stay sharp.</p>
+                    <p>{isScheduled ? 'This quiz is scheduled to start automatically.' : 'The host is preparing the arena. Stay sharp.'}</p>
+
+                    {isScheduled && quiz?.scheduledAt && (() => {
+                        const scheduledTime = new Date(quiz.scheduledAt);
+                        const now = new Date();
+                        const diff = scheduledTime - now;
+                        if (diff > 0) {
+                            const hrs  = Math.floor(diff / 3600000);
+                            const mins = Math.floor((diff % 3600000) / 60000);
+                            const secs = Math.floor((diff % 60000) / 1000);
+                            return (
+                                <div style={{ margin: '1rem 0', padding: '0.75rem 1.5rem', background: 'rgba(255,204,2,0.1)', borderRadius: '12px', border: '1px solid rgba(255,204,2,0.3)', color: '#FFCC02', fontWeight: 700, fontSize: '1.1rem', letterSpacing: 1 }}>
+                                    ⏰ Starts in: {hrs > 0 ? `${hrs}h ` : ''}{mins}m {secs}s
+                                </div>
+                            );
+                        }
+                        return <div style={{ color: '#10B981', fontWeight: 700, margin: '0.5rem 0' }}>🚀 Starting any moment now...</div>;
+                    })()}
+
                     <div className="quiz-stats-banner">
                         <div className="stat-banner-item"><FiUsers /> <span>{participantCount || quiz?.participantCount || 0} Joined</span></div>
                         <div className="stat-banner-item"><FiZap /> <span>{questions.length} Items</span></div>
                     </div>
+
+                    {/* Manual Sync / Refresh Button */}
+                    <button
+                        onClick={handleManualSync}
+                        disabled={isSyncing}
+                        style={{
+                            marginTop: '1.5rem',
+                            padding: '0.7rem 1.8rem',
+                            background: isSyncing ? 'rgba(255,255,255,0.1)' : 'rgba(255,204,2,0.15)',
+                            border: '1px solid rgba(255,204,2,0.4)',
+                            borderRadius: '10px',
+                            color: '#FFCC02',
+                            fontWeight: 700,
+                            fontSize: '0.9rem',
+                            cursor: isSyncing ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            margin: '1.5rem auto 0'
+                        }}
+                    >
+                        {isSyncing ? (
+                            <><span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #FFCC02', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}></span> Syncing...</>
+                        ) : (
+                            <><FiClock /> Refresh / Check Status</>
+                        )}
+                    </button>
+                    <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.5rem', textAlign: 'center' }}>Auto-checks every 15 seconds</p>
                 </div>
             </div>
         );
