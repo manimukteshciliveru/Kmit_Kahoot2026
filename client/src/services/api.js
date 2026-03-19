@@ -216,6 +216,9 @@ export const flashcardAPI = {
     getAll: () => api.get('/flashcards'),
     create: (data) => api.post('/flashcards', data),
     generate: (data) => api.post('/flashcards/generate', data),
+    generateFromFile: (formData) => api.post('/flashcards/generate', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
     updateMastery: (data) => api.patch('/flashcards/mastery', data),
     delete: (id) => api.delete(`/flashcards/${id}`)
 };

@@ -21,6 +21,7 @@
     gap: 0.8rem;
     background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -296,3 +297,238 @@
 }
 
 .animate-popIn { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+/* ===== LOADING ===== */
+.flash-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #64748b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+.empty-icon { font-size: 4rem; color: #334155; }
+.empty-state h3 { font-size: 1.3rem; color: #94a3b8; }
+
+/* ===== SET FOOTER ===== */
+.set-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+.btn-delete-small {
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    padding: 0.3rem;
+    transition: color 0.2s;
+}
+.btn-delete-small:hover { color: #EF4444; }
+
+.btn-back {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #94a3b8;
+    padding: 0.6rem 1.2rem;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+.btn-back:hover { color: white; background: rgba(255,255,255,0.1); }
+
+/* ===== ENHANCED MODAL ===== */
+.modal-content {
+    max-width: 560px !important;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+.modal-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+}
+.modal-top h2 { margin: 0; font-size: 1.5rem; }
+.modal-subtitle { color: #64748b; font-size: 0.9rem; margin-top: 0.3rem; }
+.modal-close {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #94a3b8;
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.modal-close:hover { color: white; background: rgba(255,255,255,0.1); }
+
+/* ===== GENERATION TABS ===== */
+.gen-tabs {
+    display: flex;
+    gap: 0.5rem;
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.gen-tab {
+    flex: 1;
+    padding: 0.6rem;
+    border: none;
+    background: none;
+    color: #64748b;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+}
+.gen-tab:hover { color: #94a3b8; }
+.gen-tab.active {
+    background: #8B5CF6;
+    color: white;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+}
+
+/* ===== TAB PANELS ===== */
+.tab-panel { display: flex; flex-direction: column; gap: 0; }
+
+/* ===== TEXTAREA ===== */
+.content-textarea {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    color: white;
+    outline: none;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    transition: border-color 0.3s;
+    box-sizing: border-box;
+}
+.content-textarea:focus { border-color: #8B5CF6; }
+.char-count { display: block; text-align: right; color: #475569; font-size: 0.78rem; margin-top: 0.3rem; }
+
+/* ===== DRAG & DROP ZONE ===== */
+.drop-zone {
+    border: 2px dashed rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: #64748b;
+    margin-top: 1rem;
+}
+.drop-zone:hover, .drop-zone.dragging {
+    border-color: #8B5CF6;
+    background: rgba(139, 92, 246, 0.06);
+    color: #94a3b8;
+}
+.drop-zone.has-file {
+    border-style: solid;
+    border-color: rgba(16, 185, 129, 0.5);
+    background: rgba(16, 185, 129, 0.04);
+}
+.upload-icon { font-size: 2.5rem; color: #475569; margin-bottom: 0.8rem; display: block; }
+.drop-zone p { margin: 0 0 0.3rem; font-weight: 500; }
+.drop-zone small { font-size: 0.78rem; }
+
+.file-selected {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.file-icon { font-size: 1.8rem; color: #3B82F6; }
+.file-name { font-weight: 600; color: white; word-break: break-all; }
+.file-size { color: #64748b; font-size: 0.8rem; }
+.remove-file {
+    background: rgba(239, 68, 68, 0.15);
+    border: none;
+    color: #EF4444;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-left: auto;
+}
+
+/* ===== CARD COUNT SLIDER ===== */
+.card-count-row {
+    margin: 1.2rem 0 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.card-count-row label { font-size: 0.88rem; color: #94a3b8; white-space: nowrap; }
+.count-slider {
+    flex: 1;
+    accent-color: #8B5CF6;
+    cursor: pointer;
+}
+
+/* ===== SUBMIT BUTTON SPINNER ===== */
+.btn-submit-ai {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 1rem;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #8B5CF6, #D946EF);
+    color: white;
+    border: none;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-top: 1rem;
+    transition: all 0.2s;
+}
+.btn-submit-ai:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+}
+.btn-submit-ai:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+

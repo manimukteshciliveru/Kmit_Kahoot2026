@@ -51,12 +51,48 @@ exports.updateCardMastery = async (req, res) => {
     }
 };
 
-// 💡 AI-Powered Flashcard Generation (Fast Topic Learning)
+// 💡 AI-Powered Flashcard Generation — supports topic, pasted content, and file uploads
 exports.generateAIFlashcards = async (req, res) => {
     try {
-        const { topic, subject, count = 10 } = req.body;
-        
-        const cards = await aiGenerator.generateFlashcards(topic, subject, count, req.user._id);
+        const { topic, subject, count = 10, content, mode = 'topic' } = req.body;
+        const uploadedFile = req.file; // from multer
+
+        let cards = [];
+
+        if (mode === 'file' && uploadedFile) {
+            // --- Mode 1: File Upload (PDF / DOCX) ---
+            const ext = uploadedFile.originalname.split('.').pop().toLowerCase();
+            let extractedText = '';
+
+            if (ext === 'pdf') {
+                extractedText = await aiGenerator.extractFromPDF(uploadedFile.path);
+            } else if (ext === 'docx' || ext === 'doc') {
+                extractedText = await aiGenerator.extractFromWord(uploadedFile.path);
+            } else if (ext === 'pptx' || ext === 'ppt') {
+                extractedText = await aiGenerator.extractFromPowerPoint(uploadedFile.path);
+            } else {
+                // Plain text file
+                const fs = require('fs');
+                extractedText = fs.readFileSync(uploadedFile.path, 'utf8');
+            }
+
+            const prompt = `Based on this content, generate ${count} flashcard Q&A pairs for the subject ${subject || 'General'}.\n\nCONTENT:\n${extractedText.slice(0, 8000)}`;
+            cards = await aiGenerator.generateFlashcards(prompt, subject || 'Uploaded File', count, req.user._id);
+
+            // Cleanup temp file
+            const fs = require('fs');
+            if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
+
+        } else if (mode === 'content' && content) {
+            // --- Mode 2: Pasted Text Content ---
+            const prompt = `Based on this text, generate ${count} flashcard Q&A pairs for the subject ${subject || 'General'}.\n\nTEXT:\n${content.slice(0, 8000)}`;
+            cards = await aiGenerator.generateFlashcards(prompt, subject || 'Pasted Content', count, req.user._id);
+
+        } else {
+            // --- Mode 3 (Default): Topic/Keyword ---
+            if (!topic) return res.status(400).json({ success: false, message: 'Please provide a topic.' });
+            cards = await aiGenerator.generateFlashcards(topic, subject, count, req.user._id);
+        }
 
         res.json({ 
             success: true, 
