@@ -6,6 +6,7 @@ const LeaderboardService = require('../services/leaderboardService');
 const QuizResult = require('../models/QuizResult');
 const { calculateScore } = require('../utils/calculateScore');
 const logger = require('../utils/logger');
+const battleHandler = require('./battleHandler');
 
 // 🏁 Global Quiz State Machine Definitions
 const STATES = {
@@ -143,6 +144,9 @@ module.exports = (io) => {
 
         logger.info(`🔌 [CONNECT] ${socket.user.name} (${userRole}) | SocketID: ${socket.id}`);
         socket.join(`user:${userIdStr}`);
+
+        // --- Battle Handler (1v1 Games) ---
+        battleHandler(io, socket);
 
         // --- 1. QUIZ SYNC (GROUND TRUTH) ---
         socket.on('quiz:sync', async (data) => {

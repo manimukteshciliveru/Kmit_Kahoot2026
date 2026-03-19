@@ -211,6 +211,15 @@ export const aiAPI = {
     getReview: (quizId) => api.get(`/ai/review/${quizId}`)
 };
 
+// Flashcard API
+export const flashcardAPI = {
+    getAll: () => api.get('/flashcards'),
+    create: (data) => api.post('/flashcards', data),
+    generate: (data) => api.post('/flashcards/generate', data),
+    updateMastery: (data) => api.patch('/flashcards/mastery', data),
+    delete: (id) => api.delete(`/flashcards/${id}`)
+};
+
 // User/Admin API
 export const userAPI = {
     getAll: (params) => api.get('/users', { params }),

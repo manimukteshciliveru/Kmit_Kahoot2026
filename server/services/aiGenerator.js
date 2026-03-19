@@ -339,6 +339,53 @@ class AIQuestionGenerator {
         }));
     }
 
+    async generateFlashcards(topic, subject, count = 10, userId) {
+        this.initialize();
+
+        const promptSystem = `
+        You are an educational assistant. Generate exactly ${count} flashcard question-answer pairs for the topic: ${topic} in the subject of ${subject}.
+        
+        STRICT FORMATTING RULES:
+        1. Return ONLY a valid JSON array of objects. No markdown, no 'json' code blocks.
+        2. Format: [{"question":"Concise question here","answer":"Clear and short answer here"}]
+        3. Accuracy: High academic standards.
+        `;
+
+        const requestParts = [promptSystem];
+        let responseText = '';
+        let providerUsed = '';
+        let modelUsed = '';
+
+        try {
+            if (this.gemini) {
+                const model = this.gemini.getGenerativeModel({ model: "gemini-2.0-flash" });
+                const result = await model.generateContent(requestParts);
+                const response = await result.response;
+                responseText = response.text();
+                providerUsed = 'google';
+                modelUsed = 'gemini-2.0-flash';
+            }
+
+            if (!responseText) throw new Error('AI providers failed to generate flashcards.');
+
+            const cleanJson = this.sanitizeJson(responseText);
+            const jsonMatch = cleanJson.match(/\[.*\]/s);
+            const toParse = jsonMatch ? jsonMatch[0] : cleanJson;
+            const flashcards = JSON.parse(toParse);
+
+            this.logUsage(userId, providerUsed, modelUsed, promptSystem.length, responseText.length, 'success');
+            return flashcards;
+
+        } catch (error) {
+            logger.error('Flashcard Generation Error:', error);
+            // Minimal fallback
+            return Array.from({ length: 3 }, (_, i) => ({
+                question: `${topic} Question ${i + 1}`,
+                answer: `Study this concept in ${subject}`
+            }));
+        }
+    }
+
     async generateExplanation(question, userAnswer, correctAnswer, userId) {
         this.initialize();
 

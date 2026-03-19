@@ -205,7 +205,7 @@ const FacultyDashboard = () => {
             {/* Header */}
             <div className="dash-header">
                 <div className="dash-welcome">
-                    <h1>Welcome, {user?.name?.split(' ')[0]}! 🎓</h1>
+                    <h1>Welcome, {(user?.name || 'Faculty').split(' ')[0]}! 🎓</h1>
                     <p>Quiz analytics and management dashboard</p>
                 </div>
                 <Link to="/create-quiz" className="btn btn-primary">

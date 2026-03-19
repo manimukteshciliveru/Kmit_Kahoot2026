@@ -1,0 +1,38 @@
+Software Requirement Specification (SRS): Smart Quiz Arena
+1. Purpose & Overview
+The Smart Quiz Arena is a real-time online exam platform designed specifically for college/school environments. It allows teachers (Faculty) to create and host interactive quizzes, and allows students to participate while being monitored for cheating.
+
+2. User Roles
+Admin: Manages the entire system (users, quizzes, and global settings).
+Faculty (Teachers): Creates quizzes (manually or with AI), sets timers, and monitors live student performance on a dashboard.
+Student: Joins quizzes via a code, answers questions, and views their personal performance report.
+3. Key Features (Functional Requirements)
+AI Quiz Creation: Teachers can automatically generate questions by just typing a topic or difficulty level.
+Live Dashboard: Real-time leaderboard and "Top 5 Students" graph for the teacher during the quiz.
+Advanced Anti-Cheat:
+Fullscreen Lock: Students must stay in fullscreen mode.
+Tab-Switch Detection: The system knows if a student opens Google or another tab.
+No Copy/Paste: Students cannot copy questions or paste answers.
+Network Resilience:
+Auto-Save: Answers are saved every second. If the laptop dies, the student picks up exactly where they left off.
+Offline Mode: If Wi-Fi cuts out, the student can keep answering; the app syncs everything when the net is back.
+Visual Analytics: Detailed graphs (Pie charts, Bar graphs) for both students and teachers to analyze scores and time taken.
+4. Advantages (The Good Parts)
+Feature	Why it’s an Advantage
+Integrity	The anti-cheat tools make it much harder for students to use ChatGPT or Google while taking a test at home.
+Speed	AI question generation saves teachers hours of work.
+Reliability	The app is built to handle bad Wi-Fi. Students won't lose their data if their internet flickers for a minute.
+Interactive	The live leaderboard and "Premium UI" make exams feel engaging like a game (Gamification).
+Precision	It uses "Server Sync" so even if a student’s laptop clock is wrong, the quiz timer remains perfectly accurate.
+5. Disadvantages (The Limits)
+Problem	Explanation
+Hardware Dependent	The "Fullscreen Lock" and "Blur detection" work best on laptops/desktops. It is less effective on mobile phones where notifications can interrupt the app.
+Connection Speed	While we have "Offline mode," the very first time a student joins, they need a stable connection to load the 100+ questions into memory.
+Scaling Limits	On the current free server (Render.com), the app might lag if more than 150–200 students are on the same quiz at the exact same second.
+Security Edge-Cases	While we block Alt+Tab and Copy/Paste, we cannot stop a student from looking at a separate physical smartphone or book on their desk.
+6. Technical Requirements
+Frontend: React.js (for the user interface).
+Backend: Node.js & Express (for the logic).
+Real-time: Socket.io (for the 0.1s fast updates).
+Database: MongoDB Atlas (for storing thousands of user records).
+Persistence: localforage / IndexedDB (for the "Bulletproof" auto-save).

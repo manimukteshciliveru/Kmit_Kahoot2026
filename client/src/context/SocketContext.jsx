@@ -188,6 +188,12 @@ export const SocketProvider = ({ children }) => {
         }
     }, [socket]);
 
+    const emit = useCallback((event, data) => {
+        if (socket && connected) {
+            socket.emit(event, data);
+        }
+    }, [socket, connected]);
+
     const value = {
         socket,
         connected,
@@ -201,7 +207,8 @@ export const SocketProvider = ({ children }) => {
         reportTabSwitch,
         completeQuiz,
         on,
-        off
+        off,
+        emit
     };
 
     return (

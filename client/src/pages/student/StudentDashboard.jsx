@@ -100,7 +100,7 @@ const StudentDashboard = () => {
         <div className="dashboard">
             <div className="dashboard-header">
                 <div className="welcome-section">
-                    <h1>Welcome back, {user?.name?.split(' ')[0]}! 👋</h1>
+                    <h1>Welcome back, {(user?.name || 'Student').split(' ')[0]}! 👋</h1>
                     <p>Ready to test your knowledge? Join a quiz and climb the leaderboard!</p>
                 </div>
                 <Link to="/join-quiz" className="btn btn-primary btn-lg">

@@ -1,0 +1,184 @@
+.battle-arena {
+    padding: 2rem;
+    max-width: 1000px;
+    margin: 0 auto;
+    color: #F8FAFC;
+    min-height: 80vh;
+}
+
+.arena-hero {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.hero-icon {
+    font-size: 5rem;
+    color: #FDE047;
+    filter: drop-shadow(0 0 15px rgba(253, 224, 71, 0.5));
+    animation: pulse 2s infinite;
+}
+
+.lobby-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+}
+
+.btn-find-match {
+    background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+    color: white;
+    border: none;
+    padding: 1.5rem 3.5rem;
+    border-radius: 999px;
+    font-size: 1.5rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-find-match:hover {
+    transform: scale(1.05) translateY(-5px);
+    box-shadow: 0 15px 45px rgba(239, 68, 68, 0.5);
+}
+
+.searching-view {
+    text-align: center;
+    padding: 5rem 0;
+}
+
+.search-spinner {
+    width: 100px; height: 100px;
+    border: 8px solid rgba(255, 255, 255, 0.1);
+    border-top: 8px solid #FDE047;
+    border-radius: 50%;
+    margin: 0 auto 2rem;
+    animation: spin 1s linear infinite;
+}
+
+.btn-cancel {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #94a3b8;
+    padding: 0.8rem 2rem;
+    border-radius: 12px;
+    margin-top: 2rem;
+    cursor: pointer;
+}
+
+/* FIGHTING VIEW */
+.battle-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(15, 23, 42, 0.8);
+    padding: 1.5rem 2.5rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 2rem;
+}
+
+.player-stats {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.player-stats img {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: 3px solid #3B82F6;
+    padding: 3px;
+}
+
+.player-stats.enemy img {
+    border-color: #EF4444;
+}
+
+.p-info span { font-size: 0.75rem; color: #94A3B8; font-weight: 700; }
+.p-info h3 { font-size: 1.8rem; font-weight: 800; }
+
+.vs-logo {
+    font-size: 2.5rem;
+    font-weight: 900;
+    font-style: italic;
+    color: #FDE047;
+    text-shadow: 0 0 10px rgba(253, 224, 71, 0.5);
+}
+
+.battle-progress-grid {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1.5rem;
+    border-radius: 15px;
+    margin-bottom: 2.5rem;
+}
+
+.progress-bar-label { font-size: 0.8rem; margin: 0.5rem 0; color: #94A3B8; }
+.progress-bar-bg { height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; overflow: hidden; margin-bottom: 1rem; }
+.progress-fill { height: 100%; transition: width 0.4s ease; }
+.progress-fill.my { background: #3B82F6; }
+.progress-fill.enemy { background: #EF4444; }
+
+.battle-question-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    padding: 3rem;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.q-index { color: #FDE047; font-weight: 700; margin-bottom: 1rem; }
+
+.battle-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    margin-top: 2.5rem;
+}
+
+.battle-opt-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1.5rem;
+    border-radius: 15px;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.battle-opt-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    border-color: #3B82F6;
+}
+
+/* Result Screen */
+.result-view { text-align: center; padding: 4rem 0; }
+.victory-card h1 { font-size: 5rem; color: #FDE047; margin: 1rem 0; }
+.defeat-card h1 { font-size: 5rem; color: #EF4444; margin: 1rem 0; }
+
+.final-scoreboard {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 20px;
+    margin: 3rem auto;
+    max-width: 400px;
+    overflow: hidden;
+}
+
+.score-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 1.2rem 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.score-row.highlight { background: rgba(59, 130, 246, 0.1); }
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes zoomIn { 0% { opacity: 0; transform: scale(0.5); } 100% { opacity: 1; transform: scale(1); } }

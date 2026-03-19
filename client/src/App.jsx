@@ -40,6 +40,8 @@ import FacultyAnalytics from './pages/faculty/FacultyAnalytics';
 
 // Quiz Pages
 import PlayQuiz from './pages/quiz/PlayQuiz';
+import Flashcards from './pages/student/Flashcards';
+import BattleArena from './pages/student/BattleArena';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -116,6 +118,12 @@ function App() {
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
 
+              {/* Student Only Routes */}
+              <Route path="/join" element={<ProtectedRoute allowedRoles={['student']}><JoinQuiz /></ProtectedRoute>} />
+              <Route path="/history" element={<ProtectedRoute allowedRoles={['student']}><History /></ProtectedRoute>} />
+              <Route path="/flashcards" element={<ProtectedRoute allowedRoles={['student']}><Flashcards /></ProtectedRoute>} />
+              <Route path="/quiz/report/:id" element={<ProtectedRoute allowedRoles={['student']}><QuizReport /></ProtectedRoute>} />
+
               {/* Protected Routes with Layout */}
               <Route
                 path="/"
@@ -135,6 +143,22 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <JoinQuiz />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="flashcards"
+                  element={
+                    <ProtectedRoute allowedRoles={['student']}>
+                      <Flashcards />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="battle"
+                  element={
+                    <ProtectedRoute allowedRoles={['student']}>
+                      <BattleArena />
                     </ProtectedRoute>
                   }
                 />

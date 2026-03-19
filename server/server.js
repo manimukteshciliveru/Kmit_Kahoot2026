@@ -205,6 +205,7 @@ const responseRoutes = require('./routes/response');
 const aiRoutes = require('./routes/ai');
 const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin');
+const flashcardRoutes = require('./routes/flashcard');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/quiz', quizRoutes);
@@ -212,6 +213,7 @@ app.use('/api/responses', responseRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/flashcards', flashcardRoutes);
 
 // --- 4. Global Error Handlers ---
 
