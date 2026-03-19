@@ -17,8 +17,8 @@
   gap: 1rem;
   margin-bottom: 2rem;
   padding: 2rem;
-  background: rgba(42, 13, 71, 0.7);
-  border: 1px solid rgba(255, 204, 2, 0.15);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 24px;
   backdrop-filter: blur(20px);
   position: relative;
@@ -40,13 +40,13 @@
 .welcome-section h1 {
   font-size: 1.9rem;
   font-weight: 900;
-  color: white;
+  color: var(--text-primary);
   font-family: 'Montserrat', sans-serif;
   margin-bottom: 0.4rem;
 }
 
 .welcome-section p {
-  color: rgba(255,255,255,0.5);
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
@@ -64,10 +64,10 @@
   gap: 1rem;
   padding: 1.35rem 1.5rem;
   border-radius: 20px;
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid var(--border);
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   animation: scaleIn 0.4s ease-out both;
-  background: rgba(42, 13, 71, 0.7);
+  background: var(--bg-card);
   backdrop-filter: blur(12px);
   cursor: pointer;
 }
@@ -104,14 +104,14 @@
 .stat-value {
   font-size: 1.8rem;
   font-weight: 900;
-  color: white;
+  color: var(--text-primary);
   line-height: 1.1;
   font-family: 'Montserrat', sans-serif;
 }
 
 .stat-label {
   font-size: 0.78rem;
-  color: rgba(255,255,255,0.45);
+  color: var(--text-secondary);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -128,8 +128,8 @@
 }
 
 .dashboard-card {
-  background: rgba(42, 13, 71, 0.7);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 24px;
   overflow: hidden;
   backdrop-filter: blur(12px);
@@ -153,7 +153,7 @@
 .dashboard-card .card-header h2 {
   font-size: 1rem;
   font-weight: 800;
-  color: white;
+  color: var(--text-primary);
   font-family: 'Montserrat', sans-serif;
 }
 
@@ -204,7 +204,7 @@
 .quiz-info h3 {
   font-size: 0.9rem;
   font-weight: 700;
-  color: white;
+  color: var(--text-primary);
   font-family: 'Montserrat', sans-serif;
 }
 
