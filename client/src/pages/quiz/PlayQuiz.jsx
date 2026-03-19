@@ -23,6 +23,7 @@ const PlayQuiz = () => {
     const [isDataReady, setIsDataReady] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [responseId, setResponseId] = useState(null);
+    const questionStartTimeRef = useRef(Date.now());
 
     // --- Answer State (Centralized) ---
     // Structure: { [questionId]: "Selected Option or Text" }
@@ -389,7 +390,7 @@ const PlayQuiz = () => {
             quizId,
             questionId,
             answer: option,
-            timeTaken: Math.max(0, (quiz?.settings?.questionTimer - timeLeft) * 1000)
+            timeTaken: Date.now() - questionStartTimeRef.current
         });
     };
 
@@ -411,13 +412,14 @@ const PlayQuiz = () => {
             quizId,
             questionId: currentQ._id,
             answer,
-            timeTaken: Math.max(0, (quiz?.settings?.questionTimer - timeLeft) * 1000)
+            timeTaken: Date.now() - questionStartTimeRef.current
         });
     };
 
     const goToQuestion = (idx) => {
         if (idx < 0 || idx >= questions.length || !isDataReady) return;
         setCurrentIndex(idx);
+        questionStartTimeRef.current = Date.now();
         // Sync local text answer for the new question
         const qId = questions[idx]?._id;
         setLocalTextAnswer(answers[qId] || '');
@@ -598,6 +600,11 @@ const PlayQuiz = () => {
                                                 onChange={e => handleTextUpdate(q._id, e.target.value)}
                                                 onBlur={handleAnswerSubmit}
                                                 disabled={!['active', 'question_active', 'live', 'draft', 'waiting'].includes(status) || isSubmitting || !connected}
+                                                onPaste={(e) => {
+                                                    e.preventDefault();
+                                                    toast.error("🚨 Cheating Warning: Pasting answers is prohibited. Violation recorded.");
+                                                    if (quizId) responseAPI.reportTabSwitch({ quizId });
+                                                }}
                                             />
                                         ) : (
                                             <input
@@ -607,6 +614,11 @@ const PlayQuiz = () => {
                                                 onChange={e => handleTextUpdate(q._id, e.target.value)}
                                                 onBlur={handleAnswerSubmit}
                                                 disabled={!['active', 'question_active', 'live', 'draft', 'waiting'].includes(status) || isSubmitting || !connected}
+                                                onPaste={(e) => {
+                                                    e.preventDefault();
+                                                    toast.error("🚨 Cheating Warning: Pasting answers is prohibited. Violation recorded.");
+                                                    if (quizId) responseAPI.reportTabSwitch({ quizId });
+                                                }}
                                             />
                                         )}
                                         <div className="text-help">Your answer is automatically saved as you type.</div>

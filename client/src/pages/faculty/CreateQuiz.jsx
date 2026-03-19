@@ -360,7 +360,8 @@ const CreateQuiz = () => {
             if (aiSource === 'text') {
                 response = await aiAPI.generateFromText({
                     text: aiText,
-                    ...aiSettings
+                    ...aiSettings,
+                    difficulty: quizData.settings.difficultyLevel
                 });
             } else {
                 const formData = new FormData();
@@ -368,7 +369,7 @@ const CreateQuiz = () => {
                     formData.append('files', file);
                 });
                 formData.append('count', aiSettings.count);
-                formData.append('difficulty', aiSettings.difficulty);
+                formData.append('difficulty', quizData.settings.difficultyLevel);
                 formData.append('type', aiSettings.type);
 
                 response = await aiAPI.generateFromFile(formData);
@@ -1034,19 +1035,7 @@ const CreateQuiz = () => {
                                                     onChange={(e) => setAiSettings({ ...aiSettings, count: parseInt(e.target.value) })}
                                                 />
                                             </div>
-                                            <div className="form-group">
-                                                <label className="form-label">Difficulty</label>
-                                                <select
-                                                    className="form-select"
-                                                    value={aiSettings.difficulty}
-                                                    onChange={(e) => setAiSettings({ ...aiSettings, difficulty: e.target.value })}
-                                                >
-                                                    <option value="easy">Easy</option>
-                                                    <option value="medium">Medium</option>
-                                                    <option value="hard">Hard</option>
-                                                    <option value="advanced">Advanced</option>
-                                                </select>
-                                            </div>
+
                                             <div className="form-group">
                                                 <label className="form-label">Type</label>
                                                 <select
@@ -1111,19 +1100,7 @@ const CreateQuiz = () => {
                                                     onChange={(e) => setAiSettings({ ...aiSettings, count: parseInt(e.target.value) })}
                                                 />
                                             </div>
-                                            <div className="form-group">
-                                                <label className="form-label">Difficulty</label>
-                                                <select
-                                                    className="form-select"
-                                                    value={aiSettings.difficulty}
-                                                    onChange={(e) => setAiSettings({ ...aiSettings, difficulty: e.target.value })}
-                                                >
-                                                    <option value="easy">Easy</option>
-                                                    <option value="medium">Medium</option>
-                                                    <option value="hard">Hard</option>
-                                                    <option value="advanced">Advanced</option>
-                                                </select>
-                                            </div>
+
                                             <div className="form-group">
                                                 <label className="form-label">Type</label>
                                                 <select

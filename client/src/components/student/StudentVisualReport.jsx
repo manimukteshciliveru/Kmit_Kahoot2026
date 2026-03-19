@@ -44,15 +44,27 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const res = await responseAPI.getHistory({ limit: 10 });
+                const res = await responseAPI.getHistory({ limit: 5 });
                 if (res.data?.success) {
                     // Extract data for line chart, sorted chronologically (oldest to newest)
                     const sortedResponses = [...res.data.data.responses].reverse();
-                    const trendData = sortedResponses.map((r, idx) => ({
+                    let trendData = sortedResponses.map((r, idx) => ({
                         quiz: r.quizId?.title || `Quiz ${idx + 1} `,
                         score: r.percentage || 0,
                         date: new Date(r.createdAt).toLocaleDateString()
                     }));
+                    
+                    // Always show 5 data points so graphs look complete as a curve
+                    if (trendData.length < 5) {
+                        const padCount = 5 - trendData.length;
+                        const placeholders = Array.from({ length: padCount }).map((_, i) => ({
+                            quiz: `Past Q${i + 1}`,
+                            score: null, // null skips line drawing, keeps axis scale
+                            date: 'N/A'
+                        }));
+                        trendData = [...placeholders, ...trendData];
+                    }
+                    
                     setHistoryData(trendData);
                 }
             } catch (error) {
@@ -218,10 +230,10 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
             </div>
 
             {/* Visual Analytics */}
-            <div className="analytics-graphs-container" ref={gridRef} style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '2rem' }}>
+            <div className="analytics-graphs-container" ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))', gap: '2rem', marginTop: '2rem' }}>
 
                 {/* Accuracy Breakdown (Pie Chart) */}
-                <div className="graph-card" style={{ flex: '1 1 400px', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="graph-card" style={{ minWidth: 0, background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
                         <FiCrosshair color="var(--primary)" /> Overall Accuracy
                     </h3>
@@ -241,7 +253,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                 </div>
 
                 {/* Section Performance (Bar Chart) */}
-                <div className="graph-card" style={{ flex: '1 1 400px', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="graph-card" style={{ minWidth: 0, background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
                         <FiCheckCircle color="var(--primary)" /> Section Performance
                     </h3>
@@ -272,9 +284,9 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                 </div>
 
                 {/* Personal Score Trend (Historical) */}
-                <div className="graph-card" style={{ flex: '1 1 100%', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="graph-card" style={{ gridColumn: '1 / -1', minWidth: 0, background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
-                        <FiTrendingUp color="var(--primary)" /> Personal Score Trend (Last 10 Quizzes)
+                        <FiTrendingUp color="var(--primary)" /> Personal Score Trend (Last 5 Quizzes)
                     </h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Your score progression across recent quizzes.</p>
                     <div style={{ width: '100%', minWidth: 0, height: 300 }}>
@@ -294,12 +306,13 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                                 />
                                 <Legend verticalAlign="top" height={36} />
                                 <Line
-                                    type="monotone"
+                                    type="monotoneX"
+                                    connectNulls={true}
                                     dataKey="score"
                                     stroke="#8B5CF6"
-                                    strokeWidth={3}
-                                    dot={{ r: 5, fill: '#0F172A', strokeWidth: 2, stroke: '#8B5CF6' }}
-                                    activeDot={{ r: 7 }}
+                                    strokeWidth={4}
+                                    dot={{ r: 6, fill: '#0F172A', strokeWidth: 3, stroke: '#8B5CF6' }}
+                                    activeDot={{ r: 8 }}
                                     isAnimationActive={false}
                                     name="Quiz Score %"
                                 />
@@ -313,7 +326,7 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                 </div>
 
                 {/* Time Analysis Area Chart */}
-                <div className="graph-card" style={{ flex: '1 1 100%', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="graph-card" style={{ gridColumn: '1 / -1', minWidth: 0, background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
                         <FiClock color="var(--primary)" /> Time Spent per Question
                     </h3>
