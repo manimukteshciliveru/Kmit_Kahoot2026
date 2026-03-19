@@ -107,9 +107,18 @@ exports.generateAIFlashcards = async (req, res) => {
 // Delete a set
 exports.deleteFlashcardSet = async (req, res) => {
     try {
-        await Flashcard.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
+        console.log('FLASHCARD_DELETE_REQUEST:', { id: req.params.id, userId: req.user._id });
+        const result = await Flashcard.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
+        
+        if (!result) {
+            console.log('FLASHCARD_DELETE_NOT_FOUND');
+            return res.status(404).json({ success: false, message: 'Flashcard set not found or not authorized' });
+        }
+
+        console.log('FLASHCARD_DELETE_SUCCESS');
         res.json({ success: true, message: 'Set deleted successfully' });
     } catch (error) {
+        console.error('FLASHCARD_DELETE_ERROR:', error);
         res.status(400).json({ success: false, message: error.message });
     }
 };
