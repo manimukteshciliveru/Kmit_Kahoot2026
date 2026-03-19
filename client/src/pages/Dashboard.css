@@ -147,7 +147,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid var(--border);
 }
 
 .dashboard-card .card-header h2 {
@@ -184,8 +184,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.85rem 1rem;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: var(--bg-card-light);
+  border: 1px solid var(--border);
   border-radius: 14px;
   transition: all 0.25s ease;
   cursor: pointer;
@@ -213,7 +213,7 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.78rem;
-  color: rgba(255,255,255,0.4);
+  color: var(--text-muted);
 }
 
 .quiz-status { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; }
@@ -244,9 +244,9 @@
 }
 
 .status-badge.finished, .status-badge.completed {
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.4);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--bg-card-light);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
 }
 
 /* Score in recent */
@@ -269,7 +269,7 @@
 
 .rank {
   font-size: 0.72rem;
-  color: rgba(255,255,255,0.4);
+  color: var(--text-muted);
   font-weight: 600;
 }
 
@@ -286,10 +286,10 @@
   align-items: center;
   gap: 0.6rem;
   padding: 1.25rem 0.75rem;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: var(--bg-card-light);
+  border: 1px solid var(--border);
   border-radius: 16px;
-  color: rgba(255,255,255,0.7);
+  color: var(--text-secondary);
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 700;
@@ -302,7 +302,7 @@
 
 .action-item:hover {
   transform: translateY(-3px) scale(1.03);
-  color: white;
+  color: var(--text-primary);
   border-color: rgba(255,204,2,0.35);
   background: rgba(255,204,2,0.08);
 }
@@ -339,14 +339,14 @@
 
 .empty-state h3 {
   font-size: 1.1rem;
-  color: rgba(255,255,255,0.5);
+  color: var(--text-muted);
   font-weight: 700;
   margin-bottom: 0.5rem;
   font-family: 'Montserrat', sans-serif;
 }
 
 .empty-state p {
-  color: rgba(255,255,255,0.3);
+  color: var(--text-muted);
   font-size: 0.9rem;
   margin-bottom: 1.5rem;
 }
@@ -358,7 +358,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 2.5rem;
-  color: rgba(255,255,255,0.4);
+  color: var(--text-muted);
 }
 
 .countdown-text { font-weight: 700; }
