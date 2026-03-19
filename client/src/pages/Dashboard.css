@@ -50,6 +50,23 @@
   font-size: 0.95rem;
 }
 
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+@media (max-width: 600px) {
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+  .header-actions a {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* ===== Stats Grid ===== */
 .stats-grid {
   display: grid;

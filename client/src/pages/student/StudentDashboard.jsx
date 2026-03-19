@@ -10,7 +10,8 @@ import {
     FiClock,
     FiArrowRight,
     FiZap,
-    FiUser
+    FiUser,
+    FiTarget
 } from 'react-icons/fi';
 import '../Dashboard.css';
 
@@ -103,10 +104,16 @@ const StudentDashboard = () => {
                     <h1>Welcome back, {(user?.name || 'Student').split(' ')[0]}! 👋</h1>
                     <p>Ready to test your knowledge? Join a quiz and climb the leaderboard!</p>
                 </div>
-                <Link to="/join-quiz" className="btn btn-primary btn-lg">
-                    <FiGrid />
-                    Join Quiz
-                </Link>
+                <div className="header-actions">
+                    <Link to="/join-quiz" className="btn btn-primary btn-lg">
+                        <FiGrid />
+                        Join Quiz
+                    </Link>
+                    <Link to="/games" className="btn btn-accent btn-lg">
+                        <FiTarget />
+                        Game Hub
+                    </Link>
+                </div>
             </div>
 
             <div className="stats-grid">

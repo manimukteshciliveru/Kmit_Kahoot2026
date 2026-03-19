@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import {
     FiHome, FiLogOut, FiUser, FiSettings, FiGrid, FiUsers,
     FiFileText, FiPlusCircle, FiActivity, FiSun, FiMoon,
-    FiMenu, FiX, FiLayers, FiZap
+    FiMenu, FiX, FiLayers, FiZap, FiTarget
 } from 'react-icons/fi';
 import { useTheme } from '../../context/ThemeContext';
 import KmitLogo from './KmitLogo';
@@ -47,8 +47,7 @@ const Navbar = () => {
                 return [
                     { path: '/dashboard',  icon: <FiHome />,     label: 'Dashboard' },
                     { path: '/join-quiz',  icon: <FiGrid />,     label: 'Join Quiz' },
-                    { path: '/battle',     icon: <FiZap />,      label: 'Battle Arena' },
-                    { path: '/flashcards', icon: <FiLayers />,   label: 'Flashcards' },
+                    { path: '/games',      icon: <FiTarget />,   label: 'Game Hub' },
                     { path: '/history',    icon: <FiFileText />, label: 'History' }
                 ];
             case 'faculty':

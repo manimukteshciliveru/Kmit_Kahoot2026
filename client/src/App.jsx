@@ -42,6 +42,7 @@ import FacultyAnalytics from './pages/faculty/FacultyAnalytics';
 import PlayQuiz from './pages/quiz/PlayQuiz';
 import Flashcards from './pages/student/Flashcards';
 import BattleArena from './pages/student/BattleArena';
+import GamesHub from './pages/student/GamesHub';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -159,6 +160,14 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <BattleArena />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="games"
+                  element={
+                    <ProtectedRoute allowedRoles={['student']}>
+                      <GamesHub />
                     </ProtectedRoute>
                   }
                 />
