@@ -245,24 +245,26 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem 0', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', fontSize: '1.1rem' }}>
                         <FiCheckCircle color="var(--primary)" /> Section Performance
                     </h3>
-                    <div style={{ width: '100%', height: '250px' }}>
+                    <div style={{ width: '100%', height: '265px', overflowX: 'auto', overflowY: 'hidden', display: 'flex', justifyContent: (sectionData && sectionData.length * 80 > chartWidth) ? 'flex-start' : 'center' }}>
                         {sectionData && sectionData.length > 0 ? (
-                            <BarChart width={chartWidth} height={250} data={sectionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="barColor" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.2} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
-                                <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
-                                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
-                                <RechartsTooltip content={CustomTooltipBar} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Legend verticalAlign="top" height={36} />
-                                <Bar dataKey="Accuracy" name="Performance Accuracy %" fill="url(#barColor)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                            </BarChart>
+                            <div style={{ minWidth: Math.max(chartWidth || 0, sectionData.length * 80) }}>
+                                <BarChart width={Math.max(chartWidth || 0, sectionData.length * 80)} height={250} data={sectionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="barColor" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
+                                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.2} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                                    <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} interval={0} />
+                                    <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} domain={[0, 100]} />
+                                    <RechartsTooltip content={CustomTooltipBar} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                    <Legend verticalAlign="top" height={36} />
+                                    <Bar dataKey="Accuracy" name="Performance Accuracy %" fill="url(#barColor)" radius={[4, 4, 0, 0]} barSize={40} isAnimationActive={false} />
+                                </BarChart>
+                            </div>
                         ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', width: '100%' }}>
                                 No section data available
                             </div>
                         )}

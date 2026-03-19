@@ -270,16 +270,18 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     <div className="graph-header">
                         <FiPieChart style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Section Performance (Avg)</h3>
                     </div>
-                    <div className="graph-container-box" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                    <div className="graph-container-box" style={{ width: '100%', display: 'flex', justifyContent: (sectionAnalysis && sectionAnalysis.length * 80 > chartWidth) ? 'flex-start' : 'center', overflowX: 'auto', overflowY: 'hidden' }}>
                         {sectionAnalysis && sectionAnalysis.length > 0 ? (
-                            <BarChart width={chartWidth} height={300} data={sectionAnalysis} margin={{ left: -20, top: 20, right: 20, bottom: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="section" tick={{ fill: '#94A3B8', fontSize: 10 }} tickLine={false} axisLine={false} />
-                                <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Legend verticalAlign="top" height={36} />
-                                <Bar dataKey="avgScore" name="Average Marks" fill="#6366F1" radius={[6, 6, 0, 0]} barSize={Math.max(20, 150 / sectionAnalysis.length)} isAnimationActive={false} />
-                            </BarChart>
+                            <div style={{ minWidth: Math.max(chartWidth || 0, sectionAnalysis.length * 80) }}>
+                                <BarChart width={Math.max(chartWidth || 0, sectionAnalysis.length * 80)} height={300} data={sectionAnalysis} margin={{ left: -20, top: 20, right: 20, bottom: 20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="section" tick={{ fill: '#94A3B8', fontSize: 12 }} tickLine={false} axisLine={false} interval={0} />
+                                    <YAxis tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                    <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                    <Legend verticalAlign="top" height={36} />
+                                    <Bar dataKey="avgScore" name="Average Marks" fill="#6366F1" radius={[6, 6, 0, 0]} barSize={40} isAnimationActive={false} />
+                                </BarChart>
+                            </div>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
                                 No section performance data available
