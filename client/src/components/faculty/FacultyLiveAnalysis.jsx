@@ -180,11 +180,28 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
 
     const leaderboardData = useMemo(() => {
         if (!leaderboard || leaderboard.length === 0) return [];
-        return leaderboard.slice(0, 10).map((entry, idx) => ({
-            rank: entry.rank || idx + 1,
-            // Use rollNumber if available, otherwise fallback to truncated name
-            name: entry.student?.rollNumber || entry.userId?.rollNumber || (entry.student?.name || entry.userId?.name || 'Unknown').split(' ')[0],
-            score: entry.percentage || ((entry.totalScore / (quiz?.totalPoints || 100)) * 100) || 0,
+        
+        // Deduplicate: Keep only the highest score per unique student ID
+        const highestScores = new Map();
+        
+        leaderboard.forEach(entry => {
+            const name = entry.student?.rollNumber || entry.userId?.rollNumber || (entry.student?.name || entry.userId?.name || 'Unknown').split(' ')[0];
+            const score = entry.percentage || ((entry.totalScore / (quiz?.totalPoints || 100)) * 100) || 0;
+            
+            if (!highestScores.has(name) || highestScores.get(name).calculatedScore < score) {
+                highestScores.set(name, { ...entry, rankId: name, calculatedScore: parseFloat(score.toFixed(1)) });
+            }
+        });
+        
+        // Convert map to array, sort by score descending, then take strict top 5
+        const uniqueLeaderboard = Array.from(highestScores.values())
+            .sort((a, b) => b.calculatedScore - a.calculatedScore)
+            .slice(0, 5);
+
+        return uniqueLeaderboard.map((entry, idx) => ({
+            rank: idx + 1,
+            name: entry.rankId,
+            score: entry.calculatedScore,
             fill: idx < 3 ? '#F59E0B' : '#3B82F6'
         }));
     }, [leaderboard, quiz]);
@@ -339,17 +356,17 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     </div>
                 </div>
 
-                {/* Top 10 Leaderboard (Horizontal Bar Chart) */}
+                {/* Top 5 Leaderboard (Horizontal Bar Chart) */}
                 <div className="modern-graph-card graph-card-full">
                     <div className="graph-header">
-                        <FiAward style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Top 10 Students</h3>
+                        <FiAward style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Top 5 Students</h3>
                     </div>
                     <div className="graph-container-box" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                         {leaderboardData && leaderboardData.length > 0 ? (
                             <BarChart width={gridRef.current?.clientWidth || chartWidth * 2} height={400} data={leaderboardData} layout="vertical" margin={{ left: 20, right: 20, top: 20, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                 <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#E2E8F0', fontWeight: '500' }} tickLine={false} axisLine={false} />
+                                <YAxis dataKey="name" type="category" width={110} tick={{ fill: '#E2E8F0', fontWeight: '500' }} interval={0} tickLine={false} axisLine={false} />
                                 <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                                 <Legend verticalAlign="top" height={36} />
                                 <Bar dataKey="score" name="Performance Score %" radius={[0, 6, 6, 0]} barSize={20} isAnimationActive={false} />
