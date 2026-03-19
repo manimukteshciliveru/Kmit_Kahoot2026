@@ -98,12 +98,14 @@ const Flashcards = () => {
 
     const deleteSet = async (id, e) => {
         e.stopPropagation();
-        if (!window.confirm('Delete this flashcard set?')) return;
+        if (!window.confirm('Are you sure you want to delete this flashcard set?')) return;
         try {
             await flashcardAPI.delete(id);
-            setSets(sets.filter(s => s._id !== id));
-            toast.success('Set deleted');
-        } catch { toast.error('Delete failed'); }
+            toast.success('Flashcard set deleted successfully');
+            fetchSets(); // Re-fetch to ensure perfect state sync
+        } catch (err) { 
+            toast.error(err.response?.data?.message || 'Failed to delete set'); 
+        }
     };
 
     const handleDragOver  = (e) => { e.preventDefault(); setIsDragging(true); };

@@ -378,10 +378,11 @@ class AIQuestionGenerator {
 
         } catch (error) {
             logger.error('Flashcard Generation Error:', error);
-            // Minimal fallback
-            return Array.from({ length: 3 }, (_, i) => ({
-                question: `${topic} Question ${i + 1}`,
-                answer: `Study this concept in ${subject}`
+            // Minimal fallback - generate enough for a good session
+            const fallbackCount = Math.min(count, 10);
+            return Array.from({ length: fallbackCount }, (_, i) => ({
+                question: `Concept ${i + 1}: ${topic}`,
+                answer: `Study more about this concept in the context of ${subject}. [AI Service is currently over capacity, using fallback items]`
             }));
         }
     }

@@ -201,6 +201,7 @@
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
 }
 
@@ -299,13 +300,24 @@
     background: #1E293B;
     border: 1px solid var(--fc-border);
     border-radius: 32px;
-    padding: 3rem;
+    padding: 2.5rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.3) transparent;
+}
+
+.fc-face::-webkit-scrollbar {
+    width: 6px;
+}
+.fc-face::-webkit-scrollbar-thumb {
+    background-color: rgba(139, 92, 246, 0.3);
+    border-radius: 10px;
 }
 
 .fc-back {
@@ -324,12 +336,13 @@
 }
 
 .fc-face h2, .fc-face p {
-    font-size: clamp(1.2rem, 3vw, 1.8rem);
+    font-size: clamp(1rem, 2.5vw, 1.5rem);
     font-weight: 700;
-    line-height: 1.4;
+    line-height: 1.5;
     margin: 0;
     word-wrap: break-word;
     max-width: 100%;
+    color: #F8FAFC;
 }
 
 .fc-hint {
