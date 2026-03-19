@@ -7,6 +7,8 @@ import { FiClock, FiUsers, FiZap, FiCheckCircle, FiInfo } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
 import './PlayQuiz.css';
+import localforage from 'localforage';
+import './PlayQuiz.css';
 
 const PlayQuiz = () => {
     const { quizId } = useParams();
@@ -23,24 +25,28 @@ const PlayQuiz = () => {
     const [isDataReady, setIsDataReady] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [responseId, setResponseId] = useState(null);
+    
+    // Server Clock Synchronization
+    const serverTimeOffsetRef = useRef(0);
+    const getServerTime = useCallback(() => Date.now() + serverTimeOffsetRef.current, []);
+    
     const questionStartTimeRef = useRef(Date.now());
 
     // --- Answer State (Centralized) ---
     // Structure: { [questionId]: "Selected Option or Text" }
-    const [answers, setAnswers] = useState(() => {
-        const saved = localStorage.getItem(`quiz_answers_${quizId}`);
-        return saved ? JSON.parse(saved) : {};
-    });
+    const [answers, setAnswers] = useState({});
 
     // Temporary local state for text input smoothness
     const [localTextAnswer, setLocalTextAnswer] = useState('');
 
-    // Persistence Layer
+    // Persistence Layer Initialization
     useEffect(() => {
         if (quizId) {
-            localStorage.setItem(`quiz_answers_${quizId}`, JSON.stringify(answers));
+            localforage.getItem(`quiz_answers_${quizId}`).then(saved => {
+                if (saved) setAnswers(saved);
+            }).catch(console.error);
         }
-    }, [answers, quizId]);
+    }, [quizId]);
 
     // Stats & UI
     const [score, setScore] = useState(0);
@@ -65,6 +71,13 @@ const PlayQuiz = () => {
             try {
                 setLoading(true);
                 const response = await quizAPI.getById(quizId);
+                
+                // Calculate Server Clock Drift natively measuring header origin
+                if (response.headers && response.headers.date) {
+                    const serverTime = new Date(response.headers.date).getTime();
+                    serverTimeOffsetRef.current = serverTime - Date.now();
+                }
+
                 const data = response.data.data.quiz;
                 setQuiz(data);
                 const qs = data.questions || [];
@@ -106,39 +119,35 @@ const PlayQuiz = () => {
                 data.savedAnswers.forEach(a => { if (a.answer) serverAnswersMap[a.questionId] = a.answer; });
             }
 
-            // Try to recover local answers saved before disconnect
-            let localAnswers = {};
-            try {
-                const cached = localStorage.getItem(`quiz_answers_${quizId}`);
-                if (cached) localAnswers = JSON.parse(cached);
-            } catch (e) { /* ignore parse errors */ }
+            // Try to recover local answers saved before disconnect async
+            localforage.getItem(`quiz_answers_${quizId}`).then(cached => {
+                const localAnswers = cached || {};
+                const mergedAnswers = { ...localAnswers, ...serverAnswersMap };
+                setAnswers(mergedAnswers);
 
-            // Merge: server answers take priority, but local answers fill gaps
-            const mergedAnswers = { ...localAnswers, ...serverAnswersMap };
-            setAnswers(mergedAnswers);
+                // Re-submit any local-only answers to server on reconnect
+                if (socket && data.status === 'in-progress') {
+                    Object.entries(localAnswers).forEach(([qId, ans]) => {
+                        if (!serverAnswersMap[qId] && ans) {
+                            console.log('📤 [RESYNC] Re-submitting local answer for Q:', qId);
+                            socket.emit('answer:submit', {
+                                quizId,
+                                questionId: qId,
+                                answer: ans,
+                                timeTaken: 0 
+                            });
+                        }
+                    });
+                }
 
-            // Re-submit any local-only answers to server on reconnect
-            if (socket && data.status === 'in-progress') {
-                Object.entries(localAnswers).forEach(([qId, ans]) => {
-                    if (!serverAnswersMap[qId] && ans) {
-                        console.log('📤 [RESYNC] Re-submitting local answer for Q:', qId);
-                        socket.emit('answer:submit', {
-                            quizId,
-                            questionId: qId,
-                            answer: ans,
-                            timeTaken: 0 // Time is unknown for recovered answers
-                        });
-                    }
-                });
-            }
-
-            const targetIndex = Math.max(0, data.currentQuestionIndex || 0);
-            const currentQId = questions[targetIndex]?._id;
-            if (currentQId && mergedAnswers[currentQId]) {
-                setLocalTextAnswer(mergedAnswers[currentQId]);
-            } else {
-                setLocalTextAnswer('');
-            }
+                const targetIndex = Math.max(0, data.currentQuestionIndex || 0);
+                const currentQId = questions[targetIndex]?._id;
+                if (currentQId && mergedAnswers[currentQId]) {
+                    setLocalTextAnswer(mergedAnswers[currentQId]);
+                } else {
+                    setLocalTextAnswer('');
+                }
+            }).catch(console.error);
 
             if (data.remainingTime) {
                 const secs = Math.floor(data.remainingTime / 1000);
@@ -157,7 +166,7 @@ const PlayQuiz = () => {
                 setCurrentIndex(Math.max(0, data.currentQuestionIndex));
             }
             if (data.expiresAt) {
-                const diff = (new Date(data.expiresAt).getTime() - Date.now()) / 1000;
+                const diff = (new Date(data.expiresAt).getTime() - getServerTime()) / 1000;
                 const secs = Math.max(0, Math.floor(diff));
                 setTimeLeft(secs);
                 setQuizTimeLeft(secs);
@@ -189,7 +198,7 @@ const PlayQuiz = () => {
             setCurrentIndex(0);
             if (data.questions) setQuestions(data.questions);
             if (data.expiresAt) {
-                const diff = (new Date(data.expiresAt).getTime() - Date.now()) / 1000;
+                const diff = (new Date(data.expiresAt).getTime() - getServerTime()) / 1000;
                 const secs = Math.max(0, Math.floor(diff));
                 setTimeLeft(secs);
                 setQuizTimeLeft(secs);
@@ -249,55 +258,54 @@ const PlayQuiz = () => {
         if (connected) requestSync();
     }, [connected, requestSync]);
 
-    // --- Persist answers to localStorage for offline recovery ---
+    // --- Persist answers to IndexedDB for offline multimedia recovery ---
     useEffect(() => {
         if (quizId && Object.keys(answers).length > 0) {
-            try {
-                localStorage.setItem(`quiz_answers_${quizId}`, JSON.stringify(answers));
-            } catch (e) { /* storage full, ignore */ }
+            localforage.setItem(`quiz_answers_${quizId}`, answers).catch(() => {});
         }
 
-        // Cleanup localStorage when quiz is done
+        // Cleanup storage when quiz is done
         if (['done', 'finished', 'completed'].includes(status)) {
-            localStorage.removeItem(`quiz_answers_${quizId}`);
+            localforage.removeItem(`quiz_answers_${quizId}`);
         }
     }, [answers, quizId, status]);
 
-    // --- Tab Switch / Visibility Detection for Security ---
+    // --- Security Enforcements: Blur, Tab Switch, Fullscreen ---
     useEffect(() => {
         if (!socket || !quizId) return;
 
-        const handleVisibilityChange = () => {
-            if (document.hidden && ['active', 'question_active', 'live'].includes(status)) {
-                console.warn('🛡️ [SECURITY] Tab switch detected!');
-                socket.emit('tab:switched', { quizId });
+        const enforceSecurityViolation = (type) => {
+            if (['active', 'question_active', 'live'].includes(status)) {
+                console.warn(`🛡️ [SECURITY] Violation detected: ${type}`);
+                socket.emit('tab:switched', { quizId }); // Server natively parses as strike
             }
         };
 
+        const handleVisibilityChange = () => { if (document.hidden) enforceSecurityViolation('Tab Switch'); };
+        const handleBlur = () => { enforceSecurityViolation('Window Blur'); };
+        const handleFullscreenChange = () => { if (!document.fullscreenElement) enforceSecurityViolation('Exited Fullscreen'); };
+
         const handleSecurityWarning = (data) => {
-            toast.error(data.message, {
-                duration: 4000,
-                icon: '⚠️',
-                position: 'top-center'
-            });
+            toast.error(data.message, { duration: 4000, icon: '⚠️', position: 'top-center' });
         };
 
         const handleTermination = (data) => {
-            toast.error(data.message || 'You have been removed from this quiz.', {
-                duration: 8000,
-                icon: '🚫',
-                position: 'top-center'
-            });
+            toast.error(data.message || 'You have been removed from this quiz.', { duration: 8000, icon: '🚫', position: 'top-center' });
             setStatus('done');
             setTimeout(() => navigate('/dashboard'), 3000);
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleBlur);
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        
         socket.on('security:warning', handleSecurityWarning);
         socket.on('quiz:terminated', handleTermination);
 
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('blur', handleBlur);
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
             socket.off('security:warning', handleSecurityWarning);
             socket.off('quiz:terminated', handleTermination);
         };
@@ -347,7 +355,7 @@ const PlayQuiz = () => {
                     if (socket && connected) {
                         socket.emit('quiz:complete', { quizId, answers });
                     }
-                    localStorage.removeItem(`quiz_answers_${quizId}`);
+                    localforage.removeItem(`quiz_answers_${quizId}`);
                     setStatus('done');
 
                     // Auto-redirect to results after 3 seconds
@@ -390,7 +398,7 @@ const PlayQuiz = () => {
             quizId,
             questionId,
             answer: option,
-            timeTaken: Date.now() - questionStartTimeRef.current
+            timeTaken: getServerTime() - questionStartTimeRef.current
         });
     };
 
@@ -412,14 +420,14 @@ const PlayQuiz = () => {
             quizId,
             questionId: currentQ._id,
             answer,
-            timeTaken: Date.now() - questionStartTimeRef.current
+            timeTaken: getServerTime() - questionStartTimeRef.current
         });
     };
 
     const goToQuestion = (idx) => {
         if (idx < 0 || idx >= questions.length || !isDataReady) return;
         setCurrentIndex(idx);
-        questionStartTimeRef.current = Date.now();
+        questionStartTimeRef.current = getServerTime();
         // Sync local text answer for the new question
         const qId = questions[idx]?._id;
         setLocalTextAnswer(answers[qId] || '');
@@ -455,7 +463,34 @@ const PlayQuiz = () => {
         }
     };
 
+    const [isFullscreenMode, setIsFullscreenMode] = useState(false);
+
+    useEffect(() => {
+        const handleFS = () => setIsFullscreenMode(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', handleFS);
+        return () => document.removeEventListener('fullscreenchange', handleFS);
+    }, []);
+
     if (loading) return <div className="quiz-loading-modern"><div className="loader-orbit"></div><p>Syncing Arena...</p></div>;
+
+    if (!isFullscreenMode && ['active', 'question_active', 'live'].includes(status)) {
+        return (
+            <div className="quiz-waiting-modern">
+                <div className="waiting-glass-card animate-fadeInUp" style={{ borderColor: '#F43F5E' }}>
+                    <div className="pulse-logo" style={{ color: '#F43F5E' }}><FiInfo className="zap-icon" /></div>
+                    <h1 style={{ color: '#F43F5E' }}>Fullscreen Required</h1>
+                    <p>This exam operates in strict secure mode. You must enter Fullscreen to reveal the questions and continue.</p>
+                    <button 
+                        className="btn-premium primary pulse-button" 
+                        style={{ marginTop: '2rem' }}
+                        onClick={() => document.documentElement.requestFullscreen().catch(() => toast.error('Failed to enter fullscreen'))}
+                    >
+                        ENTER EXAM SECURE MODE
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (['waiting', 'draft', 'scheduled'].includes(status)) {
         return (
@@ -522,7 +557,14 @@ const PlayQuiz = () => {
 
     return (
         <ErrorBoundary>
-            <div className={`play-quiz-game ${!connected ? 'socket-lost' : ''}`}>
+            <div 
+                className={`play-quiz-game ${!connected ? 'socket-lost' : ''}`}
+                onCopy={(e) => {
+                    e.preventDefault();
+                    toast.error("🚨 Cheating Warning: Copying exam content is strictly prohibited.");
+                }}
+                onContextMenu={(e) => e.preventDefault()}
+            >
                 {!connected && (
                     <div className="connection-lost-overlay">
                         <div className="reconnect-box">
