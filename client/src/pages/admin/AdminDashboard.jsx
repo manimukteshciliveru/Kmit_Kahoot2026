@@ -305,7 +305,7 @@ const AdminDashboard = () => {
                         </div>
                     </div>
 
-                    <div className="dashboard-card full-width quick-actions">
+                    <div className="dashboard-card full-width quick-actions" style={{ marginTop: '2rem' }}>
                         <div className="card-header">
                             <h2>Quick Actions</h2>
                         </div>
