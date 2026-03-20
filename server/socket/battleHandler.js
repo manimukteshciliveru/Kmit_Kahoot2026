@@ -4,6 +4,7 @@ const User = require('../models/User');
 const logger = require('../utils/logger');
 const { calculateScore } = require('../utils/calculateScore');
 const rankManager = require('../utils/rankManager');
+const battleAIService = require('../services/battleAI.service');
 
 // Matchmaking State
 let waitingPlayers = new Map();
@@ -16,33 +17,24 @@ module.exports = (io, socket) => {
             name: p.name,
             avatar: p.avatar,
             socketId: p.socketId,
-            mode: p.mode
+            mode: p.mode,
+            rank: p.rank
         }));
         io.emit('battle:lobby_update', lobby);
     };
 
-    const createBattle = async (p1, p2, topic = null) => {
+    const createBattle = async (p1, p2, topicStr = null) => {
         const roomID = `battle_${Date.now()}_${p1.userId}`;
         
-        let query = { status: 'live' };
-        if (topic) {
-            query.$or = [
-                { title: { $regex: topic, $options: 'i' } },
-                { description: { $regex: topic, $options: 'i' } },
-                { subject: { $regex: topic, $options: 'i' } }
-            ];
+        let quiz;
+        if (topicStr && topicStr.includes(':')) {
+            const [cat, sub] = topicStr.split(':').map(s => s.trim());
+            quiz = await battleAIService.generateBattleQuiz(cat, sub);
         } else {
-            query.isPublic = true;
+            quiz = await Quiz.findOne({ status: 'live' }).select('_id title questions settings');
         }
 
-        let randomQuiz = await Quiz.findOne(query).select('_id title questions settings');
-        
-        if (!randomQuiz) {
-            // Ultimate fallback to ANY live quiz if topic search fails
-            randomQuiz = await Quiz.findOne({ status: 'live' }).select('_id title questions settings');
-        }
-
-        if (!randomQuiz) {
+        if (!quiz) {
             io.to(p1.socketId).emit('error', { message: 'Battle arena currently empty (No Quizzes)' });
             io.to(p2.socketId).emit('error', { message: 'Battle arena currently empty (No Quizzes)' });
             return null;
@@ -50,7 +42,7 @@ module.exports = (io, socket) => {
 
         const newBattle = new Battle({
             roomID,
-            quizId: randomQuiz._id,
+            quizId: quiz._id,
             players: [
                 { userId: p1.userId, name: p1.name, socketId: p1.socketId },
                 { userId: p2.userId, name: p2.name, socketId: p2.socketId }
@@ -72,14 +64,12 @@ module.exports = (io, socket) => {
             battleId: newBattle._id,
             roomID,
             quiz: {
-                title: randomQuiz.title,
-                questions: randomQuiz.questions,
-                settings: randomQuiz.settings
+                title: quiz.title,
+                questions: quiz.questions,
+                settings: quiz.settings
             },
             players: newBattle.players
         });
-
-        logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name}`);
     };
 
     // --- Lobby ---
@@ -91,16 +81,16 @@ module.exports = (io, socket) => {
             avatar: socket.user.avatar,
             socketId: socket.id,
             mode: mode,
+            rank: socket.user.rank,
             joinedAt: Date.now()
         });
 
         if (mode === 'random') {
             const opponent = Array.from(waitingPlayers.values()).find(p => 
-                p.socketId !== socket.id && p.mode === 'random'
+                p.userId !== socket.user._id.toString() && p.mode === 'random'
             );
 
             if (opponent) {
-                // Random match (default to general or any available topic)
                 createBattle(opponent, waitingPlayers.get(socket.id));
             } else {
                 socket.emit('battle:searching');
@@ -124,11 +114,7 @@ module.exports = (io, socket) => {
         const target = waitingPlayers.get(targetSocketId);
 
         if (!target) return socket.emit('error', { message: 'Target left the sector.' });
-        
-        // CRITICAL: Logic prevent self-challenge at server level
-        if (target.userId === challenger.userId) {
-            return socket.emit('error', { message: "Internal Error: Cannot duel yourself." });
-        }
+        if (target.userId === challenger.userId) return socket.emit('error', { message: "Internal Error: Cannot duel yourself." });
 
         io.to(targetSocketId).emit('battle:incoming_challenge', {
             challengerName: challenger.name,
@@ -157,8 +143,11 @@ module.exports = (io, socket) => {
             const battle = await Battle.findById(battleId).populate('quizId');
             if (!battle || battle.status !== 'active') return;
 
-            const player = battle.players.find(p => p.userId.toString() === socket.user._id.toString());
-            const opponent = battle.players.find(p => p.userId.toString() !== socket.user._id.toString());
+            const playerIdx = battle.players.findIndex(p => p.userId.toString() === socket.user._id.toString());
+            const opponentIdx = battle.players.findIndex(p => p.userId.toString() !== socket.user._id.toString());
+            
+            const player = battle.players[playerIdx];
+            const opponent = battle.players[opponentIdx];
 
             const question = battle.quizId.questions[questionIndex];
             const { isCorrect, scoreAwarded } = calculateScore(question, answer, timeTaken / 1000, battle.quizId.settings);
@@ -166,10 +155,7 @@ module.exports = (io, socket) => {
             player.score += scoreAwarded;
             player.answers.push({ questionIndex, isCorrect, timeSpent: timeTaken });
 
-            // Authoritative score sync back to current player
             socket.emit('battle:score_sync', { newScore: player.score });
-
-            // Sync update to opponent
             if (opponent.socketId) {
                 io.to(opponent.socketId).emit('battle:opponent_update', {
                     opponentScore: player.score,
@@ -185,19 +171,24 @@ module.exports = (io, socket) => {
 
                 if (p1.score > p2.score) { winner = p1; loser = p2; }
                 else if (p2.score > p1.score) { winner = p2; loser = p1; }
-                else { winner = null; loser = null; } // Tie
+                else { winner = null; loser = null; } // Draw
 
                 battle.winner = winner ? winner.userId : null;
                 await battle.save();
 
-                // --- RANK & PROGRESS UPDATE ---
+                // --- PROGRESSION LOGIC ---
                 if (winner && loser) {
                     const winnerDoc = await User.findById(winner.userId);
                     const loserDoc = await User.findById(loser.userId);
 
                     if (winnerDoc && loserDoc) {
-                        const winPoints = rankManager.calculateMatchReward(true, { steak: winnerDoc.rank.winStreak + 1 });
-                        const lossPoints = rankManager.calculateMatchReward(false);
+                        const winPoints = rankManager.calculateRP(true, winnerDoc.rank.points, {
+                            correctAnswers: winner.answers.filter(a => a.isCorrect).length,
+                            avgTime: winner.answers.reduce((acc, a) => acc + a.timeSpent, 0) / (winner.answers.length * 1000),
+                            streak: winnerDoc.rank.winStreak + 1
+                        });
+
+                        const lossPoints = rankManager.calculateRP(false, loserDoc.rank.points);
 
                         // Update Winner
                         winnerDoc.rank.points += winPoints;
@@ -217,7 +208,6 @@ module.exports = (io, socket) => {
                         loserDoc.rank.level = lInfo.level;
                         await loserDoc.save();
 
-                        // Notify individual players of rank changes
                         io.to(winner.socketId).emit('battle:rank_update', { 
                             change: winPoints, 
                             rank: winnerDoc.rank 
@@ -231,7 +221,7 @@ module.exports = (io, socket) => {
 
                 io.to(battle.roomID).emit('battle:ended', {
                     winnerId: battle.winner,
-                    finalScores: battle.players.map(p => ({ 
+                    finalScores: battle.players.map(p => ({
                         name: p.name, 
                         score: p.score,
                         userId: p.userId

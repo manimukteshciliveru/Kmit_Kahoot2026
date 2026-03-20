@@ -128,6 +128,73 @@
 /* --- LOBBY LAYOUT --- */
 .lobby-container { background: #0f172a; border-radius: 32px; padding: 3rem; }
 .lobby-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2.5rem; }
+/* Topic Selector & Dropdowns */
+.topic-selector-group {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.selector-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(45, 55, 72, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 0 15px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    z-index: 1000; /* Ensure visibility */
+}
+
+.selector-wrapper:hover {
+    border-color: #4a5568;
+    transform: translateY(-2px);
+    box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
+}
+
+.selector-icon {
+    color: #a0aec0;
+    font-size: 1.2rem;
+}
+
+.battle-topic-dropdown {
+    background: transparent;
+    border: none;
+    color: #e2e8f0;
+    padding: 12px 10px;
+    font-size: 1rem;
+    font-weight: 500;
+    outline: none;
+    width: 180px;
+    cursor: pointer;
+}
+
+.battle-topic-dropdown option {
+    background: #2d3748;
+    color: #ffffff;
+    padding: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sub-topic-animate {
+    animation: slideInLeft 0.4s ease-out;
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
 .topic-select-wrap { display: flex; align-items: center; gap: 1rem; background: #1e293b; padding: 0.8rem 1.5rem; border-radius: 14px; flex: 1; max-width: 400px; margin: 0 2rem; }
 .topic-select-wrap select { background: transparent; border: none; color: #fff; width: 100%; font-weight: 600; outline: none; }
 

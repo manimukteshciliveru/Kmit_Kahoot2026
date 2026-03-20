@@ -95,12 +95,8 @@ const userSchema = new mongoose.Schema({
     },
     rank: {
         points: { type: Number, default: 0 },
-        tier: { 
-            type: String, 
-            enum: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Heroic', 'Grandmaster'],
-            default: 'Bronze' 
-        },
-        level: { type: Number, default: 1 }, // 1, 2, 3
+        tier: { type: String, default: 'Bronze' },
+        level: { type: Number, default: 1 },
         winStreak: { type: Number, default: 0 },
         highestPoints: { type: Number, default: 0 },
         totalWins: { type: Number, default: 0 },
