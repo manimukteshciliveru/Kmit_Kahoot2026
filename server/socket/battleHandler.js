@@ -27,7 +27,8 @@ module.exports = (io, socket) => {
         if (topic) {
             query.$or = [
                 { title: { $regex: topic, $options: 'i' } },
-                { description: { $regex: topic, $options: 'i' } }
+                { description: { $regex: topic, $options: 'i' } },
+                { subject: { $regex: topic, $options: 'i' } }
             ];
         } else {
             query.isPublic = true;
@@ -35,22 +36,14 @@ module.exports = (io, socket) => {
 
         let randomQuiz = await Quiz.findOne(query).select('_id title questions settings');
         
-        if (!randomQuiz && topic) {
-            // Fallback: If topic not found, get any live quiz but warn
-            randomQuiz = await Quiz.findOne({ status: 'live', isPublic: true }).select('_id title questions settings');
+        if (!randomQuiz) {
+            // Ultimate fallback to ANY live quiz if topic search fails
+            randomQuiz = await Quiz.findOne({ status: 'live' }).select('_id title questions settings');
         }
 
         if (!randomQuiz) {
-            // Ultimate fallback
-            randomQuiz = await Quiz.findOne({ 
-                status: { $ne: 'draft' },
-                'questions.0': { $exists: true } 
-            }).select('_id title questions settings');
-        }
-
-        if (!randomQuiz) {
-            io.to(p1.socketId).emit('error', { message: 'No suitable quizzes found.' });
-            io.to(p2.socketId).emit('error', { message: 'No suitable quizzes found.' });
+            io.to(p1.socketId).emit('error', { message: 'Battle arena currently empty (No Quizzes)' });
+            io.to(p2.socketId).emit('error', { message: 'Battle arena currently empty (No Quizzes)' });
             return null;
         }
 
@@ -85,10 +78,10 @@ module.exports = (io, socket) => {
             players: newBattle.players
         });
 
-        logger.info(`⚔️ [BATTLE] Started: ${p1.name} vs ${p2.name} | Topic: ${topic || 'Random'}`);
+        logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name}`);
     };
 
-    // --- Lobby Management ---
+    // --- Lobby ---
     socket.on('battle:enter_lobby', (data) => {
         const mode = data?.mode || 'random';
         waitingPlayers.set(socket.id, {
@@ -97,74 +90,44 @@ module.exports = (io, socket) => {
             avatar: socket.user.avatar,
             socketId: socket.id,
             mode: mode,
-            joinedAt: Date.now(),
-            votes: null
+            joinedAt: Date.now()
         });
 
-        logger.info(`👤 [BATTLE] ${socket.user.name} in lobby (${mode})`);
-        
         if (mode === 'random') {
             const opponent = Array.from(waitingPlayers.values()).find(p => 
                 p.socketId !== socket.id && p.mode === 'random'
             );
 
             if (opponent) {
-                // Random match found - start voting for topic
-                const roomID = `vote_${Date.now()}`;
-                socket.join(roomID);
-                const oppSocket = io.sockets.sockets.get(opponent.socketId);
-                if (oppSocket) oppSocket.join(roomID);
-
-                io.to(roomID).emit('battle:topic_voting', {
-                    players: [
-                        { name: opponent.name, socketId: opponent.socketId },
-                        { name: socket.user.name, socketId: socket.id }
-                    ]
-                });
+                // Random match (default to general or any available topic)
+                createBattle(opponent, waitingPlayers.get(socket.id));
             } else {
                 socket.emit('battle:searching');
                 setTimeout(() => {
-                    if (waitingPlayers.get(socket.id)?.mode === 'random') {
-                        socket.emit('battle:no_players', { message: 'No other players online for Quick Match.' });
+                    const me = waitingPlayers.get(socket.id);
+                    if (me && me.mode === 'random') {
+                        socket.emit('battle:no_players', { message: 'Quick match timed out. Try browsing for players instead.' });
+                        waitingPlayers.delete(socket.id);
+                        broadcastLobbyUpdate();
                     }
-                }, 30000);
+                }, 40000);
             }
         }
         broadcastLobbyUpdate();
     });
 
-    // --- Topic Voting (Random Mode) ---
-    socket.on('battle:submit_vote', async (data) => {
-        const { opponentSocketId, topic, voteType } = data; // voteType: 'suggest' or 'accept_other'
-        const player = waitingPlayers.get(socket.id);
-        const opponent = waitingPlayers.get(opponentSocketId);
-
-        if (!player || !opponent) return;
-
-        player.vote = { topic, type: voteType };
-
-        // Check if both voted
-        if (opponent.vote) {
-            if (opponent.vote.type === 'accept_other' || player.vote.type === 'accept_other') {
-                const finalTopic = player.vote.type === 'suggest' ? player.vote.topic : opponent.vote.topic;
-                createBattle(player, opponent, finalTopic);
-            } else if (player.vote.topic === opponent.vote.topic) {
-                createBattle(player, opponent, player.vote.topic);
-            } else {
-                // Disagreement - ask again or randomized fallback
-                socket.emit('battle:vote_conflict', { message: 'Both suggested different topics. Choose one or leave.' });
-                io.to(opponentSocketId).emit('battle:vote_conflict', { message: 'Both suggested different topics. Choose one or leave.' });
-            }
-        }
-    });
-
     // --- Direct Challenges ---
     socket.on('battle:challenge_player', (data) => {
         const { targetSocketId, topic } = data;
-        const target = waitingPlayers.get(targetSocketId);
         const challenger = waitingPlayers.get(socket.id);
+        const target = waitingPlayers.get(targetSocketId);
 
-        if (!target) return socket.emit('error', { message: 'Player left.' });
+        if (!target) return socket.emit('error', { message: 'Target left the sector.' });
+        
+        // CRITICAL: Logic prevent self-challenge at server level
+        if (target.userId === challenger.userId) {
+            return socket.emit('error', { message: "Internal Error: Cannot duel yourself." });
+        }
 
         io.to(targetSocketId).emit('battle:incoming_challenge', {
             challengerName: challenger.name,
@@ -183,14 +146,8 @@ module.exports = (io, socket) => {
         if (accept) {
             createBattle(challenger, target, topic);
         } else {
-            io.to(challengerSocketId).emit('battle:challenge_rejected', { message: 'Invitation rejected' });
+            io.to(challengerSocketId).emit('battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
         }
-    });
-
-    socket.on('battle:leave_queue', () => {
-        waitingPlayers.delete(socket.id);
-        broadcastLobbyUpdate();
-        socket.emit('battle:cancelled');
     });
 
     socket.on('battle:submit_answer', async (data) => {
@@ -208,6 +165,10 @@ module.exports = (io, socket) => {
             player.score += scoreAwarded;
             player.answers.push({ questionIndex, isCorrect, timeSpent: timeTaken });
 
+            // Authoritative score sync back to current player
+            socket.emit('battle:score_sync', { newScore: player.score });
+
+            // Sync update to opponent
             if (opponent.socketId) {
                 io.to(opponent.socketId).emit('battle:opponent_update', {
                     opponentScore: player.score,
@@ -227,7 +188,13 @@ module.exports = (io, socket) => {
                     finalScores: battle.players.map(p => ({ name: p.name, score: p.score }))
                 });
             } else await battle.save();
-        } catch (err) { logger.error('Battle Submit Error:', err); }
+        } catch (err) { logger.error('Battle Logic Error:', err); }
+    });
+
+    socket.on('battle:leave_queue', () => {
+        waitingPlayers.delete(socket.id);
+        broadcastLobbyUpdate();
+        socket.emit('battle:cancelled');
     });
 
     socket.on('disconnect', () => {
