@@ -31,12 +31,12 @@ const BattleArena = () => {
     const searchInterval = useRef(null);
 
     const TOPIC_STRUCTURE = {
-        'Python': ['Loops', 'Arrays', 'Classes', 'Dictionaries', 'Functions', 'Decorators'],
-        'Java': ['Collections', 'Inheritance', 'Streams', 'Multithreading', 'Generics'],
-        'JavaScript': ['Closures', 'Async/Await', 'ES6+', 'DOM', 'Promises'],
-        'Data Structures': ['Linked Lists', 'Trees', 'Graphs', 'Stacks/Queues'],
-        'Algorithms': ['Sorting', 'Searching', 'Dynamic Programming', 'Recursion'],
-        'Web': ['HTML5 Semantic', 'CSS Grid/Flexbox', 'Responsive Design']
+        'Python': ['Basics', 'Loops', 'Arrays', 'Classes', 'Dictionaries', 'Functions', 'Decorators', 'Generators', 'Iterators', 'Exception Handling', 'File I/O', 'Regex', 'OOPs', 'Multithreading', 'Networking', 'Web Scrapping'],
+        'Java': ['Basics', 'OOPs', 'Collections', 'Inheritance', 'Polymorphism', 'Abstractions', 'Encapsulation', 'Streams', 'Multithreading', 'Generics', 'JVM Architecture', 'Garbage Collection', 'Exception Handling', 'Networking', 'Servlets', 'JSP'],
+        'JavaScript': ['Basics', 'Variables', 'Data Types', 'Closures', 'Async/Await', 'ES6+', 'DOM Manipulation', 'Promises', 'Event Loop', 'Callback Function', 'Arrow Functions', 'Strict Mode', 'JSON', 'Local Storage'],
+        'Data Structures': ['Arrays', 'Linked Lists', 'Trees', 'Graphs', 'Stacks/Queues', 'Hash Tables', 'Heaps', 'Trie'],
+        'Algorithms': ['Sorting', 'Searching', 'Dynamic Programming', 'Recursion', 'Backtracking', 'Greedy Algorithms', 'Sliding Window', 'Two Pointers'],
+        'Web': ['HTML5 Semantic', 'CSS Grid/Flexbox', 'Responsive Design', 'SASS/SCSS', 'React Basics', 'State Management', 'React Hooks', 'Routing', 'API Integration', 'Next.js']
     };
 
     useEffect(() => {
@@ -122,6 +122,7 @@ const BattleArena = () => {
         if (targetUserId === user._id) return toast.error("Self-duel is prohibited.");
         const fullTopic = `${selectedCategory}: ${selectedSubTopic}`;
         if (socket) {
+            console.log('⚔️ [ARENA] Sending challenge to:', targetSocketId, 'Topic:', fullTopic);
             socket.emit('battle:challenge_player', { targetSocketId, topic: fullTopic });
         }
         toast.success(`Challenging for ${selectedSubTopic}...`);

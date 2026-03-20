@@ -116,6 +116,7 @@ module.exports = (io, socket) => {
         if (!target) return socket.emit('error', { message: 'Target left the sector.' });
         if (target.userId === challenger.userId) return socket.emit('error', { message: "Internal Error: Cannot duel yourself." });
 
+        console.log(`⚔️ [BATTLE] Challenge: ${challenger.nickname || challenger.name} -> ${target.nickname || target.name} (Socket: ${targetSocketId})`);
         io.to(targetSocketId).emit('battle:incoming_challenge', {
             challengerName: challenger.name,
             challengerSocketId: socket.id,
