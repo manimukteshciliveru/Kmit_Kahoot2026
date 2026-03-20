@@ -22,36 +22,24 @@ const getTierByPoints = (points) => {
     return { tier: tierConfig.tier, level: level };
 };
 
-const calculatePoints = (currentPoints, isWin, streak) => {
-    let winRng = [0, 0];
-    let lossRng = [0, 0];
+const expectedScore = (player, opponent) => {
+    return 1.0 / (1 + Math.pow(10, (opponent - player) / 400.0));
+};
 
-    // Determine the bracket for base win/loss
-    if (currentPoints < 1500) { // Bronze - Silver
-        winRng = [35, 40];
-        lossRng = [5, 10];
-    } else if (currentPoints < 3900) { // Gold - Platinum
-        winRng = [25, 30];
-        lossRng = [15, 20];
-    } else if (currentPoints < 4800) { // Diamond
-        winRng = [20, 25];
-        lossRng = [20, 25];
-    } else { // Master - Grandmaster
-        winRng = [15, 20];
-        lossRng = [25, 35];
-    }
+const getKFactor = (points) => {
+    if (points < 1500) return 40;        // Bronze-Silver
+    else if (points < 3900) return 30;   // Gold-Platinum
+    else if (points < 4800) return 25;   // Diamond
+    else return 20;                      // Master+
+};
 
-    let delta = 0;
-    if (isWin) {
-        delta = Math.floor(Math.random() * (winRng[1] - winRng[0] + 1)) + winRng[0];
-        // Streak Bonuses
-        if (streak >= 5) delta += 20;
-        else if (streak >= 3) delta += 10;
-    } else {
-        delta = -(Math.floor(Math.random() * (lossRng[1] - lossRng[0] + 1)) + lossRng[0]);
-    }
+const calculatePoints = (playerPoints, opponentPoints, isWin, bonus) => {
+    const E = expectedScore(playerPoints, opponentPoints);
+    const K = getKFactor(playerPoints);
 
-    return delta;
+    const change = K * ((isWin ? 1 : 0) - E);
+
+    return Math.round(change + bonus);
 };
 
 module.exports = { calculatePoints, getTierByPoints };
