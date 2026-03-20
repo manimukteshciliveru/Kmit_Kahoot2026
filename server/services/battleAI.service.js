@@ -8,7 +8,7 @@ const genAI = new GoogleGenerativeAI(
 
 let mistral = null;
 if (process.env.MISTRAL_API_KEY) {
-    const { Mistral } = require("@mistralai/mistral");
+    const { Mistral } = require("@mistralai/mistralai");
     mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
 }
 
