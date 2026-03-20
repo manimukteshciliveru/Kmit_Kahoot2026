@@ -374,13 +374,25 @@ const BattleArena = () => {
             {view === 'lobby' && (
                 <div className="lobby-v2 animate-slide-up">
                     <div className="lobby-head glass">
-                        <div>
-                            <h2>Battle Registry</h2>
-                            <p><span className="live-dot"></span> {lobbyPlayers.length} Elite Players Online</p>
+                        <div className="flex items-center gap-4">
+                            <LuUsers className="text-3xl text-blue-400" />
+                            <div>
+                                <h2>Battle Registry</h2>
+                                <p>Select your opponent to begin the duel</p>
+                            </div>
                         </div>
-                        <button className="close-lobby" onClick={() => setView('selection')}><LuX /></button>
                     </div>
                     <div className="lobby-grid p-4">
+                        <div className="lobby-controls-bar mb-6">
+                            <button className="btn-back-v2" onClick={() => setView('selection')}>
+                                <LuX /> Close Registry
+                            </button>
+                            <div className="lobby-stats-mini">
+                                <span className="live-dot"></span> 
+                                {lobbyPlayers.length} Legends Active
+                            </div>
+                        </div>
+
                         {lobbyPlayers.length === 0 ? (
                             <div className="empty-lobby text-center">
                                 <LuUsers className="empty-icon" />
@@ -394,7 +406,19 @@ const BattleArena = () => {
                                     return (
                                         <div key={p.userId} className={`player-card-v2 ${isMe ? 'me' : ''} glass`}>
                                             <div className="p-card-header">
-                                                <img src={p.avatar} alt={p.name} className="p-avatar-lg" />
+                                                {p.avatar ? (
+                                                    <img 
+                                                        src={p.avatar} 
+                                                        alt={p.name} 
+                                                        className="p-avatar-lg" 
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="avatar-fallback"><LuUsers /></div>
+                                                )}
                                                 <div className="p-status-mini">
                                                     {getRankIcon(p.rank?.tier)}
                                                 </div>
@@ -411,7 +435,7 @@ const BattleArena = () => {
                                                     <span className="badge badge-info">You</span>
                                                 ) : (
                                                     <button className="btn-challenge-v3" onClick={() => handleChallenge(p.userId)}>
-                                                        Challenge
+                                                        <LuSword /> Challenge
                                                     </button>
                                                 )}
                                             </div>
