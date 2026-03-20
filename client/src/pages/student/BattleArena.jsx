@@ -364,7 +364,7 @@ const BattleArena = () => {
                                 </div>
                             </div>
                             
-                            <div className="flex items-center gap-10">
+                            <div className="flex items-center gap-10 relative z-10">
                                 <button 
                                     className={`btn-roadmap-toggle ${showLevelMap ? 'active' : ''}`}
                                     onClick={() => setShowLevelMap(!showLevelMap)}
