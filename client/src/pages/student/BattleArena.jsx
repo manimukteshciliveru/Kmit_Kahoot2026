@@ -16,6 +16,7 @@ const BattleArena = () => {
     const [lobbyPlayers, setLobbyPlayers] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSubTopic, setSelectedSubTopic] = useState('');
+    const [questionCount, setQuestionCount] = useState(5);
     const [incomingChallenge, setIncomingChallenge] = useState(null);
     const [battleData, setBattleData] = useState(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -69,6 +70,7 @@ const BattleArena = () => {
         
         socket.on('battle:started', (data) => {
             setBattleData(data);
+            setIncomingChallenge(null);
             setSyncData({
                 players: data.players.map(p => ({ userId: p.userId, hp: 100, score: 0 }))
             });
@@ -188,7 +190,8 @@ const BattleArena = () => {
             if (mode === 'lobby') setView('lobby');
             socket.emit('battle:enter_lobby', { 
                 mode, 
-                topic: selectedSubTopic ? `${selectedCategory}: ${selectedSubTopic}` : 'General'
+                topic: selectedSubTopic ? `${selectedCategory}: ${selectedSubTopic}` : 'General',
+                questionCount
             });
         }
     };
@@ -198,7 +201,8 @@ const BattleArena = () => {
         if (socket) {
             socket.emit('battle:challenge_player', { 
                 targetUserId, 
-                topic: `${selectedCategory}: ${selectedSubTopic}` 
+                topic: `${selectedCategory}: ${selectedSubTopic}`,
+                questionCount
             });
             toast.success('Challenge Dispatched!');
         }
@@ -223,7 +227,7 @@ const BattleArena = () => {
                     <div className="battle-hud-v2">
                         <div className={`hud-side self ${damageEffect === 'self' ? 'damaged' : ''}`}>
                             <div className="hud-meta">
-                                <span className="hud-name">{user.name}</span>
+                                <span className="hud-name text-blue-400 font-bold">{user.name}</span>
                                 <span className="hud-score">{syncData.players.find(p => p.userId.toString() === (user.id || user._id).toString())?.score || 0} XP</span>
                             </div>
                             <div className="hp-container">
@@ -243,7 +247,7 @@ const BattleArena = () => {
 
                         <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
                             <div className="hud-meta">
-                                <span className="hud-name">Opponent</span>
+                                <span className="hud-name text-white font-bold">Opponent</span>
                                 <span className="hud-score">{syncData.players.find(p => p.userId.toString() !== (user.id || user._id).toString())?.score || 0} XP</span>
                             </div>
                             <div className="hp-container">
@@ -344,6 +348,16 @@ const BattleArena = () => {
                                     <select className="form-select" value={selectedSubTopic} onChange={(e) => setSelectedSubTopic(e.target.value)}>
                                         <option value="">Choose Topic</option>
                                         {TOPIC_STRUCTURE[selectedCategory].map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                            )}
+                            {selectedSubTopic && (
+                                <div className="form-group animate-slideDown">
+                                    <label className="form-label">Questions</label>
+                                    <select className="form-select" value={questionCount} onChange={(e) => setQuestionCount(Number(e.target.value))}>
+                                        <option value={5}>5 Questions</option>
+                                        <option value={10}>10 Questions</option>
+                                        <option value={15}>15 Questions</option>
                                     </select>
                                 </div>
                             )}
@@ -535,10 +549,10 @@ const BattleArena = () => {
                     <LuSword />
                     <div className="c-text">
                         <strong>{incomingChallenge.challengerName}</strong> wants to duel!
-                        <p>{incomingChallenge.topic}</p>
+                        <p>{incomingChallenge.topic} • {incomingChallenge.questionCount} Questions</p>
                     </div>
                     <div className="c-btns">
-                        <button className="acc" onClick={() => socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic })}>Accept</button>
+                        <button className="acc" onClick={() => socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic, questionCount: incomingChallenge.questionCount })}>Accept</button>
                         <button className="dec" onClick={() => setIncomingChallenge(null)}>Reject</button>
                     </div>
                 </div>

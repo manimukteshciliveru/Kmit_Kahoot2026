@@ -40,12 +40,12 @@ module.exports = (io, socket) => {
         sockets.forEach(s => s.join(roomID));
     };
 
-    const createBattle = async (p1, p2, topicStr = null) => {
+    const createBattle = async (p1, p2, topicStr = null, questionCount = 5) => {
         const roomID = `battle_${Date.now()}_${p1.userId}`;
         const topic = topicStr || "General";
 
         try {
-            const quizData = await generateBattleQuiz(topic);
+            const quizData = await generateBattleQuiz(topic, questionCount);
             const battleId = `B-${Math.floor(1000 + Math.random() * 9000)}`;
 
             const newBattle = new Battle({
@@ -88,6 +88,7 @@ module.exports = (io, socket) => {
         const userId = socket.user._id.toString();
         const mode = data?.mode || 'random';
         const topicRaw = data?.topic || 'General';
+        const qCount = parseInt(data?.questionCount) || 5;
         const topic = topicRaw.toLowerCase().replace(/\s+/g, ''); // Normalize
         
         waitingPlayers.set(userId, {
@@ -97,6 +98,7 @@ module.exports = (io, socket) => {
             socketId: socket.id,
             mode: mode,
             topic: topic,
+            questionCount: qCount,
             rank: socket.user.rank || { tier: 'Bronze', level: 'I', points: 0 },
             joinedAt: Date.now()
         });
@@ -105,11 +107,12 @@ module.exports = (io, socket) => {
             const opponent = Array.from(waitingPlayers.values()).find(p => 
                 p.userId !== userId && 
                 p.mode === 'random' && 
-                p.topic === topic
+                p.topic === topic &&
+                p.questionCount === qCount
             );
 
             if (opponent) {
-                createBattle(opponent, waitingPlayers.get(userId), topicRaw);
+                createBattle(opponent, waitingPlayers.get(userId), topicRaw, qCount);
             } else {
                 socket.emit('battle:searching');
             }
@@ -118,7 +121,7 @@ module.exports = (io, socket) => {
     });
 
     socket.on('battle:challenge_player', async (data) => {
-        const { targetUserId, topic } = data;
+        const { targetUserId, topic, questionCount } = data;
         const challenger = waitingPlayers.get(socket.user._id.toString());
         const target = waitingPlayers.get(targetUserId);
 
@@ -127,19 +130,20 @@ module.exports = (io, socket) => {
         emitToUser(targetUserId, 'battle:incoming_challenge', {
             challengerName: challenger.name,
             challengerUserId: challenger.userId,
-            topic: topic || 'General'
+            topic: topic || 'General',
+            questionCount: questionCount || 5
         });
     });
 
     socket.on('battle:respond_challenge', async (data) => {
-        const { challengerUserId, accept, topic } = data;
+        const { challengerUserId, accept, topic, questionCount } = data;
         const target = waitingPlayers.get(socket.user._id.toString());
         const challenger = waitingPlayers.get(challengerUserId);
 
         if (!challenger || !target) return socket.emit('error', { message: 'Duel setup expired.' });
 
         if (accept) {
-            createBattle(challenger, target, topic);
+            createBattle(challenger, target, topic, questionCount || 5);
         } else {
             emitToUser(challengerUserId, 'battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
         }
