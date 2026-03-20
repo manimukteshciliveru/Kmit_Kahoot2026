@@ -566,6 +566,8 @@
   align-items: center;
   gap: 1rem;
   margin-bottom: 2.5rem;
+  padding-left: 2rem;
+  padding-right: 2rem;
 }
 
 .roadmap-header h3 {
