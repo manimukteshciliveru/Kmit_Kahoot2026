@@ -39,7 +39,8 @@ const calculatePoints = (playerPoints, opponentPoints, isWin, bonus) => {
 
     const change = K * ((isWin ? 1 : 0) - E);
 
-    return Math.round(change + bonus);
+    const cappedBonus = Math.min(bonus, 25);
+    return Math.round(change + cappedBonus);
 };
 
 module.exports = { calculatePoints, getTierByPoints };

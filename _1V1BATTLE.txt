@@ -1,0 +1,1927 @@
+
+
+=======================================================
+FILE: client/src/pages/student/BattleArena.jsx
+DESCRIPTION: Frontend React Component for the 1v1 Battle Arena UI. Handles lobby, matching, rendering questions, and battle UI.
+=======================================================
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
+import { toast } from 'react-hot-toast';
+import { 
+    LuSword, LuUsers, LuTrophy, LuTimer, LuSkull, 
+    LuBookOpen, LuX, LuChevronRight, LuTarget, 
+    LuZap, LuShieldCheck, LuCrown, LuFlame, LuHeart
+} from 'react-icons/lu';
+import './BattleArena.css';
+
+const BattleArena = () => {
+    const { socket, connected } = useSocket();
+    const { user } = useAuth();
+    const [view, setView] = useState('selection'); // selection, searching, lobby, playing, results
+    const [lobbyPlayers, setLobbyPlayers] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedSubTopic, setSelectedSubTopic] = useState('');
+    const [questionCount, setQuestionCount] = useState(5);
+    const [questionTimer, setQuestionTimer] = useState(20);
+    const [incomingChallenge, setIncomingChallenge] = useState(null);
+    const [battleData, setBattleData] = useState(null);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [timer, setTimer] = useState(20);
+    const [searchTime, setSearchTime] = useState(0);
+    
+    // Synchronized Progression States
+    const [roundStatus, setRoundStatus] = useState('answering'); // answering, waiting, resolved
+    const [roundResult, setRoundResult] = useState(null);
+    
+    // Battle Stats
+    const [syncData, setSyncData] = useState(null);
+    const [damageEffect, setDamageEffect] = useState(null); // 'self' or 'opponent'
+    
+    // Results
+    const [finalResults, setFinalResults] = useState(null);
+
+    const timerRef = useRef(null);
+    const searchInterval = useRef(null);
+
+    const TOPIC_STRUCTURE = {
+        'Python': ['Basics', 'Loops', 'Arrays', 'Classes', 'Dictionaries', 'Functions', 'Decorators', 'Generators', 'Iterators', 'Exception Handling', 'File I/O', 'Regex', 'OOPs', 'Multithreading', 'Networking', 'Web Scrapping'],
+        'Java': ['Basics', 'OOPs', 'Collections', 'Inheritance', 'Polymorphism', 'Abstractions', 'Encapsulation', 'Streams', 'Multithreading', 'Generics', 'JVM Architecture', 'Garbage Collection', 'Exception Handling', 'Networking', 'Servlets', 'JSP'],
+        'JavaScript': ['Basics', 'Variables', 'Data Types', 'Closures', 'Async/Await', 'ES6+', 'DOM Manipulation', 'Promises', 'Event Loop', 'Callback Function', 'Arrow Functions', 'Strict Mode', 'JSON', 'Local Storage'],
+        'Data Structures': ['Arrays', 'Linked Lists', 'Trees', 'Graphs', 'Stacks/Queues', 'Hash Tables', 'Heaps', 'Trie'],
+        'Algorithms': ['Sorting', 'Searching', 'Dynamic Programming', 'Recursion', 'Backtracking', 'Greedy Algorithms', 'Sliding Window', 'Two Pointers'],
+        'Web': ['HTML5 Semantic', 'CSS Grid/Flexbox', 'Responsive Design', 'SASS/SCSS', 'React Basics', 'State Management', 'React Hooks', 'Routing', 'API Integration', 'Next.js']
+    };
+
+    const TIER_ROADMAP = [
+        { name: 'Bronze', min: 0, icon: <LuShieldCheck className="text-orange-600" /> },
+        { name: 'Silver', min: 600, icon: <LuShieldCheck className="text-gray-400" /> },
+        { name: 'Gold', min: 1500, icon: <LuCrown className="text-yellow-400" /> },
+        { name: 'Platinum', min: 2700, icon: <LuZap className="text-cyan-400" /> },
+        { name: 'Diamond', min: 3900, icon: <LuTarget className="text-blue-500" /> },
+        { name: 'Master', min: 4800, icon: <LuFlame className="text-purple-500" /> },
+        { name: 'Grandmaster', min: 5000, icon: <LuCrown className="text-red-500" /> }
+    ];
+
+    useEffect(() => {
+        if (socket && connected && user) {
+            socket.emit('battle:enter_lobby', { mode: 'idle', topic: 'General' });
+        }
+    }, [socket, connected, user]);
+
+    useEffect(() => {
+        if (!socket || !connected) return;
+
+        socket.on('battle:lobby_update', setLobbyPlayers);
+        socket.on('battle:incoming_challenge', setIncomingChallenge);
+        
+        socket.on('battle:started', (data) => {
+            setBattleData(data);
+            setIncomingChallenge(null);
+            setSyncData({
+                players: data.players.map(p => ({ userId: p.userId, hp: 100, score: 0 }))
+            });
+            setView('playing');
+            setCurrentQuestionIndex(0);
+            setRoundStatus('answering');
+            startQuestionTimer();
+            toast.success('Duel Started!', { icon: '⚔️' });
+        });
+
+        socket.on('battle:sync', (data) => {
+            if (syncData) {
+                const myId = user.id || user._id;
+                const myPrevHp = syncData.players.find(p => p.userId.toString() === myId.toString())?.hp;
+                const myNewHp = data.players.find(p => p.userId.toString() === myId.toString())?.hp;
+                const oppPrevHp = syncData.players.find(p => p.userId.toString() !== myId.toString())?.hp;
+                const oppNewHp = data.players.find(p => p.userId.toString() !== myId.toString())?.hp;
+
+                if (myNewHp < myPrevHp) triggerDamageEffect('self');
+                if (oppNewHp < oppPrevHp) triggerDamageEffect('opponent');
+            }
+            setSyncData(data);
+        });
+
+        socket.on('battle:waiting_for_opponent', () => {
+            setRoundStatus('waiting');
+            clearInterval(timerRef.current);
+        });
+
+        socket.on('battle:round_resolved', (data) => {
+            setRoundResult(data);
+            setRoundStatus('resolved');
+            clearInterval(timerRef.current);
+        });
+
+        socket.on('battle:next_question', ({ nextIndex }) => {
+            setCurrentQuestionIndex(nextIndex);
+            setRoundStatus('answering');
+            setRoundResult(null);
+            startQuestionTimer();
+        });
+
+        socket.on('battle:ended', (data) => {
+            clearInterval(timerRef.current);
+            setFinalResults(data);
+            setView('results');
+        });
+
+        socket.on('battle:searching', () => {
+            setView('searching');
+            setSearchTime(0);
+            clearInterval(searchInterval.current);
+            searchInterval.current = setInterval(() => setSearchTime(p => p + 1), 1000);
+        });
+
+        socket.on('battle:opponent_left', (data) => {
+            toast.success(data.message, { icon: '🏆', duration: 5000 });
+            clearInterval(timerRef.current);
+            setView('selection');
+        });
+
+        return () => {
+            socket.off('battle:lobby_update');
+            socket.off('battle:incoming_challenge');
+            socket.off('battle:started');
+            socket.off('battle:sync');
+            socket.off('battle:waiting_for_opponent');
+            socket.off('battle:round_resolved');
+            socket.off('battle:next_question');
+            socket.off('battle:ended');
+            socket.off('battle:searching');
+            socket.off('battle:opponent_left');
+            clearInterval(timerRef.current);
+            clearInterval(searchInterval.current);
+        };
+    }, [socket, connected, syncData, user]);
+
+    const triggerDamageEffect = (target) => {
+        setDamageEffect(target);
+        setTimeout(() => setDamageEffect(null), 500);
+    };
+
+    const startQuestionTimer = () => {
+        setTimer(20);
+        clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+            setTimer(prev => {
+                if (prev <= 1) {
+                    handleAnswer(null);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
+    const handleAnswer = (answerIndex) => {
+        if (roundStatus !== 'answering') return;
+        
+        clearInterval(timerRef.current);
+        if (socket && battleData) {
+            socket.emit('battle:submit_answer', {
+                battleId: battleData.battleId,
+                questionIndex: currentQuestionIndex,
+                answer: answerIndex,
+                timeTaken: (20 - timer) * 1000
+            });
+        }
+    };
+
+    const startSearch = (mode = 'random') => {
+        if (!selectedSubTopic && mode !== 'idle' && mode !== 'lobby') {
+            return toast.error("Select a path first!");
+        }
+        
+        if (socket) {
+            if (mode === 'lobby') setView('lobby');
+            socket.emit('battle:enter_lobby', { 
+                mode, 
+                topic: selectedSubTopic ? `${selectedCategory}: ${selectedSubTopic}` : 'General',
+                questionCount,
+                questionTimer
+            });
+        }
+    };
+
+    const handleChallenge = (targetUserId) => {
+        if (!selectedSubTopic) return toast.error("Select your battle topic first!");
+        if (socket) {
+            socket.emit('battle:challenge_player', { 
+                targetUserId, 
+                topic: `${selectedCategory}: ${selectedSubTopic}`,
+                questionCount,
+                questionTimer
+            });
+            toast.success('Challenge Dispatched!');
+        }
+    };
+
+    const getRankIcon = (tier) => {
+        const t = tier?.toLowerCase();
+        if (t === 'bronze') return <LuShieldCheck className="rank-i bronze" />;
+        if (t === 'silver') return <LuShieldCheck className="rank-i silver" />;
+        if (t === 'gold') return <LuCrown className="rank-i gold" />;
+        if (t === 'platinum') return <LuZap className="rank-i platinum" />;
+        if (t === 'diamond') return <LuTarget className="rank-i diamond" />;
+        if (t === 'master') return <LuFlame className="rank-i master" />;
+        if (t === 'grandmaster') return <LuCrown className="rank-i gm" />;
+        return <LuShieldCheck className="rank-i" />;
+    };
+
+    return (
+        <div className="arena-v2">
+            {view === 'playing' && battleData && syncData && (
+                <div className={`battle-playing-screen ${damageEffect ? `shake-${damageEffect}` : ''}`}>
+                    <div className="battle-hud-v2">
+                        <div className={`hud-side self ${damageEffect === 'self' ? 'damaged' : ''}`}>
+                            <div className="hud-meta">
+                                <span className="hud-name text-blue-400 font-bold">{user.name}</span>
+                            </div>
+                        </div>
+
+                        <div className="match-timer-ring">
+                            <svg viewBox="0 0 100 100" className="w-full h-full">
+                                <circle cx="50" cy="50" r="45" className="timer-bg" />
+                                <circle 
+                                    cx="50" cy="50" r="45" 
+                                    className="timer-progress" 
+                                    style={{ strokeDashoffset: 283 - (283 * (timer / (battleData?.questionTimer || 20))) }}
+                                />
+                            </svg>
+                            <span className="timer-val">{timer}</span>
+                        </div>
+
+                        <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
+                            <div className="hud-meta">
+                                <span className="hud-name text-white font-bold">Opponent</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="combat-stage animate-scale-in">
+                        {roundStatus === 'answering' && (
+                            <div className="question-box glass">
+                                <div className="q-indicator">Question {currentQuestionIndex + 1} / {battleData.quiz.questions.length}</div>
+                                <h2>{battleData.quiz.questions[currentQuestionIndex].questionText}</h2>
+                                <div className="options-grid-v2">
+                                    {battleData.quiz.questions[currentQuestionIndex].options.map((opt, idx) => (
+                                        <button key={idx} className="opt-v2" onClick={() => handleAnswer(idx)}>
+                                            <div className="opt-idx">{String.fromCharCode(65 + idx)}</div>
+                                            <span className="opt-label">{opt.text}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {roundStatus === 'waiting' && (
+                            <div className="waiting-overlay glass animate-pulse">
+                                <LuTimer className="waiting-icon" />
+                                <h2>Waiting for Opponent...</h2>
+                                <p>You answered in {((20 - timer)).toFixed(1)}s</p>
+                            </div>
+                        )}
+
+                        {roundStatus === 'resolved' && roundResult && (
+                            <div className="round-resolution glass animate-scale-in">
+                                <div className="res-header">
+                                    <LuTarget />
+                                    <h2>Round {currentQuestionIndex + 1} Results</h2>
+                                </div>
+                                <div className="res-grid">
+                                    {roundResult.players.map(p => (
+                                        <div key={p.userId} className={`res-block ${p.userId === (user.id || user._id).toString() ? 'me' : ''}`}>
+                                            <div className="res-info">
+                                                <span className="player-name">{p.name}</span>
+                                                <span className={`res-badge ${p.isCorrect ? 'correct' : 'wrong'}`}>
+                                                    {p.isCorrect ? 'CORRECT' : 'WRONG'}
+                                                </span>
+                                            </div>
+                                            <div className="res-meta">
+                                                <span>Speed: {(p.timeTaken / 1000).toFixed(1)}s</span>
+                                                <span className="xp-gain">+{p.isCorrect ? (p.timeTaken < 3000 ? 15 : 10) : 0} XP</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="next-round-bar">
+                                    <div className="progress"></div>
+                                </div>
+                                <p className="status-footer">Next question incoming...</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {view === 'selection' && (
+                <div className="arena-home animate-fadeInUp">
+                    <div className="arena-header text-center">
+                        <h1>Battle Arena</h1>
+                        <p className="glow-text">Ascend the leaderboard. Prove your dominance.</p>
+                    </div>
+
+                    <div className="user-rank-status">
+                        <div className="rank-card-v2 glass">
+                            {getRankIcon(user.rank?.tier)}
+                            <div className="rank-details">
+                                <h3>{user.rank?.tier || 'Bronze'} {user.rank?.level || 'I'}</h3>
+                                <p>{user.rank?.points || 0} Rating Points</p>
+                            </div>
+                            <div className="streak-badge animate-glow">
+                                <LuFlame /> {user.rank?.winStreak || 0} Streak
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="arena-controls glass">
+                        <div className="path-picker">
+                            <div className="form-group">
+                                <label className="form-label">Category</label>
+                                <select className="form-select" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                                    <option value="">Choose Category</option>
+                                    {Object.keys(TOPIC_STRUCTURE).map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            {selectedCategory && (
+                                <div className="form-group animate-slideDown">
+                                    <label className="form-label">Sub-Topic</label>
+                                    <select className="form-select" value={selectedSubTopic} onChange={(e) => setSelectedSubTopic(e.target.value)}>
+                                        <option value="">Choose Topic</option>
+                                        {TOPIC_STRUCTURE[selectedCategory].map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                            )}
+                            {selectedSubTopic && (
+                                <div className="form-group animate-slideDown flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="form-label">Questions</label>
+                                        <select className="form-select" value={questionCount} onChange={(e) => setQuestionCount(Number(e.target.value))}>
+                                            <option value={5}>5 Questions</option>
+                                            <option value={10}>10 Questions</option>
+                                            <option value={15}>15 Questions</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="form-label">Duration</label>
+                                        <select className="form-select" value={questionTimer} onChange={(e) => setQuestionTimer(Number(e.target.value))}>
+                                            <option value={10}>10s / q</option>
+                                            <option value={20}>20s / q</option>
+                                            <option value={30}>30s / q</option>
+                                            <option value={60}>60s / q</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="action-buttons">
+                            <button className="btn-match random btn-lg" disabled={!selectedSubTopic} onClick={() => startSearch('random')}>
+                                <LuSword className="animate-bounce" /> Find Match
+                            </button>
+                            <button className="btn-match browse btn-lg" onClick={() => startSearch('lobby')}>
+                                <LuUsers /> Matchmaking Lobby
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {view === 'searching' && (
+                <div className="searching-v2 animate-fadeIn">
+                    <div className="radar-v2">
+                        <div className="circle"></div>
+                        <div className="circle"></div>
+                        <div className="circle"></div>
+                        <LuSword className="radar-sword" />
+                    </div>
+                    <h2 className="animate-pulse">Finding Opponent...</h2>
+                    <div className="search-meta">
+                        <span className="badge badge-primary">{selectedCategory}</span>
+                        <span className="badge badge-warning">{selectedSubTopic}</span>
+                    </div>
+                    <span className="search-timer">{searchTime}s</span>
+                    <button className="btn btn-danger btn-sm" onClick={() => setView('selection')}>
+                        <LuX /> Stop Searching
+                    </button>
+                </div>
+            )}
+
+            {view === 'lobby' && (
+                <div className="lobby-v2 animate-slide-up">
+                    <div className="lobby-head glass">
+                        <div className="flex items-center gap-4">
+                            <LuUsers className="text-4xl text-blue-400" />
+                            <div>
+                                <h2>Battle Registry</h2>
+                                <p>Select your opponent to begin the duel</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="lobby-grid p-4">
+                        <div className="lobby-controls-bar mb-6">
+                            <button className="btn-back-v2" onClick={() => setView('selection')}>
+                                <LuX /> Close Registry
+                            </button>
+                            <div className="lobby-stats-mini">
+                                <span className="live-dot"></span> 
+                                {lobbyPlayers.length} Legends Active
+                            </div>
+                        </div>
+
+                        {/* Rank Roadmap Integration */}
+                        <div className="rank-roadmap-container glass mb-8 p-6">
+                            <div className="roadmap-header">
+                                <LuTrophy className="text-yellow-400" />
+                                <h3>Battle Rank Roadmap</h3>
+                                <span className="current-pts">{user.rank?.points || 0} RP</span>
+                            </div>
+                            <div className="roadmap-steps">
+                                {TIER_ROADMAP.map((t, idx) => {
+                                    const currentPoints = user.rank?.points || 0;
+                                    const isReached = currentPoints >= t.min;
+                                    const nextLevel = TIER_ROADMAP[idx + 1];
+                                    let progress = 0;
+                                    
+                                    if (nextLevel && currentPoints >= t.min) {
+                                        progress = Math.min(100, ((currentPoints - t.min) / (nextLevel.min - t.min)) * 100);
+                                    } else if (!nextLevel && currentPoints >= t.min) {
+                                        progress = 100;
+                                    }
+
+                                    return (
+                                        <div key={t.name} className={`roadmap-node ${isReached ? 'reached' : ''}`}>
+                                            <div className="node-icon-wrapper">
+                                                {t.icon}
+                                                <div className="node-label">{t.name}</div>
+                                                <div className="node-threshold">{t.min}</div>
+                                            </div>
+                                            {idx < TIER_ROADMAP.length - 1 && (
+                                                <div className="roadmap-connector">
+                                                    <div className="connector-fill" style={{ width: `${progress}%` }}></div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="roadmap-footer">
+                                {(() => {
+                                    const currentPoints = user.rank?.points || 0;
+                                    const nextTier = TIER_ROADMAP.find(t => t.min > currentPoints);
+                                    if (nextTier) {
+                                        return <p>You are <strong>{nextTier.min - currentPoints} RP</strong> away from <span>{nextTier.name} League</span>!</p>;
+                                    }
+                                    return <p>Grandmaster Status Attained! You are amongst the Elite.</p>;
+                                })()}
+                            </div>
+                        </div>
+
+                        {lobbyPlayers.length === 0 ? (
+                            <div className="empty-lobby text-center">
+                                <LuUsers className="empty-icon" />
+                                <p>The arena is quiet... for now.</p>
+                            </div>
+                        ) : (
+                            <div className="players-grid">
+                                {lobbyPlayers.map(p => {
+                                    const myId = user.id || user._id;
+                                    const isMe = p.userId.toString() === myId.toString();
+                                    return (
+                                        <div key={p.userId} className={`player-card-v2 ${isMe ? 'me' : ''} glass`}>
+                                            <div className="p-card-header">
+                                                {p.avatar ? (
+                                                    <img 
+                                                        src={p.avatar} 
+                                                        alt={p.name} 
+                                                        className="p-avatar-lg" 
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="avatar-fallback"><LuUsers /></div>
+                                                )}
+                                                <div className="p-status-mini">
+                                                    {getRankIcon(p.rank?.tier)}
+                                                </div>
+                                            </div>
+                                            <div className="p-card-body">
+                                                <h4>{p.name}</h4>
+                                                <span className="p-rank-label">{p.rank?.tier} {p.rank?.level}</span>
+                                                <div className="p-topic-tag">
+                                                    <LuBookOpen /> {p.topic.split(': ')[1] || 'Any'}
+                                                </div>
+                                            </div>
+                                            <div className="p-card-footer">
+                                                {isMe ? (
+                                                    <span className="badge badge-info">You</span>
+                                                ) : (
+                                                    <button className="btn-challenge-v3" onClick={() => handleChallenge(p.userId)}>
+                                                        <LuSword /> Challenge
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {view === 'results' && finalResults && (
+                <div className="results-v2 animate-fade-in">
+                    <div className="results-card">
+                        <LuTrophy className={`trophy-icon ${finalResults.winner === user.name ? 'winner' : 'loser'}`} />
+                        <h1>{finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT'}</h1>
+                        <div className="score-summary-v2">
+                            {finalResults.results.map(r => {
+                                const myId = user.id || user._id;
+                                return (
+                                <div key={r.userId} className={`summary-row ${r.userId === myId.toString() ? 'highlight' : ''}`}>
+                                    <span>{r.name}</span>
+                                    <span className={`delta ${r.rankDelta >= 0 ? 'pos' : 'neg'}`}>
+                                        {r.rankDelta >= 0 ? '+' : ''}{r.rankDelta} RP
+                                    </span>
+                                    <span className="new-tier">{r.tier} {r.lvl}</span>
+                                </div>
+                                );
+                            })}
+                        </div>
+                        <button className="btn btn-primary btn-lg" onClick={() => setView('selection')}>Return to Base</button>
+                    </div>
+                </div>
+            )}
+
+            {incomingChallenge && (
+                <div className="challenge-toast">
+                    <LuSword />
+                    <div className="c-text">
+                        <strong>{incomingChallenge.challengerName}</strong> wants to duel!
+                        <p>{incomingChallenge.topic} • {incomingChallenge.questionCount} Qs • {incomingChallenge.questionTimer}s Timer</p>
+                    </div>
+                    <div className="c-btns">
+                        <button className="acc" onClick={() => socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic, questionCount: incomingChallenge.questionCount, questionTimer: incomingChallenge.questionTimer })}>Accept</button>
+                        <button className="dec" onClick={() => setIncomingChallenge(null)}>Reject</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default BattleArena;
+
+
+=======================================================
+FILE: client/src/pages/student/BattleArena.css
+DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
+=======================================================
+
+.arena-v2 {
+  min-height: 100vh;
+  background: radial-gradient(circle at top right, #0F172A, #020617);
+  color: #F8FAFC;
+  padding: 2rem;
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+/* Home Screen */
+.arena-home {
+  max-width: 1000px;
+  margin: 0 auto;
+  animation: fadeIn 0.8s ease-out;
+}
+
+.arena-header h1 {
+  font-size: 3rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.05em;
+  background: linear-gradient(to right, #60A5FA, #A78BFA, #F472B6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+}
+
+.arena-header p {
+  color: #94A3B8;
+  font-size: 1.1rem;
+}
+
+.user-rank-status {
+  margin: 2.5rem 0;
+}
+
+.rank-card-v2 {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.rank-card-v2::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.1) 0%, transparent 70%);
+  z-index: 0;
+}
+
+.rank-i {
+  font-size: 4rem;
+  filter: drop-shadow(0 0 15px currentColor);
+  z-index: 1;
+}
+
+.rank-i.bronze { color: #CD7F32; }
+.rank-i.silver { color: #C0C0C0; }
+.rank-i.gold { color: #FFD700; }
+.rank-i.platinum { color: #50C878; }
+.rank-i.diamond { color: #B9F2FF; }
+.rank-i.master { color: #FF4D4D; }
+.rank-i.gm { color: #FF00FF; }
+
+.rank-details { z-index: 1; flex: 1; }
+.rank-details h3 { font-size: 2rem; margin: 0; }
+.rank-details p { color: #94A3B8; margin: 0.2rem 0 0; }
+
+.streak-badge {
+  background: linear-gradient(135deg, #F97316, #EF4444);
+  padding: 0.8rem 1.5rem;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.4);
+}
+
+/* Controls */
+.path-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.path-picker select {
+  background: #1E293B;
+  border: 1px solid #334155;
+  color: #F8FAFC;
+  padding: 1.2rem;
+  border-radius: 16px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.path-picker select option,
+.form-select option {
+  background: #1E293B;
+  color: #F8FAFC;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.btn-match {
+  flex: 1;
+  padding: 1.5rem;
+  border-radius: 20px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  cursor: pointer;
+  border: none;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-match.random {
+  background: #2563EB;
+  color: white;
+  box-shadow: 0 15px 30px -5px rgba(37, 99, 235, 0.5);
+}
+
+.btn-match.random:hover:not(:disabled) {
+  transform: translateY(-5px) scale(1.02);
+  background: #3B82F6;
+}
+
+.btn-match.browse {
+  background: transparent;
+  border: 2px solid #334155;
+  color: #94A3B8;
+}
+
+.btn-match:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* Combat HUD */
+.battle-playing-screen {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.battle-hud-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 4rem;
+}
+
+.hud-side {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.6);
+  padding: 1.5rem;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s;
+}
+
+.hud-side.damaged {
+  border-color: #EF4444;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+.hud-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+}
+
+.hud-name { font-weight: 700; color: #94A3B8; }
+.hud-score { color: #60A5FA; font-weight: 600; }
+
+.hp-container {
+  height: 12px;
+  background: #0F172A;
+  border-radius: 99px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hp-bar {
+  height: 100%;
+  background: linear-gradient(to right, #EF4444, #F87171);
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hp-icon {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  font-size: 0.7rem;
+}
+
+.match-timer-ring {
+  position: relative;
+  width: 100px;
+  height: 100px;
+}
+
+.timer-bg { stroke: #1E293B; stroke-width: 8; fill: none; }
+.timer-progress {
+  stroke: #60A5FA;
+  stroke-width: 8;
+  fill: none;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+  stroke-dasharray: 283;
+}
+
+.timer-val {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+/* Question Area */
+.question-box {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 3rem;
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+.q-indicator {
+  background: #334155;
+  color: #94A3B8;
+  padding: 0.4rem 1.2rem;
+  border-radius: 99px;
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.question-box h2 {
+  font-size: 2.2rem;
+  margin-bottom: 3rem;
+  line-height: 1.3;
+}
+
+.options-grid-v2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.opt-v2 {
+  background: #1E293B;
+  border: 1px solid #334155;
+  padding: 1.5rem;
+  border-radius: 20px;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.opt-idx {
+  background: #334155;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-weight: 700;
+  color: #60A5FA;
+}
+
+.opt-v2:hover {
+  background: #334155;
+  border-color: #60A5FA;
+  transform: scale(1.02);
+}
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.shake-self .hud-side.self { animation: shake 0.5s; }
+.shake-opponent .hud-side.opponent { animation: shake 0.5s; }
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  50% { transform: translateX(10px); }
+  75% { transform: translateX(-5px); }
+  100% { transform: translateX(0); }
+}
+
+/* Results */
+.results-card {
+  text-align: center;
+  padding: 4rem;
+}
+
+.trophy-icon { font-size: 6rem; margin-bottom: 2rem; }
+.trophy-icon.winner { color: #FFD700; filter: drop-shadow(0 0 20px #FFD700); }
+.trophy-icon.loser { color: #94A3B8; }
+
+.score-summary-v2 {
+  margin: 3rem 0;
+  background: rgba(30, 41, 59, 0.4);
+  border-radius: 24px;
+  padding: 2rem;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 1.2rem;
+}
+
+.summary-row.highlight { color: #60A5FA; font-weight: 700; }
+
+.delta.pos { color: #10B981; }
+.delta.neg { color: #EF4444; }
+
+/* Challenge UI */
+.challenge-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: #1E293B;
+  border: 2px solid #60A5FA;
+  padding: 1.5rem;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  animation: slideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1000;
+}
+
+.c-btns { display: flex; gap: 0.5rem; }
+.c-btns button { padding: 0.8rem 1.2rem; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; }
+.acc { background: #60A5FA; color: white; }
+.dec { background: #334155; color: #94A3B8; }
+
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+/* Enhanced Lobby Grid */
+.lobby-v2 {
+  max-width: 1000px;
+  margin: 0 auto;
+  border-radius: 36px;
+  overflow: hidden;
+  box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.8), 0 0 40px rgba(96, 165, 250, 0.1);
+}
+
+.lobby-head {
+  padding: 2.5rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  background: #10B981;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  box-shadow: 0 0 10px #10B981;
+  animation: pulse 2s infinite;
+}
+
+.lobby-grid {
+  background: rgba(15, 23, 42, 0.5);
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.player-card-v2 {
+  padding: 1.5rem;
+  border-radius: 24px;
+  text-align: center;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.player-card-v2:hover {
+  transform: translateY(-10px);
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.player-card-v2.me {
+  border-color: #3B82F6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.p-card-header {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 1.2rem;
+}
+
+.p-avatar-lg {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  object-fit: cover;
+  border: 3px solid #334155;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+.p-status-mini {
+  position: absolute;
+  bottom: -10px;
+  right: -10px;
+  background: #1E293B;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #0F172A;
+  font-size: 1.2rem;
+}
+
+.p-card-body h4 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.p-rank-label {
+  color: #94A3B8;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.p-topic-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(148, 163, 184, 0.1);
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  color: #60A5FA;
+  margin-top: 1rem;
+}
+
+.p-card-footer {
+  margin-top: 1.5rem;
+}
+
+.lobby-controls-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 0 0.5rem;
+}
+
+.btn-back-v2 {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 0.7rem 1.4rem;
+  border-radius: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.9rem;
+}
+
+.btn-back-v2:hover {
+  background: #EF4444;
+  color: white;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+.lobby-stats-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+  padding: 0.6rem 1.2rem;
+  border-radius: 99px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.avatar-fallback {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  background: #1E293B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  color: #64748B;
+  border: 3px solid #334155;
+}
+
+.rank-roadmap-container {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 24px;
+}
+
+.roadmap-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.roadmap-header h3 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin: 0;
+  color: #F8FAFC;
+}
+
+.current-pts {
+  margin-left: auto;
+  background: rgba(59, 130, 246, 0.1);
+  color: #60A5FA;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-weight: 800;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.roadmap-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0 3rem 0;
+  min-width: 900px;
+}
+
+.roadmap-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.node-icon-wrapper {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s;
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.roadmap-node.reached .node-icon-wrapper {
+  opacity: 1;
+  filter: none;
+  transform: scale(1.1);
+}
+
+.node-icon-wrapper svg {
+  font-size: 2rem;
+}
+
+.node-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #94A3B8;
+}
+
+.node-threshold {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.roadmap-node.reached .node-label { color: #F8FAFC; }
+
+.roadmap-connector {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  right: -50%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  z-index: 1;
+}
+
+.connector-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3B82F6, #60A5FA);
+  transition: width 1s ease-out;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.roadmap-footer {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #CBD5E1;
+}
+
+.roadmap-footer strong { color: #60A5FA; font-weight: 800; }
+.roadmap-footer span { color: #FDE047; font-weight: 800; }
+
+.btn-challenge-v3 {
+  width: 100%;
+  padding: 0.8rem;
+  background: white;
+  color: #0F172A;
+  border: none;
+  border-radius: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.btn-challenge-v3:hover {
+  background: #60A5FA;
+  color: white;
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.4);
+}
+
+.arena-controls {
+  padding: 3rem;
+  margin-top: 3rem;
+  border-radius: 32px;
+}
+
+/* Animations Hub Additions */
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.searching-v2 .search-meta {
+  display: flex;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.combat-stage { position: relative; min-height: 400px; display: flex; align-items: center; justify-content: center; width: 100%; }
+
+.waiting-overlay {
+  text-align: center;
+  padding: 4rem;
+  border-radius: 32px;
+  width: 100%;
+}
+
+.waiting-icon { font-size: 4rem; color: #60A5FA; margin-bottom: 2rem; }
+
+.round-resolution {
+  width: 100%;
+  max-width: 600px;
+  padding: 2.5rem;
+  border-radius: 32px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.res-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; color: #60A5FA; }
+.res-header h2 { margin: 0; font-size: 1.5rem; }
+
+.res-grid { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2.5rem; }
+
+.res-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 1.8rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  border: 1px solid transparent;
+}
+
+.res-block.me { border-color: rgba(96, 165, 250, 0.3); background: rgba(59, 130, 246, 0.05); }
+
+.player-name { font-weight: 800; font-size: 1.1rem; }
+.res-badge { font-size: 0.7rem; font-weight: 900; padding: 2px 8px; border-radius: 4px; }
+.res-badge.correct { background: #10B981; color: white; }
+.res-badge.wrong { background: #EF4444; color: white; }
+
+.xp-gain { color: #FDE047; }
+
+.next-round-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.next-round-bar .progress {
+  height: 100%;
+  background: #60A5FA;
+  width: 100%;
+  animation: filling 4s linear;
+}
+
+@keyframes filling { from { width: 0%; } to { width: 100%; } }
+
+.status-footer { text-align: center; color: #94A3B8; font-size: 0.9rem; font-weight: 600; font-style: italic; }
+
+/* Existing Animations Helpers */
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+.animate-fade-in { animation: fadeIn 0.6s ease-out; }
+
+.animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+
+
+=======================================================
+FILE: server/socket/battleHandler.js
+DESCRIPTION: Socket.io event handler for real-time 1v1 battle logic. Handles matchmaking, HP syncing, and win/loss resolution.
+=======================================================
+
+const User = require('../models/User');
+const Battle = require('../models/Battle');
+const { generateBattleQuiz } = require('../services/battleAI.service');
+const { calculatePoints, getTierByPoints } = require('../utils/rankManager');
+const logger = require('../utils/logger');
+
+const waitingPlayers = new Map(); // userId -> player stats
+
+module.exports = (io, socket) => {
+
+    const broadcastLobbyUpdate = () => {
+        const lobby = Array.from(waitingPlayers.values()).map(p => ({
+            userId: p.userId.toString(),
+            name: p.name,
+            avatar: p.avatar,
+            mode: p.mode,
+            topic: p.topic,
+            rank: p.rank
+        }));
+        io.emit('battle:lobby_update', lobby);
+    };
+
+    const getSocketsByUserId = (userId) => {
+        const sockets = [];
+        for (const [id, s] of io.sockets.sockets) {
+            if (s.user && s.user._id.toString() === userId) {
+                sockets.push(s);
+            }
+        }
+        return sockets;
+    };
+
+    const emitToUser = (userId, event, data) => {
+        const sockets = getSocketsByUserId(userId);
+        sockets.forEach(s => s.emit(event, data));
+    };
+
+    const joinUserToRoom = (userId, roomID) => {
+        const sockets = getSocketsByUserId(userId);
+        sockets.forEach(s => s.join(roomID));
+    };
+
+    const createBattle = async (p1, p2, topicStr = null, questionCount = 5, questionTimer = 20) => {
+        const roomID = `room_${Date.now()}_${p1.userId.substring(0, 4)}`;
+        const topic = topicStr || "General";
+
+        try {
+            const quiz = await generateBattleQuiz(topic, questionCount);
+            const battleId = `btl_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+            const newBattle = new Battle({
+                battleId: battleId,
+                topic: topic,
+                roomID: roomID,
+                status: 'active',
+                questionTimer: questionTimer,
+                players: [
+                    { userId: p1.userId, name: p1.name },
+                    { userId: p2.userId, name: p2.name }
+                ],
+                quizId: { questions: quiz.questions }
+            });
+
+            await newBattle.save();
+            
+            joinUserToRoom(p1.userId, roomID);
+            joinUserToRoom(p2.userId, roomID);
+
+            waitingPlayers.delete(p1.userId);
+            waitingPlayers.delete(p2.userId);
+            broadcastLobbyUpdate();
+
+            io.to(roomID).emit('battle:started', {
+                battleId: battleId,
+                roomID: roomID,
+                players: newBattle.players,
+                topic: newBattle.topic,
+                questionTimer: newBattle.questionTimer,
+                totalQuestions: quiz.questions.length,
+                quiz: quiz
+            });
+
+            logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
+        } catch (error) {
+            logger.error('Create Battle Error:', error);
+            emitToUser(p1.userId, 'error', { message: 'Battle generation failed.' });
+            emitToUser(p2.userId, 'error', { message: 'Battle generation failed.' });
+        }
+    };
+
+    // --- Lobby ---
+    socket.on('battle:enter_lobby', (data) => {
+        const userId = socket.user._id.toString();
+        const mode = data?.mode || 'random';
+        const topicRaw = data?.topic || 'General';
+        const qCount = parseInt(data?.questionCount) || 5;
+        const qTimer = parseInt(data?.questionTimer) || 20; // Default to 20 seconds
+        const topic = topicRaw.toLowerCase().replace(/\s+/g, ''); // Normalize
+        
+        waitingPlayers.set(userId, {
+            userId: userId,
+            name: socket.user.name,
+            avatar: socket.user.avatar,
+            socketId: socket.id,
+            mode: mode,
+            topic: topic,
+            questionCount: qCount,
+            questionTimer: qTimer,
+            rank: socket.user.rank || { tier: 'Bronze', level: 'I', points: 0 },
+            joinedAt: Date.now()
+        });
+
+        if (mode === 'random') {
+            const opponent = Array.from(waitingPlayers.values()).find(p => 
+                p.userId !== userId && 
+                p.mode === 'random' && 
+                p.topic === topic &&
+                p.questionCount === qCount &&
+                p.questionTimer === qTimer
+            );
+
+            if (opponent) {
+                createBattle(opponent, waitingPlayers.get(userId), topicRaw, qCount, qTimer);
+            } else {
+                socket.emit('battle:searching');
+            }
+        }
+        broadcastLobbyUpdate();
+    });
+
+    socket.on('battle:challenge_player', async (data) => {
+        const { targetUserId, topic, questionCount, questionTimer } = data;
+        const challenger = waitingPlayers.get(socket.user._id.toString());
+        const target = waitingPlayers.get(targetUserId);
+
+        if (!target) return socket.emit('error', { message: 'Target is not in the lobby.' });
+
+        emitToUser(targetUserId, 'battle:incoming_challenge', {
+            challengerName: challenger.name,
+            challengerUserId: challenger.userId,
+            topic: topic || 'General',
+            questionCount: questionCount || 5,
+            questionTimer: questionTimer || 20
+        });
+    });
+
+    socket.on('battle:respond_challenge', async (data) => {
+        const { challengerUserId, accept, topic, questionCount, questionTimer } = data;
+        const target = waitingPlayers.get(socket.user._id.toString());
+        const challenger = waitingPlayers.get(challengerUserId);
+
+        if (!challenger || !target) return socket.emit('error', { message: 'Duel setup expired.' });
+
+        if (accept) {
+            createBattle(challenger, target, topic, questionCount || 5, questionTimer || 20);
+        } else {
+            emitToUser(challengerUserId, 'battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
+        }
+    });
+
+    // --- In-Game (Synchronized Progression) ---
+    socket.on('battle:submit_answer', async (data) => {
+        const { battleId, questionIndex, answer, timeTaken } = data;
+        
+        try {
+            const battle = await Battle.findOne({ battleId }).populate('players.userId');
+            if (!battle || battle.status !== 'active') return;
+
+            const player = battle.players.find(p => p.userId._id.toString() === socket.user._id.toString());
+            const opponent = battle.players.find(p => p.userId._id.toString() !== socket.user._id.toString());
+            
+            if (!player || !opponent) return;
+            
+            // Avoid double submission for same question
+            if (player.answers.some(a => a.questionIndex === questionIndex)) return;
+
+            const question = battle.quizId.questions[questionIndex];
+            const isCorrect = (answer !== null && answer === question.correctAnswer);
+            const perfectTimeBonus = isCorrect && timeTaken < 3000; 
+
+            // Update Player State for THIS Round
+            const roundAnswer = { 
+                questionIndex, 
+                isCorrect, 
+                timeSpent: timeTaken || 15000,
+                perfect: perfectTimeBonus
+            };
+            player.answers.push(roundAnswer);
+
+            // Apply HP Logic (Opponent takes damage if I get it right)
+            if (isCorrect) {
+                const damage = perfectTimeBonus ? 30 : 20;
+                opponent.hp = Math.max(0, opponent.hp - damage);
+                player.score += perfectTimeBonus ? 15 : 10;
+            } else {
+                player.hp = Math.max(0, player.hp - 10); // Mishap damage
+            }
+
+            await battle.save();
+
+            // Check if BOTH have answered THIS question
+            const opponentAnswer = opponent.answers.find(a => a.questionIndex === questionIndex);
+
+            if (opponentAnswer) {
+                // ROUND RESOLVED: Both answered
+                const resolution = {
+                    questionIndex,
+                    correctAnswer: question.correctAnswer,
+                    players: battle.players.map(p => {
+                        const ans = p.answers.find(a => a.questionIndex === questionIndex);
+                        return {
+                            userId: p.userId._id.toString(),
+                            name: p.name,
+                            isCorrect: ans?.isCorrect || false,
+                            timeTaken: ans?.timeSpent || 0,
+                            hp: p.hp,
+                            score: p.score
+                        };
+                    })
+                };
+
+                io.to(battle.roomID).emit('battle:round_resolved', resolution);
+
+                // Wait 3 seconds then signal next question or end
+                setTimeout(async () => {
+                    const refreshedBattle = await Battle.findOne({ battleId });
+                    const lastQuestion = questionIndex === refreshedBattle.quizId.questions.length - 1;
+
+                    if (lastQuestion) {
+                        await concludeBattle(refreshedBattle);
+                    } else {
+                        io.to(battle.roomID).emit('battle:next_question', { nextIndex: questionIndex + 1 });
+                    }
+                }, 4000);
+
+            } else {
+                // Only one has answered: Notify the other or tell the current one to wait
+                socket.emit('battle:waiting_for_opponent', { questionIndex });
+                // We still sync the HP bars live
+                io.to(battle.roomID).emit('battle:sync', {
+                    players: battle.players.map(p => ({
+                        userId: p.userId._id.toString(),
+                        hp: p.hp,
+                        score: p.score
+                    }))
+                });
+            }
+
+        } catch (err) { logger.error('Battle Sync Error:', err); }
+    });
+
+    const concludeBattle = async (battle) => {
+        battle.status = 'completed';
+        battle.endedAt = new Date();
+
+        const p1 = battle.players[0];
+        const p2 = battle.players[1];
+
+        // Determine winner
+        let winner, loser;
+        if (p1.hp > p2.hp) { winner = p1; loser = p2; }
+        else if (p2.hp > p1.hp) { winner = p2; loser = p1; }
+        else if (p1.score > p2.score) { winner = p1; loser = p2; }
+        else { winner = p2; loser = p1; }
+
+        winner.isWinner = true;
+        await battle.save();
+
+        // Points & Streaks Logic
+        const winnerUser = await User.findById(winner.userId);
+        const loserUser = await User.findById(loser.userId);
+
+        // --- Calculate Bonuses for Winner ---
+        let winnerBonus = 0;
+        if (winnerUser.rank.winStreak >= 5) winnerBonus += 20;
+        else if (winnerUser.rank.winStreak >= 3) winnerBonus += 10;
+        
+        if (winner.score >= 50) winnerBonus += 5; // Fast Win
+        if (winner.hp === 100) winnerBonus += 10; // Perfect Win
+
+        let winPoints = calculatePoints(winnerUser.rank.points, loserUser.rank.points, true, winnerBonus);
+        const lossPoints = calculatePoints(loserUser.rank.points, winnerUser.rank.points, false, 0);
+
+        winnerUser.rank.points += winPoints;
+        winnerUser.rank.winStreak += 1;
+        winnerUser.rank.totalWins += 1;
+        
+        loserUser.rank.points = Math.max(0, loserUser.rank.points + lossPoints);
+        loserUser.rank.winStreak = 0;
+        loserUser.rank.totalLosses += 1;
+
+        // Upgrade Tiers
+        const winRank = getTierByPoints(winnerUser.rank.points);
+        const lossRank = getTierByPoints(loserUser.rank.points);
+        winnerUser.rank.tier = winRank.tier;
+        winnerUser.rank.level = winRank.level;
+        loserUser.rank.tier = lossRank.tier;
+        loserUser.rank.level = lossRank.level;
+
+        await winnerUser.save();
+        await loserUser.save();
+
+        io.to(battle.roomID).emit('battle:ended', {
+            winner: winner.name,
+            results: [
+                { userId: winnerUser._id, name: winnerUser.name, rankDelta: winPoints, newPoints: winnerUser.rank.points, tier: winnerUser.rank.tier, lvl: winnerUser.rank.level },
+                { userId: loserUser._id, name: loserUser.name, rankDelta: lossPoints, newPoints: loserUser.rank.points, tier: loserUser.rank.tier, lvl: loserUser.rank.level }
+            ]
+        });
+
+        logger.info(`🏆 [BATTLE END] ${winner.name} won! Delta Win: ${winPoints} | Delta Loss: ${lossPoints}`);
+    };
+
+    socket.on('disconnect', async () => {
+        const userId = socket.user._id.toString();
+        waitingPlayers.delete(userId);
+        broadcastLobbyUpdate();
+
+        // Check for active battles to apply AFK penalty
+        try {
+            const activeBattle = await Battle.findOne({
+                status: 'active',
+                'players.userId': socket.user._id
+            });
+
+            if (activeBattle) {
+                const player = activeBattle.players.find(p => p.userId.toString() === userId);
+                const opponent = activeBattle.players.find(p => p.userId.toString() !== userId);
+                
+                player.afk = true;
+                player.hp = 0; // Immediate forfeit
+
+                const userModel = await User.findById(userId);
+                userModel.rank.points = Math.max(0, userModel.rank.points - 50);
+                userModel.rank.winStreak = 0;
+                userModel.rank.totalLosses += 1;
+                
+                const rankData = getTierByPoints(userModel.rank.points);
+                userModel.rank.tier = rankData.tier;
+                userModel.rank.level = rankData.level;
+                
+                await userModel.save();
+                
+                io.to(activeBattle.roomID).emit('battle:opponent_left', {
+                    message: `${player.name} has abandoned the field (-50 RP penalty applied).`,
+                    winner: opponent.name
+                });
+
+                await concludeBattle(activeBattle);
+            }
+        } catch (err) { logger.error('Disconnect Penalty Error:', err); }
+    });
+};
+
+
+=======================================================
+FILE: server/services/battleAI.service.js
+DESCRIPTION: Service to generate dynamic battle questions using Generative AI (OpenAI / Gemini) APIs.
+=======================================================
+
+require("dotenv").config();
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || "dummy");
+
+let openai;
+if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined') {
+    const { OpenAI } = require("openai");
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
+
+const formatQuestionsArray = (topic, parsedQuestions, targetCount) => {
+    let questions = mapOptions(parsedQuestions).slice(0, targetCount);
+    // Force pad array to EXACT targetCount if AI failed to generate enough
+    if (questions.length < targetCount) {
+        const remaining = targetCount - questions.length;
+        const fallbacks = createFallback(topic, remaining, questions.length);
+        questions = [...questions, ...fallbacks];
+    }
+    return { topic, questions };
+};
+
+const generateBattleQuiz = async (topic, count = 5) => {
+    const prompt = `Generate exactly ${count} highly competitive multiple choice questions about "${topic}".
+    Rules:
+    1. Mix of medium and hard difficulty.
+    2. Format strictly as a valid JSON array only. No markdown formatting, no backticks, no comments.
+    3. Each object should have exactly: "questionText" (string), "options" (array of exactly 4 strings), "correctAnswer" (integer 0-3), "difficulty" (string "medium" or "hard").
+    Ensure the question is clear and the options distinct.`;
+
+    try {
+        // Primary Attempt: Gemini 1.5 Flash (Generous Free Tier)
+        try {
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const result = await model.generateContent(prompt);
+            let text = result.response.text().replace(/```json/gi, "").replace(/```/g, "").trim();
+            
+            // Fix parsing if AI adds rogue markdown
+            const firstBracket = text.indexOf('[');
+            const lastBracket = text.lastIndexOf(']');
+            if (firstBracket !== -1 && lastBracket !== -1) {
+                text = text.substring(firstBracket, lastBracket + 1);
+            }
+
+            return formatQuestionsArray(topic, JSON.parse(text), count);
+        } catch (geminiError) {
+            console.error('Gemini Failed:', geminiError.message);
+            // Secondary Attempt: OpenAI
+            if (openai) {
+                const completion = await openai.chat.completions.create({
+                    model: "gpt-3.5-turbo",
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: 0.7,
+                });
+                let text = completion.choices[0].message.content.replace(/```json/gi, "").replace(/```/g, "").trim();
+                
+                const firstBracket = text.indexOf('[');
+                const lastBracket = text.lastIndexOf(']');
+                if (firstBracket !== -1 && lastBracket !== -1) {
+                    text = text.substring(firstBracket, lastBracket + 1);
+                }
+
+                return formatQuestionsArray(topic, JSON.parse(text), count);
+            }
+            throw new Error("Both APIs failed or not configured");
+        }
+    } catch (err) {
+        console.error('Battle AI Error/Fallback triggered:', err.message);
+        return { topic, questions: createFallback(topic, count, 0) };
+    }
+};
+
+const mapOptions = (questions) => questions.map(q => ({
+    questionText: q.questionText,
+    options: q.options.map((opt, i) => ({ text: opt.toString(), isCorrect: i === Number(q.correctAnswer) })),
+    correctAnswer: Number(q.correctAnswer),
+    difficulty: q.difficulty || 'medium'
+}));
+
+const createFallback = (topic, count, startIndex = 0) => Array.from({ length: count }, (_, i) => {
+    const opts = [
+        { text: "Correct Data Structure", isCorrect: true }, 
+        { text: "Wrong Interface", isCorrect: false }, 
+        { text: "Memory Leak", isCorrect: false }, 
+        { text: "Syntax Error", isCorrect: false }
+    ].sort(() => Math.random() - 0.5);
+    return {
+        questionText: `Challenge Question ${startIndex + i + 1}: Core concept implementation of ${topic}.`,
+        options: opts,
+        correctAnswer: opts.findIndex(o => o.isCorrect),
+        difficulty: (startIndex + i) % 2 === 0 ? 'medium' : 'hard'
+    };
+});
+
+module.exports = { generateBattleQuiz };
+
+
+=======================================================
+FILE: server/utils/rankManager.js
+DESCRIPTION: Elo ranking logic, streak calculation, and tier thresholds calculator.
+=======================================================
+
+const TIER_THRESHOLDS = [
+    { tier: 'Bronze', levels: ['I', 'II', 'III'], thresholds: [0, 200, 400], max: 599 },
+    { tier: 'Silver', levels: ['I', 'II', 'III'], thresholds: [600, 900, 1200], max: 1499 },
+    { tier: 'Gold',   levels: ['I', 'II', 'III'], thresholds: [1500, 1900, 2300], max: 2699 },
+    { tier: 'Platinum', levels: ['I', 'II', 'III'], thresholds: [2700, 3100, 3500], max: 3899 },
+    { tier: 'Diamond',  levels: ['I', 'II', 'III'], thresholds: [3900, 4200, 4500], max: 4799 },
+    { tier: 'Master',   levels: ['Master'], thresholds: [4800], max: 4999 },
+    { tier: 'Grandmaster', levels: ['Grandmaster'], thresholds: [5000], max: 10000000 }
+];
+
+const getTierByPoints = (points) => {
+    const tierConfig = TIER_THRESHOLDS.find(t => points >= t.thresholds[0] && points <= t.max);
+    if (!tierConfig) return TIER_THRESHOLDS[TIER_THRESHOLDS.length - 1]; // Fallback to GM
+
+    let level = tierConfig.levels[0];
+    for (let i = tierConfig.thresholds.length - 1; i >= 0; i--) {
+        if (points >= tierConfig.thresholds[i]) {
+            level = tierConfig.levels[i];
+            break;
+        }
+    }
+    return { tier: tierConfig.tier, level: level };
+};
+
+const expectedScore = (player, opponent) => {
+    return 1.0 / (1 + Math.pow(10, (opponent - player) / 400.0));
+};
+
+const getKFactor = (points) => {
+    if (points < 1500) return 40;        // Bronze-Silver
+    else if (points < 3900) return 30;   // Gold-Platinum
+    else if (points < 4800) return 25;   // Diamond
+    else return 20;                      // Master+
+};
+
+const calculatePoints = (playerPoints, opponentPoints, isWin, bonus) => {
+    const E = expectedScore(playerPoints, opponentPoints);
+    const K = getKFactor(playerPoints);
+
+    const change = K * ((isWin ? 1 : 0) - E);
+
+    return Math.round(change + bonus);
+};
+
+module.exports = { calculatePoints, getTierByPoints };
+
+
+=======================================================
+FILE: server/models/Battle.js
+DESCRIPTION: Mongoose Schema for storing battle metadata, players, and answered question accuracy.
+=======================================================
+
+const mongoose = require('mongoose');
+
+const battleSchema = new mongoose.Schema({
+    battleId: { type: String, required: true, unique: true },
+    topic: { type: String, required: true },
+    mode: { type: String, enum: ['random', 'challenge'], default: 'random' },
+    status: { type: String, enum: ['waiting', 'active', 'completed', 'canceled'], default: 'active' },
+    
+    players: [{
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        name: String,
+        socketId: String,
+        hp: { type: Number, default: 100 },
+        score: { type: Number, default: 0 },
+        isWinner: { type: Boolean, default: false },
+        answers: [{
+            questionIndex: Number,
+            isCorrect: Boolean,
+            timeSpent: Number, // in ms
+            perfect: Boolean, // if speed was exceptionally fast
+            answeredAt: { type: Date, default: Date.now }
+        }],
+        afk: { type: Boolean, default: false }
+    }],
+    
+    quizId: {
+        topic: String,
+        questions: [{
+            questionText: String,
+            options: [{ text: String, isCorrect: Boolean }],
+            correctAnswer: Number, // Index of correct option
+            difficulty: String
+        }]
+    },
+    
+    roomID: String,
+    startedAt: { type: Date, default: Date.now },
+    endedAt: Date
+}, { timestamps: true });
+
+module.exports = mongoose.model('Battle', battleSchema);

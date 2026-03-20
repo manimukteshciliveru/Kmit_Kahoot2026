@@ -37,6 +37,7 @@ const BattleArena = () => {
 
     const timerRef = useRef(null);
     const searchInterval = useRef(null);
+    const syncDataRef = useRef(null);
 
     const TOPIC_STRUCTURE = {
         'Python': ['Basics', 'Loops', 'Arrays', 'Classes', 'Dictionaries', 'Functions', 'Decorators', 'Generators', 'Iterators', 'Exception Handling', 'File I/O', 'Regex', 'OOPs', 'Multithreading', 'Networking', 'Web Scrapping'],
@@ -83,16 +84,17 @@ const BattleArena = () => {
         });
 
         socket.on('battle:sync', (data) => {
-            if (syncData) {
-                const myId = user.id || user._id;
-                const myPrevHp = syncData.players.find(p => p.userId.toString() === myId.toString())?.hp;
-                const myNewHp = data.players.find(p => p.userId.toString() === myId.toString())?.hp;
-                const oppPrevHp = syncData.players.find(p => p.userId.toString() !== myId.toString())?.hp;
-                const oppNewHp = data.players.find(p => p.userId.toString() !== myId.toString())?.hp;
-
-                if (myNewHp < myPrevHp) triggerDamageEffect('self');
-                if (oppNewHp < oppPrevHp) triggerDamageEffect('opponent');
+            const prev = syncDataRef.current;
+            if (prev) {
+                const myId = (user.id || user._id).toString();
+                const myPrev  = prev.players.find(p => p.userId === myId);
+                const myNew   = data.players.find(p => p.userId === myId);
+                const oppPrev = prev.players.find(p => p.userId !== myId);
+                const oppNew  = data.players.find(p => p.userId !== myId);
+                if (myNew?.hp  < myPrev?.hp)  triggerDamageEffect('self');
+                if (oppNew?.hp < oppPrev?.hp) triggerDamageEffect('opponent');
             }
+            syncDataRef.current = data;
             setSyncData(data);
         });
 
@@ -133,6 +135,13 @@ const BattleArena = () => {
             setView('selection');
         });
 
+        socket.on('battle:disconnect', () => {
+            toast.error('Disconnected from battle server. Returning to selection.', { duration: 5000 });
+            clearInterval(timerRef.current);
+            clearInterval(searchInterval.current);
+            setView('selection');
+        });
+
         return () => {
             socket.off('battle:lobby_update');
             socket.off('battle:incoming_challenge');
@@ -146,8 +155,9 @@ const BattleArena = () => {
             socket.off('battle:opponent_left');
             clearInterval(timerRef.current);
             clearInterval(searchInterval.current);
+            socket.off('battle:disconnect');
         };
-    }, [socket, connected, syncData, user]);
+    }, [socket, connected, user]);
 
     const triggerDamageEffect = (target) => {
         setDamageEffect(target);
@@ -232,6 +242,15 @@ const BattleArena = () => {
                             <div className="hud-meta">
                                 <span className="hud-name text-blue-400 font-bold">{user.name}</span>
                             </div>
+                            {(() => {
+                                const myId = (user.id || user._id)?.toString();
+                                const myData = syncData?.players?.find(p => p.userId === myId);
+                                return (
+                                    <div className="hp-container">
+                                        <div className="hp-bar" style={{ width: `${myData?.hp ?? 100}%` }} />
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         <div className="match-timer-ring">
@@ -250,6 +269,15 @@ const BattleArena = () => {
                             <div className="hud-meta">
                                 <span className="hud-name text-white font-bold">Opponent</span>
                             </div>
+                            {(() => {
+                                const myId = (user.id || user._id)?.toString();
+                                const oppData = syncData?.players?.find(p => p.userId !== myId);
+                                return (
+                                    <div className="hp-container">
+                                        <div className="hp-bar" style={{ width: `${oppData?.hp ?? 100}%` }} />
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
 
@@ -533,15 +561,15 @@ const BattleArena = () => {
                         <LuTrophy className={`trophy-icon ${finalResults.winner === user.name ? 'winner' : 'loser'}`} />
                         <h1>{finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT'}</h1>
                         <div className="score-summary-v2">
-                            {finalResults.results.map(r => {
+                            {finalResults.results.map((r, idx) => {
                                 const myId = user.id || user._id;
                                 return (
-                                <div key={r.userId} className={`summary-row ${r.userId === myId.toString() ? 'highlight' : ''}`}>
+                                <div key={idx} className={`summary-row ${r.userId?.toString() === (user.id || user._id)?.toString() ? 'highlight' : ''}`}>
                                     <span>{r.name}</span>
                                     <span className={`delta ${r.rankDelta >= 0 ? 'pos' : 'neg'}`}>
-                                        {r.rankDelta >= 0 ? '+' : ''}{r.rankDelta} RP
+                                        {r.rankDelta > 0 ? '+' : ''}{r.rankDelta} RP
                                     </span>
-                                    <span className="new-tier">{r.tier} {r.lvl}</span>
+                                    <span>{r.tier} {r.lvl}</span>
                                 </div>
                                 );
                             })}

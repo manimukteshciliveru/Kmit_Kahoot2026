@@ -5,6 +5,8 @@ const battleSchema = new mongoose.Schema({
     topic: { type: String, required: true },
     mode: { type: String, enum: ['random', 'challenge'], default: 'random' },
     status: { type: String, enum: ['waiting', 'active', 'completed', 'canceled'], default: 'active' },
+    questionTimer: { type: Number, default: 20 },
+    questionCount: { type: Number, default: 5 },
     
     players: [{
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -23,7 +25,7 @@ const battleSchema = new mongoose.Schema({
         afk: { type: Boolean, default: false }
     }],
     
-    quizId: {
+    quiz: {
         topic: String,
         questions: [{
             questionText: String,

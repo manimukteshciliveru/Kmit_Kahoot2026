@@ -54,11 +54,12 @@ module.exports = (io, socket) => {
                 roomID: roomID,
                 status: 'active',
                 questionTimer: questionTimer,
+                questionCount: questionCount,
                 players: [
                     { userId: p1.userId, name: p1.name },
                     { userId: p2.userId, name: p2.name }
                 ],
-                quizId: { questions: quiz.questions }
+                quiz: { questions: quiz.questions }
             });
 
             await newBattle.save();
@@ -82,9 +83,14 @@ module.exports = (io, socket) => {
 
             logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
         } catch (error) {
-            logger.error('Create Battle Error:', error);
-            emitToUser(p1.userId, 'error', { message: 'Battle generation failed.' });
-            emitToUser(p2.userId, 'error', { message: 'Battle generation failed.' });
+            logger.error('Create Battle Error:', error.message);
+            emitToUser(p1.userId, 'error', { 
+                message: 'Question generation failed. Please try again in a moment.' 
+            });
+            emitToUser(p2.userId, 'error', { 
+                message: 'Question generation failed. Please try again in a moment.' 
+            });
+            return;
         }
     };
 
@@ -163,18 +169,27 @@ module.exports = (io, socket) => {
         const { battleId, questionIndex, answer, timeTaken } = data;
         
         try {
-            const battle = await Battle.findOne({ battleId }).populate('players.userId');
-            if (!battle || battle.status !== 'active') return;
+            const battle = await Battle.findOneAndUpdate(
+                {
+                    battleId,
+                    status: 'active',
+                    'players': { $elemMatch: {
+                        'userId': socket.user._id,
+                        'answers.questionIndex': { $ne: questionIndex }
+                    }}
+                },
+                { $set: { updatedAt: new Date() } },
+                { new: true }
+            ).populate('players.userId');
+
+            if (!battle) return; // duplicate submission blocked atomically
 
             const player = battle.players.find(p => p.userId._id.toString() === socket.user._id.toString());
             const opponent = battle.players.find(p => p.userId._id.toString() !== socket.user._id.toString());
             
             if (!player || !opponent) return;
-            
-            // Avoid double submission for same question
-            if (player.answers.some(a => a.questionIndex === questionIndex)) return;
 
-            const question = battle.quizId.questions[questionIndex];
+            const question = battle.quiz.questions[questionIndex];
             const isCorrect = (answer !== null && answer === question.correctAnswer);
             const perfectTimeBonus = isCorrect && timeTaken < 3000; 
 
@@ -224,7 +239,7 @@ module.exports = (io, socket) => {
                 // Wait 3 seconds then signal next question or end
                 setTimeout(async () => {
                     const refreshedBattle = await Battle.findOne({ battleId });
-                    const lastQuestion = questionIndex === refreshedBattle.quizId.questions.length - 1;
+                    const lastQuestion = questionIndex === refreshedBattle.quiz.questions.length - 1;
 
                     if (lastQuestion) {
                         await concludeBattle(refreshedBattle);
@@ -257,11 +272,12 @@ module.exports = (io, socket) => {
         const p2 = battle.players[1];
 
         // Determine winner
-        let winner, loser;
-        if (p1.hp > p2.hp) { winner = p1; loser = p2; }
-        else if (p2.hp > p1.hp) { winner = p2; loser = p1; }
+        let winner, loser, isDraw = false;
+        if (p1.hp > p2.hp)         { winner = p1; loser = p2; }
+        else if (p2.hp > p1.hp)    { winner = p2; loser = p1; }
         else if (p1.score > p2.score) { winner = p1; loser = p2; }
-        else { winner = p2; loser = p1; }
+        else if (p2.score > p1.score) { winner = p2; loser = p1; }
+        else { isDraw = true; winner = p1; loser = p2; }
 
         winner.isWinner = true;
         await battle.save();
@@ -275,11 +291,11 @@ module.exports = (io, socket) => {
         if (winnerUser.rank.winStreak >= 5) winnerBonus += 20;
         else if (winnerUser.rank.winStreak >= 3) winnerBonus += 10;
         
-        if (winner.score >= 50) winnerBonus += 5; // Fast Win
-        if (winner.hp === 100) winnerBonus += 10; // Perfect Win
+        if (winner.score >= 50 && !isDraw) winnerBonus += 5; // Fast Win
+        if (winner.hp === 100 && !isDraw) winnerBonus += 10; // Perfect Win
 
-        let winPoints = calculatePoints(winnerUser.rank.points, loserUser.rank.points, true, winnerBonus);
-        const lossPoints = calculatePoints(loserUser.rank.points, winnerUser.rank.points, false, 0);
+        const winPoints  = isDraw ? 0 : calculatePoints(winnerUser.rank.points, loserUser.rank.points, true, winnerBonus);
+        const lossPoints = isDraw ? 0 : calculatePoints(loserUser.rank.points, winnerUser.rank.points, false, 0);
 
         winnerUser.rank.points += winPoints;
         winnerUser.rank.winStreak += 1;
@@ -346,7 +362,8 @@ module.exports = (io, socket) => {
                     winner: opponent.name
                 });
 
-                await concludeBattle(activeBattle);
+                const freshBattle = await Battle.findOne({ battleId: activeBattle.battleId });
+                await concludeBattle(freshBattle);
             }
         } catch (err) { logger.error('Disconnect Penalty Error:', err); }
     });
