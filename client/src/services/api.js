@@ -7,11 +7,9 @@ const getApiUrl = () => {
         return import.meta.env.VITE_API_URL;
     }
 
-    // In production, use the current origin
+    // In production, use the Render backend URL
     if (import.meta.env.PROD) {
-        const protocol = window.location.protocol;
-        const host = window.location.host;
-        return `${protocol}//${host}/api`;
+        return 'https://kahoot-backend-w7i4.onrender.com/api/v1';
     }
 
     // Fallback for development

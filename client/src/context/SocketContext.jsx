@@ -40,7 +40,7 @@ export const SocketProvider = ({ children }) => {
         // 🚀 2. Initialize production-grade socket
         let socketUrl = import.meta.env.VITE_SOCKET_URL;
         if (!socketUrl) {
-            socketUrl = import.meta.env.PROD ? window.location.origin : 'http://localhost:5000';
+            socketUrl = import.meta.env.PROD ? 'https://kahoot-backend-w7i4.onrender.com' : 'http://localhost:5000';
         }
 
         console.log('🔌 [SOCKET] Opening live lane to:', socketUrl);
