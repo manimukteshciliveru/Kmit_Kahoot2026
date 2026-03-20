@@ -26,8 +26,23 @@ module.exports = (io, socket) => {
             const roomID = `battle_${Date.now()}_${userId}`;
             
             // Pick a random public quiz for the battle (or a specific topic if requested)
-            const randomQuiz = await Quiz.findOne({ isPublic: true }).select('_id title questions settings');
-            if (!randomQuiz) return socket.emit('error', { message: 'No quizzes available for battle' });
+            let randomQuiz = await Quiz.findOne({ isPublic: true }).select('_id title questions settings');
+            
+            // Fallback: If no public quizzes, pick ANY quiz (excluding drafts if possible)
+            if (!randomQuiz) {
+                logger.info('⚠️ [BATTLE] No public quizzes found, falling back to any available quiz');
+                randomQuiz = await Quiz.findOne({ 
+                    status: { $ne: 'draft' },
+                    'questions.0': { $exists: true } 
+                }).select('_id title questions settings');
+            }
+
+            if (!randomQuiz) {
+                logger.error('❌ [BATTLE] Matching failed: No quizzes found in system');
+                socket.emit('error', { message: 'No play-ready quizzes available in the system yet.' });
+                opponentSocket.emit('error', { message: 'Matchmaking aborted: No play-ready quizzes found.' });
+                return;
+            }
 
             const newBattle = new Battle({
                 roomID,
