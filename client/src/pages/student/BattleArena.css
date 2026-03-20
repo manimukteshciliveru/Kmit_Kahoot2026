@@ -549,6 +549,115 @@
   border: 3px solid #334155;
 }
 
+.rank-roadmap-container {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 24px;
+}
+
+.roadmap-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.roadmap-header h3 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin: 0;
+  color: #F8FAFC;
+}
+
+.current-pts {
+  margin-left: auto;
+  background: rgba(59, 130, 246, 0.1);
+  color: #60A5FA;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-weight: 800;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.roadmap-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0 3rem 0;
+  min-width: 900px;
+}
+
+.roadmap-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.node-icon-wrapper {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s;
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.roadmap-node.reached .node-icon-wrapper {
+  opacity: 1;
+  filter: none;
+  transform: scale(1.1);
+}
+
+.node-icon-wrapper svg {
+  font-size: 2rem;
+}
+
+.node-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #94A3B8;
+}
+
+.node-threshold {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.roadmap-node.reached .node-label { color: #F8FAFC; }
+
+.roadmap-connector {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  right: -50%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  z-index: 1;
+}
+
+.connector-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3B82F6, #60A5FA);
+  transition: width 1s ease-out;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.roadmap-footer {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #CBD5E1;
+}
+
+.roadmap-footer strong { color: #60A5FA; font-weight: 800; }
+.roadmap-footer span { color: #FDE047; font-weight: 800; }
+
 .btn-challenge-v3 {
   width: 100%;
   padding: 0.8rem;
