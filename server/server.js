@@ -1,4 +1,7 @@
+console.log('🏁 [STARTUP] Starting server.js...');
 require('dotenv').config();
+console.log('✅ [STARTUP] dotenv configured.');
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -8,10 +11,12 @@ const path = require('path');
 
 // Global Exception Handler - MUST BE FIRST
 const logger = require('./utils/logger');
+console.log('✅ [STARTUP] Core modules and logger loaded.');
+
 process.on('uncaughtException', (err) => {
-    logger.error('❌ [CRITICAL] UNCAUGHT EXCEPTION!');
-    logger.error(err.message);
-    logger.error(err.stack);
+    console.error('❌ [CRITICAL] UNCAUGHT EXCEPTION!');
+    console.error(err.message);
+    console.error(err.stack);
 });
 
 const connectDB = require('./config/db');
@@ -255,6 +260,7 @@ try {
 // Start server
 const PORT = process.env.PORT || 5000;
 
+console.log('🏁 [STARTUP] Attempting to listen on port:', PORT);
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
