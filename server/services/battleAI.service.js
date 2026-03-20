@@ -1,8 +1,9 @@
+require("dotenv").config();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || "dummy");
 
 const generateBattleQuiz = async (topic, count = 5) => {
     const prompt = `Generate exactly ${count} highly competitive multiple choice questions about "${topic}".
@@ -13,25 +14,43 @@ const generateBattleQuiz = async (topic, count = 5) => {
     Ensure the question is clear and the options distinct.`;
 
     try {
-        // Primary Attempt: OpenAI
-        if (process.env.OPENAI_API_KEY) {
-            const completion = await openai.chat.completions.create({
-                model: "gpt-3.5-turbo",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.7,
-            });
-            const text = completion.choices[0].message.content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        // Primary Attempt: Gemini 1.5 Flash (Generous Free Tier)
+        try {
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const result = await model.generateContent(prompt);
+            let text = result.response.text().replace(/```json/gi, "").replace(/```/g, "").trim();
+            
+            // Fix parsing if AI adds rogue markdown
+            const firstBracket = text.indexOf('[');
+            const lastBracket = text.lastIndexOf(']');
+            if (firstBracket !== -1 && lastBracket !== -1) {
+                text = text.substring(firstBracket, lastBracket + 1);
+            }
+
             const questions = JSON.parse(text).slice(0, count);
             return { topic, questions: mapOptions(questions) };
-        }
-        
-        // Secondary Attempt: Gemini Flash
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().replace(/```json/gi, "").replace(/```/g, "").trim();
-        const questions = JSON.parse(text).slice(0, count);
-        return { topic, questions: mapOptions(questions) };
+        } catch (geminiError) {
+            console.error('Gemini Failed:', geminiError.message);
+            // Secondary Attempt: OpenAI
+            if (process.env.OPENAI_API_KEY) {
+                const completion = await openai.chat.completions.create({
+                    model: "gpt-3.5-turbo",
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: 0.7,
+                });
+                let text = completion.choices[0].message.content.replace(/```json/gi, "").replace(/```/g, "").trim();
+                
+                const firstBracket = text.indexOf('[');
+                const lastBracket = text.lastIndexOf(']');
+                if (firstBracket !== -1 && lastBracket !== -1) {
+                    text = text.substring(firstBracket, lastBracket + 1);
+                }
 
+                const questions = JSON.parse(text).slice(0, count);
+                return { topic, questions: mapOptions(questions) };
+            }
+            throw new Error("Both APIs failed");
+        }
     } catch (err) {
         console.error('Battle AI Error/Fallback triggered:', err.message);
         return { topic, questions: createFallback(topic, count) };
