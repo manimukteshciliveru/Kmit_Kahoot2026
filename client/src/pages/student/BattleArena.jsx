@@ -2,14 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { toast } from 'react-hot-toast';
-import { FiZap, FiUser, FiActivity, FiX, FiInfo, FiAward, FiGlobe, FiUsers, FiCheck, FiSlash } from 'react-icons/fi';
+import { FiZap, FiUser, FiActivity, FiX, FiInfo, FiAward, FiGlobe, FiUsers, FiCheck, FiSlash, FiFilter, FiBookOpen } from 'react-icons/fi';
 import './BattleArena.css';
 
 const BattleArena = () => {
     const { user } = useAuth();
     const { socket, connected, on, emit } = useSocket();
     
-    const [mode, setMode] = useState('selection'); // selection, searching, lobby, fighting, result
+    const [mode, setMode] = useState('selection'); // selection, searching, lobby, voting, fighting, result
     const [battleData, setBattleData] = useState(null);
     const [opponentData, setOpponentData] = useState({ score: 0, progress: 0 });
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -19,9 +19,14 @@ const BattleArena = () => {
 
     // Lobby & Matchmaking
     const [lobbyPlayers, setLobbyPlayers] = useState([]);
+    const [selectedTopic, setSelectedTopic] = useState('');
     const [incomingChallenge, setIncomingChallenge] = useState(null);
+    const [selectionType, setSelectionType] = useState(null); // 'random' or 'choose'
+    const [votingData, setVotingData] = useState(null);
     const [searchTime, setSearchTime] = useState(0);
     const searchInterval = useRef(null);
+
+    const TOPICS = ['HTML/CSS', 'JavaScript', 'React', 'Node.js', 'Python', 'Java', 'Database', 'General'];
 
     useEffect(() => {
         if (!on) return;
@@ -36,6 +41,7 @@ const BattleArena = () => {
             setOpponentData({ score: 0, progress: 0 });
             setQuestionStartTime(Date.now());
             setIncomingChallenge(null);
+            setVotingData(null);
             toast.success('Battle Starts Now!');
         });
 
@@ -55,6 +61,7 @@ const BattleArena = () => {
         on('battle:cancelled', () => setMode('selection'));
         
         on('battle:lobby_update', (lobby) => {
+            // CRITICAL: Filter out self from lobby
             setLobbyPlayers(lobby.filter(p => p.userId !== user._id));
         });
 
@@ -65,11 +72,17 @@ const BattleArena = () => {
 
         on('battle:incoming_challenge', (data) => {
             setIncomingChallenge(data);
-            toast(`Challenge from ${data.challengerName}!`, { icon: '💌', duration: 10000 });
+            toast(`Challenge from ${data.challengerName} on ${data.topic}!`, { icon: '💌', duration: 15000 });
         });
 
         on('battle:challenge_rejected', (data) => {
             toast.error(data.message);
+        });
+
+        on('battle:topic_voting', (data) => {
+            setVotingData(data);
+            setMode('voting');
+            clearInterval(searchInterval.current);
         });
 
         return () => {
@@ -81,6 +94,7 @@ const BattleArena = () => {
         emit('battle:enter_lobby', { mode: 'random' });
         setSearchTime(0);
         setMode('searching');
+        setSelectionType('random');
         searchInterval.current = setInterval(() => {
             setSearchTime(prev => prev + 1);
         }, 1000);
@@ -89,24 +103,42 @@ const BattleArena = () => {
     const enterChooseLobby = () => {
         emit('battle:enter_lobby', { mode: 'choose' });
         setMode('lobby');
+        setSelectionType('choose');
     };
 
     const cancelSearch = () => {
         emit('battle:leave_queue');
         clearInterval(searchInterval.current);
         setMode('selection');
+        setSelectionType(null);
+        setIncomingChallenge(null);
     };
 
-    const challengePlayer = (targetSocketId) => {
-        emit('battle:challenge_player', { targetSocketId });
-        toast.success('Invitation sent!');
+    const handleChallenge = (targetSocketId) => {
+        if (!selectedTopic) {
+            toast.error('Please select a topic first!');
+            return;
+        }
+        emit('battle:challenge_player', { targetSocketId, topic: selectedTopic });
+        toast.success(`Invitation for ${selectedTopic} sent!`);
+    };
+
+    const submitVote = (topic, type) => {
+        const opponent = votingData.players.find(p => p.socketId !== socket.id);
+        emit('battle:submit_vote', {
+            opponentSocketId: opponent.socketId,
+            topic,
+            voteType: type
+        });
+        toast.success('Vote submitted, waiting for opponent...');
     };
 
     const respondToChallenge = (accept) => {
         if (!incomingChallenge) return;
         emit('battle:respond_challenge', {
             challengerSocketId: incomingChallenge.challengerSocketId,
-            accept
+            accept,
+            topic: incomingChallenge.topic
         });
         if (!accept) setIncomingChallenge(null);
     };
@@ -124,7 +156,7 @@ const BattleArena = () => {
             setCurrentIndex(prev => prev + 1);
             setQuestionStartTime(Date.now());
         } else {
-            toast('Waiting for opponent...', { icon: '⏳' });
+            toast('Waiting for opponent to finish...', { icon: '⏳' });
         }
     };
 
@@ -150,7 +182,7 @@ const BattleArena = () => {
                         </div>
                         <div className="mode-option" onClick={enterChooseLobby}>
                             <FiUsers className="mode-icon" />
-                            <h3>Choose Opponent</h3>
+                            <h3>Browse Players</h3>
                             <p>Browse students currently in lobby</p>
                             <button className="btn-mode-select secondary">View Lobby</button>
                         </div>
@@ -181,6 +213,13 @@ const BattleArena = () => {
                 <div className="lobby-browser">
                     <div className="lobby-header">
                         <h2>Battle Lobby</h2>
+                        <div className="lobby-topic-picker">
+                            <FiFilter />
+                            <select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)}>
+                                <option value="">Choose Battle Topic...</option>
+                                {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
                         <button className="btn-back" onClick={cancelSearch}>Back</button>
                     </div>
                     
@@ -188,23 +227,51 @@ const BattleArena = () => {
                         <div className="empty-lobby">
                             <FiUser className="empty-icon" />
                             <h3>Lobby is quiet...</h3>
-                            <p>No other players are currently in the lobby. Invite a friend or try Quick Match!</p>
-                            <button className="btn-quick-switch" onClick={startRandomSearch}>Try Quick Match</button>
+                            <p>No other players online. Try Quick Match or wait here!</p>
+                            <button className="btn-quick-switch" onClick={startRandomSearch}>Quick Match</button>
                         </div>
                     ) : (
                         <div className="lobby-list">
                             {lobbyPlayers.map(p => (
                                 <div key={p.socketId} className="lobby-player-card">
-                                    <img src={p.avatar || `https://ui-avatars.com/api/?name=${p.name}`} alt={p.name} />
+                                    <div className="p-avatar-wrap">
+                                        <img src={p.avatar || `https://ui-avatars.com/api/?name=${p.name}`} alt={p.name} />
+                                        <div className="p-status-dot online" />
+                                    </div>
                                     <div className="p-details">
                                         <h4>{p.name}</h4>
-                                        <span>Status: Ready to Fight</span>
+                                        <span>Status: {p.mode === 'random' ? 'Quick Match' : 'Waiting for Challenge'}</span>
                                     </div>
-                                    <button className="btn-challenge" onClick={() => challengePlayer(p.socketId)}>Challenge</button>
+                                    <button className="btn-challenge" onClick={() => handleChallenge(p.socketId)}>
+                                        Challenge
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── VOTING VIEW (RANDOM MODE) ── */}
+            {mode === 'voting' && votingData && (
+                <div className="voting-view animate-zoomIn">
+                    <div className="voting-card">
+                        <div className="vs-header">
+                            <span>{votingData.players[0].name}</span>
+                            <div className="vs-logo">VS</div>
+                            <span>{votingData.players[1].name}</span>
+                        </div>
+                        <h2>Agree on a Topic</h2>
+                        <p>Both players must select a topic to begin.</p>
+                        
+                        <div className="voting-topics">
+                            {TOPICS.map(t => (
+                                <button key={t} className="vote-btn" onClick={() => submitVote(t, 'suggest')}>
+                                    {t}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -215,7 +282,10 @@ const BattleArena = () => {
                         <div className="challenge-badge">NEW CHALLENGE!</div>
                         <img src={`https://ui-avatars.com/api/?name=${incomingChallenge.challengerName}`} alt="Challenger" />
                         <h3>{incomingChallenge.challengerName}</h3>
-                        <p>wants to battle you!</p>
+                        <div className="challenge-topic-tag">
+                            <FiBookOpen /> <span>Topic: {incomingChallenge.topic}</span>
+                        </div>
+                        <p>wants to battle you. Acccept?</p>
                         <div className="challenge-actions">
                             <button className="btn-accept" onClick={() => respondToChallenge(true)}>
                                 <FiCheck /> Accept
