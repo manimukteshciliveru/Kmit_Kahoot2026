@@ -532,3 +532,75 @@
   gap: 1rem;
   margin: 1.5rem 0;
 }
+
+.combat-stage { position: relative; min-height: 400px; display: flex; align-items: center; justify-content: center; width: 100%; }
+
+.waiting-overlay {
+  text-align: center;
+  padding: 4rem;
+  border-radius: 32px;
+  width: 100%;
+}
+
+.waiting-icon { font-size: 4rem; color: #60A5FA; margin-bottom: 2rem; }
+
+.round-resolution {
+  width: 100%;
+  max-width: 600px;
+  padding: 2.5rem;
+  border-radius: 32px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.res-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; color: #60A5FA; }
+.res-header h2 { margin: 0; font-size: 1.5rem; }
+
+.res-grid { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2.5rem; }
+
+.res-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 1.8rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  border: 1px solid transparent;
+}
+
+.res-block.me { border-color: rgba(96, 165, 250, 0.3); background: rgba(59, 130, 246, 0.05); }
+
+.player-name { font-weight: 800; font-size: 1.1rem; }
+.res-badge { font-size: 0.7rem; font-weight: 900; padding: 2px 8px; border-radius: 4px; }
+.res-badge.correct { background: #10B981; color: white; }
+.res-badge.wrong { background: #EF4444; color: white; }
+
+.xp-gain { color: #FDE047; }
+
+.next-round-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.next-round-bar .progress {
+  height: 100%;
+  background: #60A5FA;
+  width: 100%;
+  animation: filling 4s linear;
+}
+
+@keyframes filling { from { width: 0%; } to { width: 100%; } }
+
+.status-footer { text-align: center; color: #94A3B8; font-size: 0.9rem; font-weight: 600; font-style: italic; }
+
+/* Existing Animations Helpers */
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+.animate-fade-in { animation: fadeIn 0.6s ease-out; }
+
+.animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+

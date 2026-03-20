@@ -22,6 +22,10 @@ const BattleArena = () => {
     const [timer, setTimer] = useState(20);
     const [searchTime, setSearchTime] = useState(0);
     
+    // Synchronized Progression States
+    const [roundStatus, setRoundStatus] = useState('answering'); // answering, waiting, resolved
+    const [roundResult, setRoundResult] = useState(null);
+    
     // Battle Stats
     const [syncData, setSyncData] = useState(null);
     const [damageEffect, setDamageEffect] = useState(null); // 'self' or 'opponent'
@@ -41,7 +45,6 @@ const BattleArena = () => {
         'Web': ['HTML5 Semantic', 'CSS Grid/Flexbox', 'Responsive Design', 'SASS/SCSS', 'React Basics', 'State Management', 'React Hooks', 'Routing', 'API Integration', 'Next.js']
     };
 
-    // --- Automatic Lobby Entry ---
     useEffect(() => {
         if (socket && connected && user) {
             socket.emit('battle:enter_lobby', { mode: 'idle', topic: 'General' });
@@ -60,14 +63,15 @@ const BattleArena = () => {
                 players: data.players.map(p => ({ userId: p.userId, hp: 100, score: 0 }))
             });
             setView('playing');
-            setCurrentQuestionIndex(0); // Reset index for safety
+            setCurrentQuestionIndex(0);
+            setRoundStatus('answering');
             startQuestionTimer();
-            toast.success('Battle Started!', { icon: '⚔️' });
+            toast.success('Duel Started!', { icon: '⚔️' });
         });
 
         socket.on('battle:sync', (data) => {
             if (syncData) {
-                const myId = user.id || user._id; // Handle both id formats
+                const myId = user.id || user._id;
                 const myPrevHp = syncData.players.find(p => p.userId.toString() === myId.toString())?.hp;
                 const myNewHp = data.players.find(p => p.userId.toString() === myId.toString())?.hp;
                 const oppPrevHp = syncData.players.find(p => p.userId.toString() !== myId.toString())?.hp;
@@ -77,6 +81,24 @@ const BattleArena = () => {
                 if (oppNewHp < oppPrevHp) triggerDamageEffect('opponent');
             }
             setSyncData(data);
+        });
+
+        socket.on('battle:waiting_for_opponent', () => {
+            setRoundStatus('waiting');
+            clearInterval(timerRef.current);
+        });
+
+        socket.on('battle:round_resolved', (data) => {
+            setRoundResult(data);
+            setRoundStatus('resolved');
+            clearInterval(timerRef.current);
+        });
+
+        socket.on('battle:next_question', ({ nextIndex }) => {
+            setCurrentQuestionIndex(nextIndex);
+            setRoundStatus('answering');
+            setRoundResult(null);
+            startQuestionTimer();
         });
 
         socket.on('battle:ended', (data) => {
@@ -103,6 +125,9 @@ const BattleArena = () => {
             socket.off('battle:incoming_challenge');
             socket.off('battle:started');
             socket.off('battle:sync');
+            socket.off('battle:waiting_for_opponent');
+            socket.off('battle:round_resolved');
+            socket.off('battle:next_question');
             socket.off('battle:ended');
             socket.off('battle:searching');
             socket.off('battle:opponent_left');
@@ -131,6 +156,8 @@ const BattleArena = () => {
     };
 
     const handleAnswer = (answerIndex) => {
+        if (roundStatus !== 'answering') return;
+        
         clearInterval(timerRef.current);
         if (socket && battleData) {
             socket.emit('battle:submit_answer', {
@@ -140,18 +167,10 @@ const BattleArena = () => {
                 timeTaken: (20 - timer) * 1000
             });
         }
-
-        // Wait brief second to show selection before next Q
-        if (currentQuestionIndex < battleData.quiz.questions.length - 1) {
-            setTimeout(() => {
-                setCurrentQuestionIndex(prev => prev + 1);
-                startQuestionTimer();
-            }, 1000);
-        }
     };
 
     const startSearch = (mode = 'random') => {
-        if (!selectedSubTopic && mode !== 'idle') {
+        if (!selectedSubTopic && mode !== 'idle' && mode !== 'lobby') {
             return toast.error("Select a path first!");
         }
         
@@ -159,7 +178,7 @@ const BattleArena = () => {
             if (mode === 'lobby') setView('lobby');
             socket.emit('battle:enter_lobby', { 
                 mode, 
-                topic: `${selectedCategory}: ${selectedSubTopic}` 
+                topic: selectedSubTopic ? `${selectedCategory}: ${selectedSubTopic}` : 'General'
             });
         }
     };
@@ -187,197 +206,229 @@ const BattleArena = () => {
         return <LuShieldCheck className="rank-i" />;
     };
 
-    if (view === 'playing' && battleData && syncData) {
-        const q = battleData.quiz.questions[currentQuestionIndex];
-        const myId = user.id || user._id;
-        const selfMatch = syncData.players.find(p => p.userId.toString() === myId.toString());
-        const oppoMatch = syncData.players.find(p => p.userId.toString() !== myId.toString());
-
-        return (
-            <div className={`battle-playing-screen ${damageEffect ? `shake-${damageEffect}` : ''}`}>
-                <div className="battle-hud-v2">
-                    <div className={`hud-side self ${damageEffect === 'self' ? 'damaged' : ''}`}>
-                        <div className="hud-meta">
-                            <span className="hud-name">{user.name}</span>
-                            <span className="hud-score">{selfMatch?.score || 0} XP</span>
-                        </div>
-                        <div className="hp-container">
-                            <div className="hp-bar" style={{ width: `${selfMatch?.hp || 100}%` }}></div>
-                            <LuHeart className="hp-icon" />
-                        </div>
-                    </div>
-
-                    <div className="match-timer-ring">
-                        <svg viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="45" className="timer-bg" />
-                            <circle cx="50" cy="50" r="45" className="timer-progress"
-                                style={{ strokeDashoffset: (1 - timer/20) * 283 }} />
-                        </svg>
-                        <span className="timer-val">{timer}</span>
-                    </div>
-
-                    <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
-                        <div className="hud-meta">
-                            <span className="hud-name">Opponent</span>
-                            <span className="hud-score">{oppoMatch?.score || 0} XP</span>
-                        </div>
-                        <div className="hp-container">
-                            <div className="hp-bar" style={{ width: `${oppoMatch?.hp || 100}%` }}></div>
-                            <LuHeart className="hp-icon" />
-                        </div>
-                    </div>
-                <                    <div className="combat-stage animate-scale-in">
-                        <div className="question-box glass">
-                            <div className="q-indicator">Question {currentQuestionIndex + 1} / {battleData.quiz.questions.length}</div>
-                            <h2>{q.questionText}</h2>
-                            <div className="options-grid-v2">
-                                {q.options.map((opt, idx) => (
-                                    <button key={idx} className="opt-v2" onClick={() => handleAnswer(idx)}>
-                                        <div className="opt-idx">{String.fromCharCode(65 + idx)}</div>
-                                        <span className="opt-label">{opt.text}</span>
-                                    </button>
-                                ))}
+    return (
+        <div className="arena-v2">
+            {view === 'playing' && battleData && syncData && (
+                <div className={`battle-playing-screen ${damageEffect ? `shake-${damageEffect}` : ''}`}>
+                    <div className="battle-hud-v2">
+                        <div className={`hud-side self ${damageEffect === 'self' ? 'damaged' : ''}`}>
+                            <div className="hud-meta">
+                                <span className="hud-name">{user.name}</span>
+                                <span className="hud-score">{syncData.players.find(p => p.userId.toString() === (user.id || user._id).toString())?.score || 0} XP</span>
+                            </div>
+                            <div className="hp-container">
+                                <div className="hp-bar" style={{ width: `${syncData.players.find(p => p.userId.toString() === (user.id || user._id).toString())?.hp || 100}%` }}></div>
+                                <LuHeart className="hp-icon" />
                             </div>
                         </div>
+
+                        <div className="match-timer-ring">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" className="timer-bg" />
+                                <circle cx="50" cy="50" r="45" className="timer-progress"
+                                    style={{ strokeDashoffset: (1 - timer/20) * 283 }} />
+                            </svg>
+                            <span className="timer-val">{timer}</span>
+                        </div>
+
+                        <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
+                            <div className="hud-meta">
+                                <span className="hud-name">Opponent</span>
+                                <span className="hud-score">{syncData.players.find(p => p.userId.toString() !== (user.id || user._id).toString())?.score || 0} XP</span>
+                            </div>
+                            <div className="hp-container">
+                                <div className="hp-bar" style={{ width: `${syncData.players.find(p => p.userId.toString() !== (user.id || user._id).toString())?.hp || 100}%` }}></div>
+                                <LuHeart className="hp-icon" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="combat-stage animate-scale-in">
+                        {roundStatus === 'answering' && (
+                            <div className="question-box glass">
+                                <div className="q-indicator">Question {currentQuestionIndex + 1} / {battleData.quiz.questions.length}</div>
+                                <h2>{battleData.quiz.questions[currentQuestionIndex].questionText}</h2>
+                                <div className="options-grid-v2">
+                                    {battleData.quiz.questions[currentQuestionIndex].options.map((opt, idx) => (
+                                        <button key={idx} className="opt-v2" onClick={() => handleAnswer(idx)}>
+                                            <div className="opt-idx">{String.fromCharCode(65 + idx)}</div>
+                                            <span className="opt-label">{opt.text}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {roundStatus === 'waiting' && (
+                            <div className="waiting-overlay glass animate-pulse">
+                                <LuTimer className="waiting-icon" />
+                                <h2>Waiting for Opponent...</h2>
+                                <p>You answered in {((20 - timer)).toFixed(1)}s</p>
+                            </div>
+                        )}
+
+                        {roundStatus === 'resolved' && roundResult && (
+                            <div className="round-resolution glass animate-scale-in">
+                                <div className="res-header">
+                                    <LuTarget />
+                                    <h2>Round {currentQuestionIndex + 1} Results</h2>
+                                </div>
+                                <div className="res-grid">
+                                    {roundResult.players.map(p => (
+                                        <div key={p.userId} className={`res-block ${p.userId === (user.id || user._id).toString() ? 'me' : ''}`}>
+                                            <div className="res-info">
+                                                <span className="player-name">{p.name}</span>
+                                                <span className={`res-badge ${p.isCorrect ? 'correct' : 'wrong'}`}>
+                                                    {p.isCorrect ? 'CORRECT' : 'WRONG'}
+                                                </span>
+                                            </div>
+                                            <div className="res-meta">
+                                                <span>Speed: {(p.timeTaken / 1000).toFixed(1)}s</span>
+                                                <span className="xp-gain">+{p.isCorrect ? (p.timeTaken < 3000 ? 15 : 10) : 0} XP</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="next-round-bar">
+                                    <div className="progress"></div>
+                                </div>
+                                <p className="status-footer">Next question incoming...</p>
+                            </div>
+                        )}
                     </div>
                 </div>
-            );
-        }
+            )}
 
-        return (
-            <div className="arena-v2">
-                {view === 'selection' && (
-                    <div className="arena-home animate-fadeInUp">
-                        <div className="arena-header text-center">
-                            <h1>Battle Arena</h1>
-                            <p className="glow-text">Ascend the leaderboard. Prove your dominance.</p>
-                        </div>
+            {view === 'selection' && (
+                <div className="arena-home animate-fadeInUp">
+                    <div className="arena-header text-center">
+                        <h1>Battle Arena</h1>
+                        <p className="glow-text">Ascend the leaderboard. Prove your dominance.</p>
+                    </div>
 
-                        <div className="user-rank-status">
-                            <div className="rank-card-v2 glass">
-                                {getRankIcon(user.rank?.tier)}
-                                <div className="rank-details">
-                                    <h3>{user.rank?.tier || 'Bronze'} {user.rank?.level || 'I'}</h3>
-                                    <p>{user.rank?.points || 0} Rating Points</p>
-                                </div>
-                                <div className="streak-badge animate-glow">
-                                    <LuFlame /> {user.rank?.winStreak || 0} Streak
-                                </div>
+                    <div className="user-rank-status">
+                        <div className="rank-card-v2 glass">
+                            {getRankIcon(user.rank?.tier)}
+                            <div className="rank-details">
+                                <h3>{user.rank?.tier || 'Bronze'} {user.rank?.level || 'I'}</h3>
+                                <p>{user.rank?.points || 0} Rating Points</p>
+                            </div>
+                            <div className="streak-badge animate-glow">
+                                <LuFlame /> {user.rank?.winStreak || 0} Streak
                             </div>
                         </div>
+                    </div>
 
-                        <div className="arena-controls glass">
-                            <div className="path-picker">
-                                <div className="form-group">
-                                    <label className="form-label">Category</label>
-                                    <select className="form-select" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-                                        <option value="">Choose Category</option>
-                                        {Object.keys(TOPIC_STRUCTURE).map(c => <option key={c} value={c}>{c}</option>)}
+                    <div className="arena-controls glass">
+                        <div className="path-picker">
+                            <div className="form-group">
+                                <label className="form-label">Category</label>
+                                <select className="form-select" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                                    <option value="">Choose Category</option>
+                                    {Object.keys(TOPIC_STRUCTURE).map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            {selectedCategory && (
+                                <div className="form-group animate-slideDown">
+                                    <label className="form-label">Sub-Topic</label>
+                                    <select className="form-select" value={selectedSubTopic} onChange={(e) => setSelectedSubTopic(e.target.value)}>
+                                        <option value="">Choose Topic</option>
+                                        {TOPIC_STRUCTURE[selectedCategory].map(t => <option key={t} value={t}>{t}</option>)}
                                     </select>
-                                </div>
-                                {selectedCategory && (
-                                    <div className="form-group animate-slideDown">
-                                        <label className="form-label">Sub-Topic</label>
-                                        <select className="form-select" value={selectedSubTopic} onChange={(e) => setSelectedSubTopic(e.target.value)}>
-                                            <option value="">Choose Topic</option>
-                                            {TOPIC_STRUCTURE[selectedCategory].map(t => <option key={t} value={t}>{t}</option>)}
-                                        </select>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="action-buttons">
-                                <button className="btn-match random btn-lg" disabled={!selectedSubTopic} onClick={() => startSearch('random')}>
-                                    <LuSword className="animate-bounce" /> Find Match
-                                </button>
-                                <button className="btn-match browse btn-lg" onClick={() => startSearch('lobby')}>
-                                    <LuUsers /> Matchmaking Lobby
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {view === 'searching' && (
-                    <div className="searching-v2 animate-fadeIn">
-                        <div className="radar-v2">
-                            <div className="circle"></div>
-                            <div className="circle"></div>
-                            <div className="circle"></div>
-                            <LuSword className="radar-sword" />
-                        </div>
-                        <h2 className="animate-pulse">Finding Opponent...</h2>
-                        <div className="search-meta">
-                            <span className="badge badge-primary">{selectedCategory}</span>
-                            <span className="badge badge-warning">{selectedSubTopic}</span>
-                        </div>
-                        <span className="search-timer">{searchTime}s</span>
-                        <button className="btn btn-danger btn-sm" onClick={() => setView('selection')}>
-                            <LuX /> Stop Searching
-                        </button>
-                    </div>
-                )}
-
-                {view === 'lobby' && (
-                    <div className="lobby-v2 animate-slide-up">
-                        <div className="lobby-head glass">
-                            <div>
-                                <h2>Battle Registry</h2>
-                                <p><span className="live-dot"></span> {lobbyPlayers.length} Elite Players Online</p>
-                            </div>
-                            <button className="close-lobby" onClick={() => setView('selection')}><LuX /></button>
-                        </div>
-                        
-                        <div className="lobby-grid p-4">
-                            {lobbyPlayers.length === 0 ? (
-                                <div className="empty-lobby text-center">
-                                    <LuUsers className="empty-icon" />
-                                    <p>The arena is quiet... for now.</p>
-                                </div>
-                            ) : (
-                                <div className="players-grid">
-                                    {lobbyPlayers.map(p => {
-                                        const myId = user.id || user._id;
-                                        const isMe = p.userId.toString() === myId.toString();
-                                        return (
-                                            <div key={p.userId} className={`player-card-v2 ${isMe ? 'me' : ''} glass`}>
-                                                <div className="p-card-header">
-                                                    <img src={p.avatar} alt={p.name} className="p-avatar-lg" />
-                                                    <div className="p-status-mini">
-                                                        {getRankIcon(p.rank?.tier)}
-                                                    </div>
-                                                </div>
-                                                <div className="p-card-body">
-                                                    <h4>{p.name}</h4>
-                                                    <span className="p-rank-label">{p.rank?.tier} {p.rank?.level}</span>
-                                                    <div className="p-topic-tag">
-                                                        <LuBookOpen /> {p.topic.split(': ')[1] || 'Any'}
-                                                    </div>
-                                                </div>
-                                                <div className="p-card-footer">
-                                                    {isMe ? (
-                                                        <span className="badge badge-info">You</span>
-                                                    ) : (
-                                                        <button className="btn-challenge-v3" onClick={() => handleChallenge(p.userId)}>
-                                                            Challenge
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
                                 </div>
                             )}
                         </div>
+
+                        <div className="action-buttons">
+                            <button className="btn-match random btn-lg" disabled={!selectedSubTopic} onClick={() => startSearch('random')}>
+                                <LuSword className="animate-bounce" /> Find Match
+                            </button>
+                            <button className="btn-match browse btn-lg" onClick={() => startSearch('lobby')}>
+                                <LuUsers /> Matchmaking Lobby
+                            </button>
+                        </div>
                     </div>
-                )}     )}
+                </div>
+            )}
+
+            {view === 'searching' && (
+                <div className="searching-v2 animate-fadeIn">
+                    <div className="radar-v2">
+                        <div className="circle"></div>
+                        <div className="circle"></div>
+                        <div className="circle"></div>
+                        <LuSword className="radar-sword" />
+                    </div>
+                    <h2 className="animate-pulse">Finding Opponent...</h2>
+                    <div className="search-meta">
+                        <span className="badge badge-primary">{selectedCategory}</span>
+                        <span className="badge badge-warning">{selectedSubTopic}</span>
+                    </div>
+                    <span className="search-timer">{searchTime}s</span>
+                    <button className="btn btn-danger btn-sm" onClick={() => setView('selection')}>
+                        <LuX /> Stop Searching
+                    </button>
+                </div>
+            )}
+
+            {view === 'lobby' && (
+                <div className="lobby-v2 animate-slide-up">
+                    <div className="lobby-head glass">
+                        <div>
+                            <h2>Battle Registry</h2>
+                            <p><span className="live-dot"></span> {lobbyPlayers.length} Elite Players Online</p>
+                        </div>
+                        <button className="close-lobby" onClick={() => setView('selection')}><LuX /></button>
+                    </div>
+                    <div className="lobby-grid p-4">
+                        {lobbyPlayers.length === 0 ? (
+                            <div className="empty-lobby text-center">
+                                <LuUsers className="empty-icon" />
+                                <p>The arena is quiet... for now.</p>
+                            </div>
+                        ) : (
+                            <div className="players-grid">
+                                {lobbyPlayers.map(p => {
+                                    const myId = user.id || user._id;
+                                    const isMe = p.userId.toString() === myId.toString();
+                                    return (
+                                        <div key={p.userId} className={`player-card-v2 ${isMe ? 'me' : ''} glass`}>
+                                            <div className="p-card-header">
+                                                <img src={p.avatar} alt={p.name} className="p-avatar-lg" />
+                                                <div className="p-status-mini">
+                                                    {getRankIcon(p.rank?.tier)}
+                                                </div>
+                                            </div>
+                                            <div className="p-card-body">
+                                                <h4>{p.name}</h4>
+                                                <span className="p-rank-label">{p.rank?.tier} {p.rank?.level}</span>
+                                                <div className="p-topic-tag">
+                                                    <LuBookOpen /> {p.topic.split(': ')[1] || 'Any'}
+                                                </div>
+                                            </div>
+                                            <div className="p-card-footer">
+                                                {isMe ? (
+                                                    <span className="badge badge-info">You</span>
+                                                ) : (
+                                                    <button className="btn-challenge-v3" onClick={() => handleChallenge(p.userId)}>
+                                                        Challenge
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {view === 'results' && finalResults && (
                 <div className="results-v2 animate-fade-in">
                     <div className="results-card">
                         <LuTrophy className={`trophy-icon ${finalResults.winner === user.name ? 'winner' : 'loser'}`} />
                         <h1>{finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT'}</h1>
-                        
                         <div className="score-summary-v2">
                             {finalResults.results.map(r => {
                                 const myId = user.id || user._id;
@@ -392,8 +443,7 @@ const BattleArena = () => {
                                 );
                             })}
                         </div>
-                        
-                        <button className="btn-return" onClick={() => setView('selection')}>Return to Base</button>
+                        <button className="btn btn-primary btn-lg" onClick={() => setView('selection')}>Return to Base</button>
                     </div>
                 </div>
             )}

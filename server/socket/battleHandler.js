@@ -145,26 +145,36 @@ module.exports = (io, socket) => {
         }
     });
 
-    // --- In-Game ---
+    // --- In-Game (Synchronized Progression) ---
     socket.on('battle:submit_answer', async (data) => {
         const { battleId, questionIndex, answer, timeTaken } = data;
         
         try {
             const battle = await Battle.findOne({ battleId }).populate('players.userId');
-            if (!battle || battle.status === 'completed') return;
+            if (!battle || battle.status !== 'active') return;
 
             const player = battle.players.find(p => p.userId._id.toString() === socket.user._id.toString());
             const opponent = battle.players.find(p => p.userId._id.toString() !== socket.user._id.toString());
             
-            if (!player || !opponent) {
-                logger.error('Battle Sync Error: Player or Opponent not found');
-                return;
-            }
+            if (!player || !opponent) return;
             
-            const question = battle.quizId.questions[questionIndex];
-            const isCorrect = answer === question.correctAnswer;
-            const perfectTimeBonus = timeTaken < 3000; // <3s for perfect damage
+            // Avoid double submission for same question
+            if (player.answers.some(a => a.questionIndex === questionIndex)) return;
 
+            const question = battle.quizId.questions[questionIndex];
+            const isCorrect = (answer !== null && answer === question.correctAnswer);
+            const perfectTimeBonus = isCorrect && timeTaken < 3000; 
+
+            // Update Player State for THIS Round
+            const roundAnswer = { 
+                questionIndex, 
+                isCorrect, 
+                timeSpent: timeTaken || 15000,
+                perfect: perfectTimeBonus
+            };
+            player.answers.push(roundAnswer);
+
+            // Apply HP Logic (Opponent takes damage if I get it right)
             if (isCorrect) {
                 const damage = perfectTimeBonus ? 30 : 20;
                 opponent.hp = Math.max(0, opponent.hp - damage);
@@ -173,34 +183,58 @@ module.exports = (io, socket) => {
                 player.hp = Math.max(0, player.hp - 10); // Mishap damage
             }
 
-            player.answers.push({ 
-                questionIndex, 
-                isCorrect, 
-                timeSpent: timeTaken,
-                perfect: perfectTimeBonus && isCorrect
-            });
+            await battle.save();
 
-            // Live Sync
-            io.to(battle.roomID).emit('battle:sync', {
-                players: battle.players.map(p => ({
-                    userId: p.userId._id.toString(),
-                    hp: p.hp,
-                    score: p.score,
-                    lastAnswer: { questionIndex, isCorrect }
-                }))
-            });
+            // Check if BOTH have answered THIS question
+            const opponentAnswer = opponent.answers.find(a => a.questionIndex === questionIndex);
 
-            // Game over?
-            const knockout = opponent.hp <= 0;
-            const finalQ = player.answers.length === battle.quizId.questions.length;
-            const oppoDone = opponent.answers.length === battle.quizId.questions.length;
+            if (opponentAnswer) {
+                // ROUND RESOLVED: Both answered
+                const resolution = {
+                    questionIndex,
+                    correctAnswer: question.correctAnswer,
+                    players: battle.players.map(p => {
+                        const ans = p.answers.find(a => a.questionIndex === questionIndex);
+                        return {
+                            userId: p.userId._id.toString(),
+                            name: p.name,
+                            isCorrect: ans?.isCorrect || false,
+                            timeTaken: ans?.timeSpent || 0,
+                            hp: p.hp,
+                            score: p.score
+                        };
+                    })
+                };
 
-            if (knockout || (finalQ && oppoDone)) {
-                await concludeBattle(battle);
+                io.to(battle.roomID).emit('battle:round_resolved', resolution);
+
+                // Wait 3 seconds then signal next question or end
+                setTimeout(async () => {
+                    const refreshedBattle = await Battle.findOne({ battleId });
+                    const knockout = refreshedBattle.players.some(p => p.hp <= 0);
+                    const lastQuestion = questionIndex === refreshedBattle.quizId.questions.length - 1;
+
+                    if (knockout || lastQuestion) {
+                        await concludeBattle(refreshedBattle);
+                    } else {
+                        io.to(battle.roomID).emit('battle:next_question', { nextIndex: questionIndex + 1 });
+                    }
+                }, 4000);
+
             } else {
-                await battle.save();
+                // Only one has answered: Notify the other or tell the current one to wait
+                socket.emit('battle:waiting_for_opponent', { questionIndex });
+                // We still sync the HP bars live
+                io.to(battle.roomID).emit('battle:sync', {
+                    players: battle.players.map(p => ({
+                        userId: p.userId._id.toString(),
+                        hp: p.hp,
+                        score: p.score
+                    }))
+                });
             }
-        } catch (err) { logger.error('Battle Logic Error:', err); }
+
+        } catch (err) { logger.error('Battle Sync Error:', err); }
     });
 
     const concludeBattle = async (battle) => {
