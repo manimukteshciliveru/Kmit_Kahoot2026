@@ -91,16 +91,16 @@ const userSchema = new mongoose.Schema({
         quizzesCreated: { type: Number, default: 0 },
         averageScore: { type: Number, default: 0 },
         totalPoints: { type: Number, default: 0 },
-        bestRank: { type: Number, default: null }
+        bestRank: { type: String, default: 'Bronze I' }
     },
     rank: {
         points: { type: Number, default: 0 },
         tier: { type: String, default: 'Bronze' },
-        level: { type: Number, default: 1 },
+        level: { type: String, default: 'I' }, // I, II, III
         winStreak: { type: Number, default: 0 },
-        highestPoints: { type: Number, default: 0 },
         totalWins: { type: Number, default: 0 },
-        totalLosses: { type: Number, default: 0 }
+        totalLosses: { type: Number, default: 0 },
+        highestPoints: { type: Number, default: 0 }
     },
     lastLogin: {
         type: Date,

@@ -1,16 +1,13 @@
-const Battle = require('../models/Battle');
-const Quiz = require('../models/Quiz');
 const User = require('../models/User');
+const Battle = require('../models/Battle');
+const { generateBattleQuiz } = require('../services/battleAI.service');
+const { calculatePoints, getTierByPoints } = require('../utils/rankManager');
 const logger = require('../utils/logger');
-const { calculateScore } = require('../utils/calculateScore');
-const rankManager = require('../utils/rankManager');
-const battleAIService = require('../services/battleAI.service');
 
-// Matchmaking State
-let waitingPlayers = new Map();
+const waitingPlayers = new Map(); // userId -> player stats
 
 module.exports = (io, socket) => {
-    
+
     const broadcastLobbyUpdate = () => {
         const lobby = Array.from(waitingPlayers.values()).map(p => ({
             userId: p.userId,
@@ -45,57 +42,53 @@ module.exports = (io, socket) => {
 
     const createBattle = async (p1, p2, topicStr = null) => {
         const roomID = `battle_${Date.now()}_${p1.userId}`;
-        
-        let quiz;
-        if (topicStr && topicStr.includes(':')) {
-            const [cat, sub] = topicStr.split(':').map(s => s.trim());
-            quiz = await battleAIService.generateBattleQuiz(cat, sub);
-        } else {
-            quiz = await Quiz.findOne({ status: 'live' }).select('_id title questions settings');
+        const topic = topicStr || "General";
+
+        try {
+            const quizData = await generateBattleQuiz(topic);
+            const battleId = `B-${Math.floor(1000 + Math.random() * 9000)}`;
+
+            const newBattle = new Battle({
+                battleId: battleId,
+                topic: topic,
+                roomID: roomID,
+                players: [
+                    { userId: p1.userId, name: p1.name, socketId: p1.socketId },
+                    { userId: p2.userId, name: p2.name, socketId: p2.socketId }
+                ],
+                quizId: quizData
+            });
+
+            await newBattle.save();
+            
+            joinUserToRoom(p1.userId, roomID);
+            joinUserToRoom(p2.userId, roomID);
+
+            waitingPlayers.delete(p1.userId);
+            waitingPlayers.delete(p2.userId);
+            broadcastLobbyUpdate();
+
+            io.to(roomID).emit('battle:started', {
+                battleId: battleId,
+                roomID: roomID,
+                players: newBattle.players,
+                quiz: quizData
+            });
+
+            logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
+        } catch (error) {
+            logger.error('Create Battle Error:', error);
+            emitToUser(p1.userId, 'error', { message: 'Battle generation failed.' });
+            emitToUser(p2.userId, 'error', { message: 'Battle generation failed.' });
         }
-
-        if (!quiz) {
-            io.to(p1.socketId).emit('error', { message: 'Battle arena currently empty (No Quizzes)' });
-            io.to(p2.socketId).emit('error', { message: 'Battle arena currently empty (No Quizzes)' });
-            return null;
-        }
-
-        const newBattle = new Battle({
-            roomID,
-            quizId: quiz._id,
-            players: [
-                { userId: p1.userId, name: p1.name, socketId: p1.socketId },
-                { userId: p2.userId, name: p2.name, socketId: p2.socketId }
-            ],
-            status: 'active'
-        });
-
-        await newBattle.save();
-        
-        joinUserToRoom(p1.userId, roomID);
-        joinUserToRoom(p2.userId, roomID);
-
-        waitingPlayers.delete(p1.userId);
-        waitingPlayers.delete(p2.userId);
-        broadcastLobbyUpdate();
-
-        io.to(roomID).emit('battle:started', {
-            battleId: newBattle._id,
-            roomID,
-            quiz: {
-                title: quiz.title,
-                questions: quiz.questions,
-                settings: quiz.settings
-            },
-            players: newBattle.players
-        });
     };
 
     // --- Lobby ---
     socket.on('battle:enter_lobby', (data) => {
         const userId = socket.user._id.toString();
         const mode = data?.mode || 'random';
-        const topic = data?.topic || 'General';
+        const topicRaw = data?.topic || 'General';
+        const topic = topicRaw.toLowerCase().replace(/\s+/g, ''); // Normalize
         
         waitingPlayers.set(userId, {
             userId: userId,
@@ -104,12 +97,11 @@ module.exports = (io, socket) => {
             socketId: socket.id,
             mode: mode,
             topic: topic,
-            rank: socket.user.rank || { tier: 'Bronze', level: 1, points: 0 },
+            rank: socket.user.rank || { tier: 'Bronze', level: 'I', points: 0 },
             joinedAt: Date.now()
         });
 
         if (mode === 'random') {
-            // Find opponent with SAME topic (and also searching for random)
             const opponent = Array.from(waitingPlayers.values()).find(p => 
                 p.userId !== userId && 
                 p.mode === 'random' && 
@@ -117,32 +109,21 @@ module.exports = (io, socket) => {
             );
 
             if (opponent) {
-                createBattle(opponent, waitingPlayers.get(userId), topic);
+                createBattle(opponent, waitingPlayers.get(userId), topicRaw);
             } else {
                 socket.emit('battle:searching');
-                setTimeout(() => {
-                    const me = waitingPlayers.get(userId);
-                    if (me && me.mode === 'random' && me.socketId === socket.id) {
-                        socket.emit('battle:no_players', { message: 'Matchmaking timed out. Try a different topic or browser lobby.' });
-                        waitingPlayers.delete(userId);
-                        broadcastLobbyUpdate();
-                    }
-                }, 60000);
             }
         }
         broadcastLobbyUpdate();
     });
 
-    // --- Direct Challenges ---
-    socket.on('battle:challenge_player', (data) => {
+    socket.on('battle:challenge_player', async (data) => {
         const { targetUserId, topic } = data;
         const challenger = waitingPlayers.get(socket.user._id.toString());
         const target = waitingPlayers.get(targetUserId);
 
-        if (!target) return socket.emit('error', { message: 'Target is no longer in the lobby.' });
-        if (target.userId === challenger.userId) return socket.emit('error', { message: "Internal Error: Cannot duel yourself." });
+        if (!target) return socket.emit('error', { message: 'Target is not in the lobby.' });
 
-        console.log(`⚔️ [BATTLE] Challenge: ${challenger.name} -> ${target.name} Topic: ${topic}`);
         emitToUser(targetUserId, 'battle:incoming_challenge', {
             challengerName: challenger.name,
             challengerUserId: challenger.userId,
@@ -150,15 +131,12 @@ module.exports = (io, socket) => {
         });
     });
 
-    socket.on('battle:respond_challenge', (data) => {
+    socket.on('battle:respond_challenge', async (data) => {
         const { challengerUserId, accept, topic } = data;
-        const challenger = waitingPlayers.get(challengerUserId);
         const target = waitingPlayers.get(socket.user._id.toString());
+        const challenger = waitingPlayers.get(challengerUserId);
 
-        if (!challenger) {
-            return socket.emit('error', { message: 'Challenger has left the arena.' });
-        }
-        if (!target) return;
+        if (!challenger || !target) return socket.emit('error', { message: 'Duel setup expired.' });
 
         if (accept) {
             createBattle(challenger, target, topic);
@@ -167,154 +145,150 @@ module.exports = (io, socket) => {
         }
     });
 
+    // --- In-Game ---
     socket.on('battle:submit_answer', async (data) => {
         const { battleId, questionIndex, answer, timeTaken } = data;
+        
         try {
-            const battle = await Battle.findById(battleId).populate('quizId');
-            if (!battle || battle.status !== 'active') return;
+            const battle = await Battle.findOne({ battleId }).populate('players.userId');
+            if (!battle || battle.status === 'completed') return;
 
-            const playerIdx = battle.players.findIndex(p => p.userId.toString() === socket.user._id.toString());
-            const opponentIdx = battle.players.findIndex(p => p.userId.toString() !== socket.user._id.toString());
+            const player = battle.players.find(p => p.userId._id.toString() === socket.user._id.toString());
+            const opponent = battle.players.find(p => p.userId._id.toString() !== socket.user._id.toString());
             
-            const player = battle.players[playerIdx];
-            const opponent = battle.players[opponentIdx];
-
             const question = battle.quizId.questions[questionIndex];
-            const { isCorrect, scoreAwarded } = calculateScore(question, answer, timeTaken / 1000, battle.quizId.settings);
+            const isCorrect = answer === question.correctAnswer;
+            const perfectTimeBonus = timeTaken < 3000; // <3s for perfect damage
 
-            player.score += scoreAwarded;
-            player.answers.push({ questionIndex, isCorrect, timeSpent: timeTaken });
+            if (isCorrect) {
+                const damage = perfectTimeBonus ? 30 : 20;
+                opponent.hp = Math.max(0, opponent.hp - damage);
+                player.score += perfectTimeBonus ? 15 : 10;
+            } else {
+                player.hp = Math.max(0, player.hp - 10); // Mishap damage
+            }
 
-            socket.emit('battle:score_sync', { newScore: player.score });
-            
-            emitToUser(opponent.userId, 'battle:opponent_update', {
-                opponentScore: player.score,
-                questionIndex,
-                isCorrect
+            player.answers.push({ 
+                questionIndex, 
+                isCorrect, 
+                timeSpent: timeTaken,
+                perfect: perfectTimeBonus && isCorrect
             });
 
-            if (battle.players.every(p => p.answers.length === battle.quizId.questions.length)) {
-                battle.status = 'completed';
-                const [p1, p2] = battle.players;
-                let winner, loser;
+            // Live Sync
+            io.to(battle.roomID).emit('battle:sync', {
+                players: battle.players.map(p => ({
+                    userId: p.userId._id,
+                    hp: p.hp,
+                    score: p.score,
+                    lastAnswer: { questionIndex, isCorrect }
+                }))
+            });
 
-                if (p1.score > p2.score) { winner = p1; loser = p2; }
-                else if (p2.score > p1.score) { winner = p2; loser = p1; }
-                else { winner = null; loser = null; } // Draw
+            // Game over?
+            const knockout = opponent.hp <= 0;
+            const finalQ = player.answers.length === battle.quizId.questions.length;
+            const oppoDone = opponent.answers.length === battle.quizId.questions.length;
 
-                battle.winner = winner ? winner.userId : null;
-                await battle.save();
-
-                // --- PROGRESSION LOGIC ---
-                if (winner && loser) {
-                    const winnerDoc = await User.findById(winner.userId);
-                    const loserDoc = await User.findById(loser.userId);
-
-                    if (winnerDoc && loserDoc) {
-                        const winPoints = rankManager.calculateRP(true, winnerDoc.rank.points, {
-                            correctAnswers: winner.answers.filter(a => a.isCorrect).length,
-                            avgTime: winner.answers.reduce((acc, a) => acc + a.timeSpent, 0) / (winner.answers.length * 1000),
-                            streak: winnerDoc.rank.winStreak + 1
-                        });
-
-                        const lossPoints = rankManager.calculateRP(false, loserDoc.rank.points);
-
-                        // Update Winner
-                        winnerDoc.rank.points += winPoints;
-                        winnerDoc.rank.winStreak += 1;
-                        winnerDoc.rank.totalWins += 1;
-                        const wInfo = rankManager.getRankInfo(winnerDoc.rank.points);
-                        winnerDoc.rank.tier = wInfo.tier;
-                        winnerDoc.rank.level = wInfo.level;
-                        await winnerDoc.save();
-
-                        // Update Loser
-                        loserDoc.rank.points = Math.max(0, loserDoc.rank.points + lossPoints);
-                        loserDoc.rank.winStreak = 0;
-                        loserDoc.rank.totalLosses += 1;
-                        const lInfo = rankManager.getRankInfo(loserDoc.rank.points);
-                        loserDoc.rank.tier = lInfo.tier;
-                        loserDoc.rank.level = lInfo.level;
-                        await loserDoc.save();
-
-                        emitToUser(winner.userId, 'battle:rank_update', { 
-                            change: winPoints, 
-                            rank: winnerDoc.rank 
-                        });
-                        emitToUser(loser.userId, 'battle:rank_update', { 
-                            change: lossPoints, 
-                            rank: loserDoc.rank 
-                        });
-                    }
-                }
-
-                io.to(battle.roomID).emit('battle:ended', {
-                    winnerId: battle.winner,
-                    finalScores: battle.players.map(p => ({
-                        name: p.name, 
-                        score: p.score,
-                        userId: p.userId
-                    }))
-                });
+            if (knockout || (finalQ && oppoDone)) {
+                await concludeBattle(battle);
             } else {
                 await battle.save();
             }
         } catch (err) { logger.error('Battle Logic Error:', err); }
     });
 
-    socket.on('battle:leave_queue', () => {
-        waitingPlayers.delete(socket.id);
-        broadcastLobbyUpdate();
-        socket.emit('battle:cancelled');
-    });
+    const concludeBattle = async (battle) => {
+        battle.status = 'completed';
+        battle.endedAt = new Date();
 
-    const handlePlayerExit = async () => {
+        const p1 = battle.players[0];
+        const p2 = battle.players[1];
+
+        // Determine winner
+        let winner, loser;
+        if (p1.hp > p2.hp) { winner = p1; loser = p2; }
+        else if (p2.hp > p1.hp) { winner = p2; loser = p1; }
+        else if (p1.score > p2.score) { winner = p1; loser = p2; }
+        else { winner = p2; loser = p1; }
+
+        winner.isWinner = true;
+        await battle.save();
+
+        // Points & Streaks Logic
+        const winnerUser = await User.findById(winner.userId);
+        const loserUser = await User.findById(loser.userId);
+
+        const winPoints = calculatePoints(winnerUser.rank.points, true, winnerUser.rank.winStreak);
+        const lossPoints = calculatePoints(loserUser.rank.points, false, loserUser.rank.winStreak);
+
+        winnerUser.rank.points += winPoints;
+        winnerUser.rank.winStreak += 1;
+        winnerUser.rank.totalWins += 1;
+        
+        loserUser.rank.points = Math.max(0, loserUser.rank.points + lossPoints);
+        loserUser.rank.winStreak = 0;
+        loserUser.rank.totalLosses += 1;
+
+        // Upgrade Tiers
+        const winRank = getTierByPoints(winnerUser.rank.points);
+        const lossRank = getTierByPoints(loserUser.rank.points);
+        winnerUser.rank.tier = winRank.tier;
+        winnerUser.rank.level = winRank.level;
+        loserUser.rank.tier = lossRank.tier;
+        loserUser.rank.level = lossRank.level;
+
+        await winnerUser.save();
+        await loserUser.save();
+
+        io.to(battle.roomID).emit('battle:ended', {
+            winner: winner.name,
+            results: [
+                { userId: winnerUser._id, name: winnerUser.name, rankDelta: winPoints, newPoints: winnerUser.rank.points, tier: winnerUser.rank.tier, lvl: winnerUser.rank.level },
+                { userId: loserUser._id, name: loserUser.name, rankDelta: lossPoints, newPoints: loserUser.rank.points, tier: loserUser.rank.tier, lvl: loserUser.rank.level }
+            ]
+        });
+
+        logger.info(`🏆 [BATTLE END] ${winner.name} won! Delta Win: ${winPoints} | Delta Loss: ${lossPoints}`);
+    };
+
+    socket.on('disconnect', async () => {
         const userId = socket.user._id.toString();
         waitingPlayers.delete(userId);
         broadcastLobbyUpdate();
 
-        // Check if player was in an active battle
+        // Check for active battles to apply AFK penalty
         try {
             const activeBattle = await Battle.findOne({
                 status: 'active',
-                'players.userId': userId
-            }).populate('quizId');
+                'players.userId': socket.user._id
+            });
 
             if (activeBattle) {
-                activeBattle.status = 'cancelled';
-                const opponent = activeBattle.players.find(p => p.socketId !== socket.id);
+                const player = activeBattle.players.find(p => p.userId.toString() === userId);
+                const opponent = activeBattle.players.find(p => p.userId.toString() !== userId);
                 
-                if (opponent && opponent.socketId) {
-                    emitToUser(opponent.userId.toString(), 'battle:opponent_left', {
-                        message: 'Winner by forfeit! Your opponent has retreated.'
-                    });
-                    
-                    // Award minimum points to the remaining player
-                    const user = await User.findById(opponent.userId);
-                    if (user) {
-                        const winPoints = 15; // Flat forfeit reward
-                        user.rank.points += winPoints;
-                        user.rank.totalWins += 1;
-                        const rInfo = rankManager.getRankInfo(user.rank.points);
-                        user.rank.tier = rInfo.tier;
-                        user.rank.level = rInfo.level;
-                        await user.save();
-                        
-                        emitToUser(opponent.userId.toString(), 'battle:rank_update', {
-                            change: winPoints,
-                            rank: user.rank
-                        });
-                    }
-                }
-                await activeBattle.save();
-                io.to(activeBattle.roomID).emit('battle:ended', { status: 'cancelled' });
+                player.afk = true;
+                player.hp = 0; // Immediate forfeit
+
+                const userModel = await User.findById(userId);
+                userModel.rank.points = Math.max(0, userModel.rank.points - 50);
+                userModel.rank.winStreak = 0;
+                userModel.rank.totalLosses += 1;
+                
+                const rankData = getTierByPoints(userModel.rank.points);
+                userModel.rank.tier = rankData.tier;
+                userModel.rank.level = rankData.level;
+                
+                await userModel.save();
+                
+                io.to(activeBattle.roomID).emit('battle:opponent_left', {
+                    message: `${player.name} has abandoned the field (-50 RP penalty applied).`,
+                    winner: opponent.name
+                });
+
+                await concludeBattle(activeBattle);
             }
-        } catch (err) {
-            logger.error('Exit Logic Error:', err);
-        }
-    };
-
-    socket.on('battle:leave_battle', handlePlayerExit);
-
-    socket.on('disconnect', handlePlayerExit);
+        } catch (err) { logger.error('Disconnect Penalty Error:', err); }
+    });
 };

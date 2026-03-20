@@ -8,6 +8,7 @@ const { calculateScore } = require('../utils/calculateScore');
 const logger = require('../utils/logger');
 const battleHandler = require('./battleHandler');
 
+
 // 🏁 Global Quiz State Machine Definitions
 const STATES = {
     DRAFT: 'draft',
@@ -147,6 +148,8 @@ module.exports = (io) => {
 
         // --- Battle Handler (1v1 Games) ---
         battleHandler(io, socket);
+
+
 
         // --- 1. QUIZ SYNC (GROUND TRUTH) ---
         socket.on('quiz:sync', async (data) => {

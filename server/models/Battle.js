@@ -1,39 +1,41 @@
 const mongoose = require('mongoose');
 
 const battleSchema = new mongoose.Schema({
-    roomID: {
-        type: String,
-        required: true,
-        unique: true
-    },
+    battleId: { type: String, required: true, unique: true },
+    topic: { type: String, required: true },
+    mode: { type: String, enum: ['random', 'challenge'], default: 'random' },
+    status: { type: String, enum: ['waiting', 'active', 'completed', 'canceled'], default: 'active' },
+    
     players: [{
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         name: String,
         socketId: String,
+        hp: { type: Number, default: 100 },
         score: { type: Number, default: 0 },
+        isWinner: { type: Boolean, default: false },
         answers: [{
             questionIndex: Number,
             isCorrect: Boolean,
-            timeSpent: Number
+            timeSpent: Number, // in ms
+            perfect: Boolean, // if speed was exceptionally fast
+            answeredAt: { type: Date, default: Date.now }
         }],
-        status: { type: String, enum: ['waiting', 'playing', 'finished'], default: 'playing' }
+        afk: { type: Boolean, default: false }
     }],
+    
     quizId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Quiz'
+        topic: String,
+        questions: [{
+            questionText: String,
+            options: [{ text: String, isCorrect: Boolean }],
+            correctAnswer: Number, // Index of correct option
+            difficulty: String
+        }]
     },
-    status: {
-        type: String,
-        enum: ['pending', 'active', 'completed', 'cancelled'],
-        default: 'pending'
-    },
-    winner: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        default: null
-    }
-}, {
-    timestamps: true
-});
+    
+    roomID: String,
+    startedAt: { type: Date, default: Date.now },
+    endedAt: Date
+}, { timestamps: true });
 
 module.exports = mongoose.model('Battle', battleSchema);

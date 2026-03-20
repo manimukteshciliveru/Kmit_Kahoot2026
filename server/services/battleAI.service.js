@@ -1,93 +1,56 @@
-const OpenAI = require('openai');
-const dotenv = require('dotenv');
-const Quiz = require('../models/Quiz');
-const logger = require('../utils/logger');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-dotenv.config();
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY);
 
-let openai = null;
-if (process.env.OPENAI_API_KEY) {
+const generateBattleQuiz = async (topic) => {
     try {
-        openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY
-        });
-        logger.info('✅ AI Service: OpenAI initialized for Battle Arena');
-    } catch (error) {
-        logger.error('❌ AI Service: Failed to initialize OpenAI', error);
-    }
-} else {
-    logger.warn('⚠️ OPENAI_API_KEY is missing. AI-powered battle features will be disabled.');
-}
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        
+        const prompt = `Generate exactly 5 highly competitive multiple choice questions about "${topic}".
+        Rules:
+        1. Mix of medium and hard difficulty.
+        2. Format as JSON array.
+        3. Each object should have: questionText, options (array of 4 strings), correctAnswer (index 0-3), difficulty.
+        
+        JSON only.`;
 
-/**
- * AI Service for Battle Arena
- * Fetches/Generates questions based on selected topic from reputable sources.
- */
-class BattleAIService {
-    
-    async generateBattleQuiz(category, subtopic) {
-        try {
-            const prompt = `Act as an expert computer science instructor. 
-            Generate a set of 5 multiple-choice questions for a 1v1 battle on the subtopic "${subtopic}" within the category "${category}".
-            The questions should be similar in style and difficulty to those found on GeeksforGeeks, LeetCode, or W3Schools.
-            
-            Return ONLY a JSON array with this structure:
-            [
-              {
-                "question": "string",
-                "options": ["string", "string", "string", "string"],
-                "correctAnswer": 0, // index of correct option
-                "explanation": "string",
-                "difficulty": "medium",
-                "pointValue": 10
-              }
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        let text = response.text();
+        
+        // Sanitize for JSON parsing
+        text = text.replace(/```json|```/g, "").trim();
+        const questions = JSON.parse(text);
+
+        return {
+            topic: topic,
+            questions: questions.map(q => ({
+                questionText: q.questionText,
+                options: q.options.map((opt, i) => ({ text: opt, isCorrect: i === q.correctAnswer })),
+                correctAnswer: q.correctAnswer,
+                difficulty: q.difficulty || 'medium'
+            }))
+        };
+    } catch (err) {
+        console.error('Battle AI Error:', err);
+        // Fallback set
+        return {
+            topic: topic,
+            questions: [
+                {
+                    questionText: `Challenge Question: Deep dive into ${topic}.`,
+                    options: [
+                        { text: "Correct Architecture Choice", isCorrect: true },
+                        { text: "Scaling Bottleneck", isCorrect: false },
+                        { text: "Memory Overhead", isCorrect: false },
+                        { text: "Non-standard implementation", isCorrect: false }
+                    ],
+                    correctAnswer: 0,
+                    difficulty: 'medium'
+                }
             ]
-            
-            Ensure the code examples (if any) are correctly formatted and the questions are technically accurate.`;
-
-            if (!openai) {
-                logger.warn('OpenAI client not initialized. Using fallback quiz.');
-                return await Quiz.findOne({ status: 'live' });
-            }
-
-            const response = await openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [
-                    { role: "system", content: "You are a professional quiz generator focused on high-quality technical content from GFG, LeetCode, and W3Schools." },
-                    { role: "user", content: prompt }
-                ],
-                response_format: { type: "json_object" }
-            });
-
-            const content = JSON.parse(response.choices[0].message.content);
-            const questions = content.questions || content; // Handle varying JSON structures
-
-            // Create a temporary quiz for this battle
-            const newQuiz = new Quiz({
-                title: `${category}: ${subtopic} Battle`,
-                description: `Dynamic battle quiz for ${subtopic}`,
-                questions: questions.map(q => ({
-                    questionText: q.question,
-                    options: q.options.map((opt, idx) => ({ 
-                        text: opt, 
-                        isCorrect: idx === q.correctAnswer 
-                    })),
-                    points: q.pointValue || 10,
-                    questionType: 'multiple-choice'
-                })),
-                status: 'live',
-                isPublic: false // Hidden from general list
-            });
-
-            await newQuiz.save();
-            return newQuiz;
-
-        } catch (error) {
-            logger.error('Error generating battle quiz:', error);
-            // Fallback to a default quiz if AI fails
-            return await Quiz.findOne({ status: 'live' });
-        }
+        };
     }
-}
+};
 
-module.exports = new BattleAIService();
+module.exports = { generateBattleQuiz };

@@ -50,10 +50,9 @@ const GamesHub = () => {
                 <div className="hub-stats">
                     <div className="hub-stat-item">
                         <FiAward />
-                        <span>Arena Rank: Gold II</span>
+                        <span>Arena Rank: {user?.rank?.tier || 'Bronze'} {user?.rank?.level || 'I'}</span>
                     </div>
-                </div>
-            </header>
+                </div>            </header>
 
             <div className="games-grid">
                 {games.map((game) => (
