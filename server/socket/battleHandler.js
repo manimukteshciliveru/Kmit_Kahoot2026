@@ -16,7 +16,7 @@ module.exports = (io, socket) => {
             userId: p.userId,
             name: p.name,
             avatar: p.avatar,
-            socketId: p.socketId,
+            socketId: p.socketId, // For legacy frontend compatibility
             mode: p.mode,
             rank: p.rank
         }));
@@ -74,9 +74,11 @@ module.exports = (io, socket) => {
 
     // --- Lobby ---
     socket.on('battle:enter_lobby', (data) => {
+        const userId = socket.user._id.toString();
         const mode = data?.mode || 'random';
-        waitingPlayers.set(socket.id, {
-            userId: socket.user._id.toString(),
+        
+        waitingPlayers.set(userId, {
+            userId: userId,
             name: socket.user.name,
             avatar: socket.user.avatar,
             socketId: socket.id,
@@ -87,18 +89,18 @@ module.exports = (io, socket) => {
 
         if (mode === 'random') {
             const opponent = Array.from(waitingPlayers.values()).find(p => 
-                p.userId !== socket.user._id.toString() && p.mode === 'random'
+                p.userId !== userId && p.mode === 'random'
             );
 
             if (opponent) {
-                createBattle(opponent, waitingPlayers.get(socket.id));
+                createBattle(opponent, waitingPlayers.get(userId));
             } else {
                 socket.emit('battle:searching');
                 setTimeout(() => {
-                    const me = waitingPlayers.get(socket.id);
-                    if (me && me.mode === 'random') {
+                    const me = waitingPlayers.get(userId);
+                    if (me && me.mode === 'random' && me.socketId === socket.id) {
                         socket.emit('battle:no_players', { message: 'Quick match timed out. Try browsing for players instead.' });
-                        waitingPlayers.delete(socket.id);
+                        waitingPlayers.delete(userId);
                         broadcastLobbyUpdate();
                     }
                 }, 40000);
@@ -109,32 +111,35 @@ module.exports = (io, socket) => {
 
     // --- Direct Challenges ---
     socket.on('battle:challenge_player', (data) => {
-        const { targetSocketId, topic } = data;
-        const challenger = waitingPlayers.get(socket.id);
-        const target = waitingPlayers.get(targetSocketId);
+        const { targetUserId, topic } = data;
+        const challenger = waitingPlayers.get(socket.user._id.toString());
+        const target = waitingPlayers.get(targetUserId);
 
-        if (!target) return socket.emit('error', { message: 'Target left the sector.' });
+        if (!target) return socket.emit('error', { message: 'Target is no longer in the lobby.' });
         if (target.userId === challenger.userId) return socket.emit('error', { message: "Internal Error: Cannot duel yourself." });
 
-        console.log(`⚔️ [BATTLE] Challenge: ${challenger.nickname || challenger.name} -> ${target.nickname || target.name} (Socket: ${targetSocketId})`);
-        io.to(targetSocketId).emit('battle:incoming_challenge', {
+        console.log(`⚔️ [BATTLE] Challenge: ${challenger.name} -> ${target.name}`);
+        io.to(target.socketId).emit('battle:incoming_challenge', {
             challengerName: challenger.name,
-            challengerSocketId: socket.id,
+            challengerUserId: challenger.userId,
             topic: topic || 'General'
         });
     });
 
     socket.on('battle:respond_challenge', (data) => {
-        const { challengerSocketId, accept, topic } = data;
-        const challenger = waitingPlayers.get(challengerSocketId);
-        const target = waitingPlayers.get(socket.id);
+        const { challengerUserId, accept, topic } = data;
+        const challenger = waitingPlayers.get(challengerUserId);
+        const target = waitingPlayers.get(socket.user._id.toString());
 
-        if (!challenger || !target) return;
+        if (!challenger) {
+            return socket.emit('error', { message: 'Challenger has left the arena.' });
+        }
+        if (!target) return;
 
         if (accept) {
             createBattle(challenger, target, topic);
         } else {
-            io.to(challengerSocketId).emit('battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
+            io.to(challenger.socketId).emit('battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
         }
     });
 
@@ -241,15 +246,15 @@ module.exports = (io, socket) => {
     });
 
     const handlePlayerExit = async () => {
-        const player = waitingPlayers.get(socket.id);
-        waitingPlayers.delete(socket.id);
+        const userId = socket.user._id.toString();
+        waitingPlayers.delete(userId);
         broadcastLobbyUpdate();
 
         // Check if player was in an active battle
         try {
             const activeBattle = await Battle.findOne({
                 status: 'active',
-                'players.socketId': socket.id
+                'players.userId': userId
             }).populate('quizId');
 
             if (activeBattle) {

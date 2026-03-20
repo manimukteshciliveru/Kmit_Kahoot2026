@@ -123,14 +123,18 @@ const BattleArena = () => {
         }
     };
 
-    const handleChallenge = (targetSocketId, targetUserId) => {
+    const handleChallenge = (targetUserId) => {
         if (targetUserId === user._id) return toast.error("Self-duel is prohibited.");
+        if (!selectedCategory || !selectedSubTopic) {
+            toast.error('Select a specific sub-topic first!', { id: 'topic-err' });
+            return;
+        }
         const fullTopic = `${selectedCategory}: ${selectedSubTopic}`;
         if (socket) {
-            console.log('⚔️ [ARENA] Sending challenge to:', targetSocketId, 'Topic:', fullTopic);
-            socket.emit('battle:challenge_player', { targetSocketId, topic: fullTopic });
+            console.log('⚔️ [ARENA] Sending challenge to UserId:', targetUserId, 'Topic:', fullTopic);
+            socket.emit('battle:challenge_player', { targetUserId, topic: fullTopic });
+            toast.success('Challenge dispatched!', { icon: '📨' });
         }
-        toast.success(`Challenging for ${selectedSubTopic}...`);
     };
 
     const getRankBadge = (tier) => {
@@ -316,7 +320,7 @@ const BattleArena = () => {
                                         <span className="player-rank">{p.rank?.tier || 'Bronze'} {p.rank?.level || 1}</span>
                                     </div>
                                     {p.userId !== user._id && (
-                                        <button className="challenge-btn" onClick={() => handleChallenge(p.socketId, p.userId)}>
+                                        <button className="challenge-btn" onClick={() => handleChallenge(p.userId)}>
                                             Challenge
                                         </button>
                                     )}
@@ -344,7 +348,8 @@ const BattleArena = () => {
                         <div className="challenge-actions">
                             <button className="accept-btn" onClick={() => {
                                 if (socket) {
-                                    socket.emit('battle:respond_challenge', { challengerSocketId: incomingChallenge.challengerSocketId, accept: true, topic: incomingChallenge.topic });
+                                    socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic });
+                                    setIncomingChallenge(null);
                                 }
                             }}>Accept</button>
                             <button className="reject-btn" onClick={() => setIncomingChallenge(null)}>Decline</button>
