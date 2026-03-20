@@ -303,7 +303,7 @@ const BattleArena = () => {
                                 <div key={p.socketId} className={`lobby-player-card ${p.userId === user._id ? 'self' : ''}`}>
                                     <div className="player-avatar-wrapper">
                                         <img src={p.avatar} alt={p.name} />
-                                        <div className={`rank-dot ${p.rank.tier.toLowerCase()}`}></div>
+                                        <div className={`rank-dot ${p.rank?.tier?.toLowerCase() || 'bronze'}`}></div>
                                     </div>
                                     <div className="player-info">
                                         <h4>{p.name} {p.userId === user._id ? '(You)' : ''}</h4>

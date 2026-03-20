@@ -102,7 +102,7 @@ module.exports = (io) => {
             }
 
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            const user = await User.findById(decoded.id).select('name role avatar isActive department section rollNumber');
+            const user = await User.findById(decoded.id).select('name role avatar isActive department section rollNumber rank');
 
             if (!user || !user.isActive) {
                 logger.warn(`🚫 [SOCKET] Connection rejected: User invalid or inactive (${decoded.id})`);
