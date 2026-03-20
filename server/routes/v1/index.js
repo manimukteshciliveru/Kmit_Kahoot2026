@@ -9,6 +9,7 @@ const aiRoutes = require('../ai');
 const userRoutes = require('../user');
 const adminRoutes = require('../admin');
 const flashcardRoutes = require('../flashcard');
+const battleRoutes = require('../battle');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -18,5 +19,6 @@ router.use('/ai', aiRoutes);
 router.use('/users', userRoutes);
 router.use('/admin', adminRoutes);
 router.use('/flashcards', flashcardRoutes);
+router.use('/battle', battleRoutes);
 
 module.exports = router;

@@ -3,6 +3,7 @@ const Quiz = require('../models/Quiz');
 const User = require('../models/User');
 const logger = require('../utils/logger');
 const { calculateScore } = require('../utils/calculateScore');
+const rankManager = require('../utils/rankManager');
 
 // Matchmaking State
 let waitingPlayers = new Map();
@@ -180,14 +181,65 @@ module.exports = (io, socket) => {
             if (battle.players.every(p => p.answers.length === battle.quizId.questions.length)) {
                 battle.status = 'completed';
                 const [p1, p2] = battle.players;
-                if (p1.score > p2.score) battle.winner = p1.userId;
-                else if (p2.score > p1.score) battle.winner = p2.userId;
+                let winner, loser;
+
+                if (p1.score > p2.score) { winner = p1; loser = p2; }
+                else if (p2.score > p1.score) { winner = p2; loser = p1; }
+                else { winner = null; loser = null; } // Tie
+
+                battle.winner = winner ? winner.userId : null;
                 await battle.save();
+
+                // --- RANK & PROGRESS UPDATE ---
+                if (winner && loser) {
+                    const winnerDoc = await User.findById(winner.userId);
+                    const loserDoc = await User.findById(loser.userId);
+
+                    if (winnerDoc && loserDoc) {
+                        const winPoints = rankManager.calculateMatchReward(true, { steak: winnerDoc.rank.winStreak + 1 });
+                        const lossPoints = rankManager.calculateMatchReward(false);
+
+                        // Update Winner
+                        winnerDoc.rank.points += winPoints;
+                        winnerDoc.rank.winStreak += 1;
+                        winnerDoc.rank.totalWins += 1;
+                        const wInfo = rankManager.getRankInfo(winnerDoc.rank.points);
+                        winnerDoc.rank.tier = wInfo.tier;
+                        winnerDoc.rank.level = wInfo.level;
+                        await winnerDoc.save();
+
+                        // Update Loser
+                        loserDoc.rank.points = Math.max(0, loserDoc.rank.points + lossPoints);
+                        loserDoc.rank.winStreak = 0;
+                        loserDoc.rank.totalLosses += 1;
+                        const lInfo = rankManager.getRankInfo(loserDoc.rank.points);
+                        loserDoc.rank.tier = lInfo.tier;
+                        loserDoc.rank.level = lInfo.level;
+                        await loserDoc.save();
+
+                        // Notify individual players of rank changes
+                        io.to(winner.socketId).emit('battle:rank_update', { 
+                            change: winPoints, 
+                            rank: winnerDoc.rank 
+                        });
+                        io.to(loser.socketId).emit('battle:rank_update', { 
+                            change: lossPoints, 
+                            rank: loserDoc.rank 
+                        });
+                    }
+                }
+
                 io.to(battle.roomID).emit('battle:ended', {
                     winnerId: battle.winner,
-                    finalScores: battle.players.map(p => ({ name: p.name, score: p.score }))
+                    finalScores: battle.players.map(p => ({ 
+                        name: p.name, 
+                        score: p.score,
+                        userId: p.userId
+                    }))
                 });
-            } else await battle.save();
+            } else {
+                await battle.save();
+            }
         } catch (err) { logger.error('Battle Logic Error:', err); }
     });
 

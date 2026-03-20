@@ -2,19 +2,20 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { toast } from 'react-hot-toast';
-import { FiZap, FiUser, FiActivity, FiX, FiInfo, FiAward, FiGlobe, FiUsers, FiCheck, FiSlash, FiFilter, FiBookOpen, FiClock } from 'react-icons/fi';
+import { FiZap, FiUser, FiActivity, FiX, FiInfo, FiAward, FiGlobe, FiUsers, FiCheck, FiSlash, FiFilter, FiBookOpen, FiClock, FiTrendingUp } from 'react-icons/fi';
 import './BattleArena.css';
 
 const BattleArena = () => {
     const { user } = useAuth();
     const { socket, connected, on, emit } = useSocket();
     
-    const [mode, setMode] = useState('selection'); // selection, searching, lobby, voting, fighting, result
+    const [mode, setMode] = useState('selection'); // selection, searching, lobby, voting, fighting, waiting_finish, result
     const [battleData, setBattleData] = useState(null);
     const [opponentData, setOpponentData] = useState({ score: 0, progress: 0 });
     const [currentIndex, setCurrentIndex] = useState(0);
     const [myScore, setMyScore] = useState(0);
     const [results, setResults] = useState(null);
+    const [rankUpdate, setRankUpdate] = useState(null);
     const [questionStartTime, setQuestionStartTime] = useState(null);
     const [timeLeft, setTimeLeft] = useState(0);
     const timerInterval = useRef(null);
@@ -42,6 +43,7 @@ const BattleArena = () => {
             setOpponentData({ score: 0, progress: 0 });
             setIncomingChallenge(null);
             setVotingData(null);
+            setRankUpdate(null);
             startQuestion(0, data.quiz.questions, data.quiz.settings);
             toast.success('Battle Starts Now!');
         });
@@ -57,6 +59,10 @@ const BattleArena = () => {
             });
         });
 
+        on('battle:rank_update', (data) => {
+            setRankUpdate(data);
+        });
+
         on('battle:ended', (data) => {
             clearInterval(timerInterval.current);
             setResults(data);
@@ -70,7 +76,6 @@ const BattleArena = () => {
         });
         
         on('battle:lobby_update', (lobby) => {
-            // Filter out self and handle 'You' indicator for current player in list if needed
             setLobbyPlayers(lobby);
         });
 
@@ -160,14 +165,8 @@ const BattleArena = () => {
     };
 
     const handleChallenge = (targetSocketId, targetUserId) => {
-        if (targetUserId === user._id) {
-            toast.error("You can't challenge yourself!");
-            return;
-        }
-        if (!selectedTopic) {
-            toast.error('Choose a topic first!');
-            return;
-        }
+        if (targetUserId === user._id) return toast.error("Self-duel is prohibited.");
+        if (!selectedTopic) return toast.error('Choose a topic first!');
         emit('battle:challenge_player', { targetSocketId, topic: selectedTopic });
         toast.success(`Invitation sent!`);
     };
@@ -190,6 +189,14 @@ const BattleArena = () => {
             topic: incomingChallenge.topic
         });
         if (!accept) setIncomingChallenge(null);
+    };
+
+    const getRankBadge = (tier) => {
+        const colors = {
+            'Bronze': '#CD7F32', 'Silver': '#C0C0C0', 'Gold': '#FFD700',
+            'Platinum': '#E5E4E2', 'Diamond': '#B9F2FF', 'Heroic': '#FF4B2B', 'Grandmaster': '#800080'
+        };
+        return colors[tier] || '#fff';
     };
 
     if (!connected) return <div className="battle-error">Connecting to Arena Server...</div>;
@@ -215,6 +222,16 @@ const BattleArena = () => {
                             <FiUsers className="m-icon" />
                             <h3>Browse Players</h3>
                             <span>Choose your opponent</span>
+                        </div>
+                    </div>
+
+                    <div className="arena-user-rank">
+                        <div className="rank-summary-card">
+                            <FiAward className="r-icon" style={{color: getRankBadge(user.rank?.tier)}} />
+                            <div className="r-details">
+                                <h3>{user.rank?.tier || 'Bronze'} {user.rank?.level || 'III'}</h3>
+                                <span>{user.rank?.points || 0} Points</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -254,10 +271,13 @@ const BattleArena = () => {
                         ) : (
                             lobbyPlayers.map(p => (
                                 <div key={p.socketId} className={`p-card ${p.userId === user._id ? 'is-me' : ''}`}>
-                                    <img src={p.avatar || `https://ui-avatars.com/api/?name=${p.name}`} alt={p.name} />
+                                    <div className="p-avatar-box">
+                                        <img src={p.avatar || `https://ui-avatars.com/api/?name=${p.name}`} alt={p.name} />
+                                        <div className="rank-dot" style={{background: getRankBadge(p.rank?.tier)}} />
+                                    </div>
                                     <div className="p-info">
                                         <h4>{p.name} {p.userId === user._id && '(You)'}</h4>
-                                        <span className="p-status">Ready to Fight</span>
+                                        <span className="p-rank-label">{p.rank?.tier || 'Bronze'} {p.rank?.level || 'III'}</span>
                                     </div>
                                     {p.userId !== user._id ? (
                                         <button className="btn-challenge-sm" onClick={() => handleChallenge(p.socketId, p.userId)}>Challenge</button>
@@ -267,35 +287,6 @@ const BattleArena = () => {
                                 </div>
                             ))
                         )}
-                    </div>
-                </div>
-            )}
-
-            {/* ── VOTING ── */}
-            {mode === 'voting' && votingData && (
-                <div className="topic-voting-overlay">
-                    <div className="voting-modal">
-                        <h2>Select Battle Topic</h2>
-                        <div className="vote-options-grid">
-                            {TOPICS.map(t => (
-                                <button key={t} className="vote-option-btn" onClick={() => submitVote(t, 'suggest')}>{t}</button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── CHALLENGE MODAL ── */}
-            {incomingChallenge && mode !== 'fighting' && (
-                <div className="challenge-popup-wrap">
-                    <div className="challenge-popup">
-                        <div className="c-pulse"></div>
-                        <h3>Challenge Received!</h3>
-                        <p><strong>{incomingChallenge.challengerName}</strong> wants to battle in <strong>{incomingChallenge.topic}</strong></p>
-                        <div className="c-actions">
-                            <button className="btn-c-accept" onClick={() => respondToChallenge(true)}>Fight</button>
-                            <button className="btn-c-decline" onClick={() => respondToChallenge(false)}>Decline</button>
-                        </div>
                     </div>
                 </div>
             )}
@@ -354,7 +345,7 @@ const BattleArena = () => {
                     ) : (
                         <div className="waiting-finish-screen">
                             <div className="loader"></div>
-                            <h2>Waiting for opponent to finish...</h2>
+                            <h2>Waiting for opponent...</h2>
                             <p>Current Score: {myScore} pts</p>
                         </div>
                     )}
@@ -374,6 +365,26 @@ const BattleArena = () => {
                         <div className="defeat-splash">
                             <h1>DEFEAT</h1>
                             <p>{results.reason || "The battle is lost, but the war continues."}</p>
+                        </div>
+                    )}
+
+                    {rankUpdate && (
+                        <div className="rank-progression-card">
+                            <div className="prog-header">
+                                <FiAward style={{color: getRankBadge(rankUpdate.rank.tier)}} />
+                                <h3>{rankUpdate.rank.tier} {rankUpdate.rank.level}</h3>
+                                <span className={rankUpdate.change >= 0 ? 'pos' : 'neg'}>
+                                    {rankUpdate.change >= 0 ? `+${rankUpdate.change}` : rankUpdate.change} RP
+                                </span>
+                            </div>
+                            <div className="prog-bar-container">
+                                <div className="prog-fill" style={{width: `${rankUpdate.rank.points % 100}%`}}></div>
+                            </div>
+                            {rankUpdate.rank.winStreak > 1 && (
+                                <div className="win-streak-badge">
+                                    <FiTrendingUp /> {rankUpdate.rank.winStreak} Match Win Streak!
+                                </div>
+                            )}
                         </div>
                     )}
                     
