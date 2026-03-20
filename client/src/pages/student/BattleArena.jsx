@@ -501,12 +501,12 @@ const BattleArena = () => {
             {view === 'lobby' && (
                 <div className="lobby-v2 animate-slide-up">
                     <div className="lobby-head glass">
-                        <div className="flex items-center gap-4">
-                            <LuUsers className="text-4xl text-blue-400" />
-                            <div>
-                                <h2>Battle Registry</h2>
-                                <p>Select your opponent to begin the duel</p>
-                            </div>
+                        <div className="flex flex-col gap-1">
+                            <h2 className="flex items-center gap-3 m-0 text-2xl">
+                                <LuUsers className="text-3xl text-blue-400" />
+                                Battle Registry
+                            </h2>
+                            <p className="text-slate-400 m-0 text-sm">Select your opponent to begin the duel</p>
                         </div>
                     </div>
                     <div className="lobby-grid p-4">
