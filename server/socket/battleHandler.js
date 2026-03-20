@@ -4,97 +4,168 @@ const User = require('../models/User');
 const logger = require('../utils/logger');
 const { calculateScore } = require('../utils/calculateScore');
 
-// Matchmaking Queue
-let waitingPlayers = [];
+// Matchmaking State
+// waitingPlayers is a map of socketId -> player info
+let waitingPlayers = new Map();
 
 module.exports = (io, socket) => {
     
-    // --- 1. Find a Match ---
-    socket.on('battle:find_match', async (data) => {
-        const userId = socket.user._id.toString();
+    // Helper to get all waiting players (for "Choose" mode)
+    const broadcastLobbyUpdate = () => {
+        const lobby = Array.from(waitingPlayers.values()).map(p => ({
+            userId: p.userId,
+            name: p.name,
+            avatar: p.avatar,
+            socketId: p.socketId,
+            mode: p.mode
+        }));
+        io.emit('battle:lobby_update', lobby);
+    };
+
+    // Helper to start a battle between two players
+    const createBattle = async (p1, p2) => {
+        const roomID = `battle_${Date.now()}_${p1.userId}`;
         
-        // Prevent double queuing
-        if (waitingPlayers.find(p => p.userId === userId)) return;
+        let randomQuiz = await Quiz.findOne({ isPublic: true, status: 'live' }).select('_id title questions settings');
+        if (!randomQuiz) {
+            randomQuiz = await Quiz.findOne({ 
+                status: { $ne: 'draft' },
+                'questions.0': { $exists: true } 
+            }).select('_id title questions settings');
+        }
 
-        logger.info(`🔍 [BATTLE] ${socket.user.name} looking for match...`);
+        if (!randomQuiz) {
+            io.to(p1.socketId).emit('error', { message: 'No play-ready quizzes found.' });
+            io.to(p2.socketId).emit('error', { message: 'No play-ready quizzes found.' });
+            return null;
+        }
 
-        if (waitingPlayers.length > 0) {
-            // Found an opponent!
-            const opponent = waitingPlayers.shift();
-            
-            // Create a unique Battle Room
-            const roomID = `battle_${Date.now()}_${userId}`;
-            
-            // Pick a random public quiz for the battle (or a specific topic if requested)
-            let randomQuiz = await Quiz.findOne({ isPublic: true }).select('_id title questions settings');
-            
-            // Fallback: If no public quizzes, pick ANY quiz (excluding drafts if possible)
-            if (!randomQuiz) {
-                logger.info('⚠️ [BATTLE] No public quizzes found, falling back to any available quiz');
-                randomQuiz = await Quiz.findOne({ 
-                    status: { $ne: 'draft' },
-                    'questions.0': { $exists: true } 
-                }).select('_id title questions settings');
+        const newBattle = new Battle({
+            roomID,
+            quizId: randomQuiz._id,
+            players: [
+                { userId: p1.userId, name: p1.name, socketId: p1.socketId },
+                { userId: p2.userId, name: p2.name, socketId: p2.socketId }
+            ],
+            status: 'active'
+        });
+
+        await newBattle.save();
+
+        // Join both sockets to room
+        const s1 = io.sockets.sockets.get(p1.socketId);
+        const s2 = io.sockets.sockets.get(p2.socketId);
+        if (s1) s1.join(roomID);
+        if (s2) s2.join(roomID);
+
+        // Remove from waiting map
+        waitingPlayers.delete(p1.socketId);
+        waitingPlayers.delete(p2.socketId);
+        broadcastLobbyUpdate();
+
+        io.to(roomID).emit('battle:started', {
+            battleId: newBattle._id,
+            roomID,
+            quiz: {
+                title: randomQuiz.title,
+                questions: randomQuiz.questions,
+                settings: randomQuiz.settings
+            },
+            players: newBattle.players
+        });
+
+        logger.info(`⚔️ [BATTLE] Match started: ${p1.name} vs ${p2.name}`);
+        return newBattle;
+    };
+
+    // --- 1. Enter Lobby ---
+    socket.on('battle:enter_lobby', (data) => {
+        const mode = data?.mode || 'random'; // 'random' or 'choose'
+        
+        waitingPlayers.set(socket.id, {
+            userId: socket.user._id.toString(),
+            name: socket.user.name,
+            avatar: socket.user.avatar,
+            socketId: socket.id,
+            mode: mode,
+            joinedAt: Date.now()
+        });
+
+        logger.info(`👤 [BATTLE] ${socket.user.name} entered lobby (${mode})`);
+        
+        if (mode === 'random') {
+            // Try to find another random player
+            const opponent = Array.from(waitingPlayers.values()).find(p => 
+                p.socketId !== socket.id && p.mode === 'random'
+            );
+
+            if (opponent) {
+                createBattle(opponent, waitingPlayers.get(socket.id));
+            } else {
+                socket.emit('battle:searching');
+                // Set a timeout: if no one joins in 30s, notify
+                setTimeout(() => {
+                    const stillWaiting = waitingPlayers.get(socket.id);
+                    if (stillWaiting && stillWaiting.mode === 'random') {
+                        socket.emit('battle:no_players', { message: 'No other players online right now. Try again later!' });
+                    }
+                }, 30000);
             }
+        }
+        
+        broadcastLobbyUpdate();
+    });
 
-            if (!randomQuiz) {
-                logger.error('❌ [BATTLE] Matching failed: No quizzes found in system');
-                socket.emit('error', { message: 'No play-ready quizzes available in the system yet.' });
-                opponentSocket.emit('error', { message: 'Matchmaking aborted: No play-ready quizzes found.' });
-                return;
-            }
+    // --- 2. Challenge Student ---
+    socket.on('battle:challenge_player', (data) => {
+        const targetSocketId = data.targetSocketId;
+        const targetPlayer = waitingPlayers.get(targetSocketId);
+        const challenger = waitingPlayers.get(socket.id);
 
-            const newBattle = new Battle({
-                roomID,
-                quizId: randomQuiz._id,
-                players: [
-                    { userId: opponent.userId, name: opponent.name, socketId: opponent.socketId },
-                    { userId: userId, name: socket.user.name, socketId: socket.id }
-                ],
-                status: 'active'
-            });
+        if (!targetPlayer || !challenger) {
+            return socket.emit('error', { message: 'Player is no longer available.' });
+        }
 
-            await newBattle.save();
+        logger.info(`💌 [BATTLE] ${challenger.name} challenged ${targetPlayer.name}`);
 
-            // Join both sockets to the room
-            const opponentSocket = io.sockets.sockets.get(opponent.socketId);
-            if (opponentSocket) opponentSocket.join(roomID);
-            socket.join(roomID);
+        io.to(targetSocketId).emit('battle:incoming_challenge', {
+            challengerId: challenger.userId,
+            challengerName: challenger.name,
+            challengerSocketId: socket.id
+        });
+    });
 
-            // Notify both players
-            io.to(roomID).emit('battle:started', {
-                battleId: newBattle._id,
-                roomID,
-                quiz: {
-                    title: randomQuiz.title,
-                    questions: randomQuiz.questions,
-                    settings: randomQuiz.settings
-                },
-                players: newBattle.players
-            });
+    // --- 3. Accept/Reject Challenge ---
+    socket.on('battle:respond_challenge', (data) => {
+        const { challengerSocketId, accept } = data;
+        const challenger = waitingPlayers.get(challengerSocketId);
+        const target = waitingPlayers.get(socket.id);
 
-            logger.info(`⚔️ [BATTLE] Match started: ${opponent.name} vs ${socket.user.name}`);
+        if (!challenger || !target) {
+            if (accept) socket.emit('error', { message: 'Challenger left the lobby.' });
+            return;
+        }
+
+        if (accept) {
+            createBattle(challenger, target);
         } else {
-            // Add to queue
-            waitingPlayers.push({
-                userId,
-                name: socket.user.name,
-                socketId: socket.id
+            logger.info(`❌ [BATTLE] ${target.name} rejected ${challenger.name}`);
+            io.to(challengerSocketId).emit('battle:challenge_rejected', {
+                message: 'Invitation rejected'
             });
-            socket.emit('battle:searching', { message: 'Searching for opponent...' });
         }
     });
 
-    // --- 2. Leave Queue ---
+    // --- 4. Leave Lobby ---
     socket.on('battle:leave_queue', () => {
-        waitingPlayers = waitingPlayers.filter(p => p.socketId !== socket.id);
+        waitingPlayers.delete(socket.id);
+        broadcastLobbyUpdate();
         socket.emit('battle:cancelled');
     });
 
-    // --- 3. Submit Answer in Battle ---
+    // --- 5. Submit Answer ---
     socket.on('battle:submit_answer', async (data) => {
         const { battleId, questionIndex, answer, timeTaken } = data;
-        
         try {
             const battle = await Battle.findById(battleId).populate('quizId');
             if (!battle || battle.status !== 'active') return;
@@ -110,7 +181,6 @@ module.exports = (io, socket) => {
             player.score += scoreAwarded;
             player.answers.push({ questionIndex, isCorrect, timeSpent: timeTaken });
 
-            // Send real-time update to opponent
             if (opponent.socketId) {
                 io.to(opponent.socketId).emit('battle:opponent_update', {
                     opponentScore: player.score,
@@ -119,19 +189,14 @@ module.exports = (io, socket) => {
                 });
             }
 
-            // Check if both finished this question or all questions
-            const totalQuestions = battle.quizId.questions.length;
-            const everyoneFinished = battle.players.every(p => p.answers.length === totalQuestions);
+            const totalQs = battle.quizId.questions.length;
+            const finished = battle.players.every(p => p.answers.length === totalQs);
 
-            if (everyoneFinished) {
+            if (finished) {
                 battle.status = 'completed';
-                // Determine winner
-                const p1 = battle.players[0];
-                const p2 = battle.players[1];
-                
+                const [p1, p2] = battle.players;
                 if (p1.score > p2.score) battle.winner = p1.userId;
                 else if (p2.score > p1.score) battle.winner = p2.userId;
-
                 await battle.save();
 
                 io.to(battle.roomID).emit('battle:ended', {
@@ -141,36 +206,31 @@ module.exports = (io, socket) => {
             } else {
                 await battle.save();
             }
-
-        } catch (err) {
-            logger.error('[BATTLE] Submit Error:', err);
-        }
+        } catch (err) { logger.error('[BATTLE] Submit Error:', err); }
     });
 
-    // --- 4. Anti-Cheat: Forfeit on Tab Switch ---
+    // --- 6. Anti-Cheat ---
     socket.on('battle:tab_switch', async (data) => {
         const { battleId } = data;
         const battle = await Battle.findById(battleId);
         if (!battle || battle.status !== 'active') return;
 
-        const loser = battle.players.find(p => p.userId.toString() === socket.user._id.toString());
         const winner = battle.players.find(p => p.userId.toString() !== socket.user._id.toString());
-
         battle.status = 'completed';
         battle.winner = winner.userId;
         await battle.save();
 
         io.to(battle.roomID).emit('battle:ended', {
             winnerId: winner.userId,
-            reason: 'Opponent disqualified for cheating (tab switch)',
+            reason: 'Opponent disqualified for switching tabs',
             finalScores: battle.players.map(p => ({ name: p.name, score: p.score }))
         });
-        
-        logger.warn(`🚫 [BATTLE] ${socket.user.name} forfeited due to tab switch`);
     });
 
-    // Handle Clean disconnect
     socket.on('disconnect', () => {
-        waitingPlayers = waitingPlayers.filter(p => p.socketId !== socket.id);
+        if (waitingPlayers.has(socket.id)) {
+            waitingPlayers.delete(socket.id);
+            broadcastLobbyUpdate();
+        }
     });
 };
