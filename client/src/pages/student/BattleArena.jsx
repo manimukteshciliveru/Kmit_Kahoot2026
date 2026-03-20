@@ -53,6 +53,11 @@ const BattleArena = () => {
             setOpponentData(prev => ({ ...prev, score: data.opponentScore, status: 'answered' }));
         });
         socket.on('battle:rank_update', setRankUpdate);
+        socket.on('battle:opponent_left', (data) => {
+            toast.success(data.message, { icon: '🏆', duration: 5000 });
+            clearInterval(timerRef.current);
+            setView('selection');
+        });
         socket.on('battle:ended', (data) => {
             clearInterval(timerRef.current);
             setView('results');

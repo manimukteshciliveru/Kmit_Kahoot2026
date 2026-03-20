@@ -240,8 +240,53 @@ module.exports = (io, socket) => {
         socket.emit('battle:cancelled');
     });
 
-    socket.on('disconnect', () => {
+    const handlePlayerExit = async () => {
+        const player = waitingPlayers.get(socket.id);
         waitingPlayers.delete(socket.id);
         broadcastLobbyUpdate();
-    });
+
+        // Check if player was in an active battle
+        try {
+            const activeBattle = await Battle.findOne({
+                status: 'active',
+                'players.socketId': socket.id
+            }).populate('quizId');
+
+            if (activeBattle) {
+                activeBattle.status = 'cancelled';
+                const opponent = activeBattle.players.find(p => p.socketId !== socket.id);
+                
+                if (opponent && opponent.socketId) {
+                    io.to(opponent.socketId).emit('battle:opponent_left', {
+                        message: 'Winner by forfeit! Your opponent has retreated.'
+                    });
+                    
+                    // Award minimum points to the remaining player
+                    const user = await User.findById(opponent.userId);
+                    if (user) {
+                        const winPoints = 15; // Flat forfeit reward
+                        user.rank.points += winPoints;
+                        user.rank.totalWins += 1;
+                        const rInfo = rankManager.getRankInfo(user.rank.points);
+                        user.rank.tier = rInfo.tier;
+                        user.rank.level = rInfo.level;
+                        await user.save();
+                        
+                        io.to(opponent.socketId).emit('battle:rank_update', {
+                            change: winPoints,
+                            rank: user.rank
+                        });
+                    }
+                }
+                await activeBattle.save();
+                io.to(activeBattle.roomID).emit('battle:ended', { status: 'cancelled' });
+            }
+        } catch (err) {
+            logger.error('Exit Logic Error:', err);
+        }
+    };
+
+    socket.on('battle:leave_battle', handlePlayerExit);
+
+    socket.on('disconnect', handlePlayerExit);
 };

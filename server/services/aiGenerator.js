@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const mammoth = require('mammoth');
 const officeparser = require('officeparser');
+const OpenAI = require('openai');
 const AILog = require('../models/AILog');
 const logger = require('../utils/logger'); // Use our new logger
 
@@ -23,6 +24,7 @@ class AIQuestionGenerator {
     constructor() {
         this.gemini = null;
         this.mistral = null;
+        this.openai = null;
         this.initialized = false;
         this.workingModelName = null;
     }
@@ -48,6 +50,16 @@ class AIQuestionGenerator {
                 logger.info('✅ AI Service: Mistral AI initialized');
             } catch (error) {
                 logger.error('❌ AI Service: Failed to initialize Mistral', error);
+            }
+        }
+
+        // Initialize OpenAI
+        if (process.env.OPENAI_API_KEY) {
+            try {
+                this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                logger.info('✅ AI Service: OpenAI initialized');
+            } catch (error) {
+                logger.error('❌ AI Service: Failed to initialize OpenAI', error);
             }
         }
 
@@ -188,20 +200,39 @@ class AIQuestionGenerator {
                 }
             }
 
-            // Attempt 2: Mistral AI (Fallback)
+            // Attempt 3: OpenAI (High Fidelity Fallback)
+            if (!responseText && this.openai) {
+                logger.info('AI Service: Falling back to OpenAI...');
+                const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
+                try {
+                    const response = await this.openai.chat.completions.create({
+                        model: "gpt-4o",
+                        messages: [
+                            { role: "system", content: "You are a professional quiz generator focused on high-quality technical content." },
+                            { role: "user", content: promptSystem + '\n' + textContent }
+                        ],
+                        response_format: { type: "json_object" }
+                    });
+                    const content = JSON.parse(response.choices[0].message.content);
+                    responseText = JSON.stringify(content.questions || content);
+                    providerUsed = 'openai';
+                    modelUsed = 'gpt-4o';
+                    logger.info('✅ AI Service: Success with OpenAI');
+                } catch (openaiError) {
+                    logger.error('❌ AI Service: OpenAI Failed', openaiError);
+                }
+            }
+
+            // Attempt 4: Mistral AI (Budget Fallback)
             if (!responseText && this.mistral) {
                 logger.info('AI Service: Falling back to Mistral...');
-                // Convert parts to string for Mistral (it doesn't handle multimodal arrays the same way)
-                // For this implementation, we assume text-only parts for Mistral fallback if possible
                 const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
-
                 try {
                     const chatResponse = await this.mistral.chat.complete({
                         model: MISTRAL_MODEL,
                         messages: [{ role: 'user', content: promptSystem + '\n' + textContent }],
                     });
-
-                    if (chatResponse && chatResponse.choices && chatResponse.choices[0] && chatResponse.choices[0].message) {
+                    if (chatResponse?.choices?.[0]?.message) {
                         responseText = chatResponse.choices[0].message.content;
                         providerUsed = 'mistral';
                         modelUsed = MISTRAL_MODEL;
@@ -212,7 +243,7 @@ class AIQuestionGenerator {
                 }
             }
 
-            // Attempt 3: Local Fallback (Last Resort)
+            // Attempt 5: Local Fallback (Last Resort)
             if (!responseText) {
                 throw new Error('All AI providers failed.');
             }
@@ -343,12 +374,13 @@ class AIQuestionGenerator {
         this.initialize();
 
         const promptSystem = `
-        You are an educational assistant. Generate exactly ${count} flashcard question-answer pairs for the topic: ${topic} in the subject of ${subject}.
+        You are an educational assistant. Generate exactly ${count} UNIQUE flashcard question-answer pairs for the topic: ${topic}.
         
         STRICT FORMATTING RULES:
         1. Return ONLY a valid JSON array of objects. No markdown, no 'json' code blocks.
         2. Format: [{"question":"Concise question here","answer":"Clear and short answer here"}]
-        3. Accuracy: High academic standards.
+        3. VARIETY: Ensure every flashcard covers a DIFFERENT sub-concept or aspect to avoid repetition.
+        4. Accuracy: High academic standards.
         `;
 
         const requestParts = [promptSystem];
@@ -357,13 +389,54 @@ class AIQuestionGenerator {
         let modelUsed = '';
 
         try {
+            // Attempt 1: Gemini
             if (this.gemini) {
-                const model = this.gemini.getGenerativeModel({ model: "gemini-2.0-flash" });
-                const result = await model.generateContent(requestParts);
-                const response = await result.response;
-                responseText = response.text();
-                providerUsed = 'google';
-                modelUsed = 'gemini-2.0-flash';
+                try {
+                    const model = this.gemini.getGenerativeModel({ model: "gemini-2.0-flash" });
+                    const result = await model.generateContent(requestParts);
+                    const response = await result.response;
+                    responseText = response.text();
+                    providerUsed = 'google';
+                    modelUsed = 'gemini-2.0-flash';
+                } catch (e) {
+                    logger.warn('Gemini Flashcard generation failed:', e.message);
+                }
+            }
+
+            // Attempt 2: OpenAI
+            if (!responseText && this.openai) {
+                try {
+                    const response = await this.openai.chat.completions.create({
+                        model: "gpt-4o",
+                        messages: [{ role: "user", content: promptSystem }],
+                        response_format: { type: "json_object" }
+                    });
+                    const content = JSON.parse(response.choices[0].message.content);
+                    responseText = JSON.stringify(content.flashcards || content);
+                    providerUsed = 'openai';
+                    modelUsed = 'gpt-4o';
+                } catch (e) {
+                    logger.warn('OpenAI Flashcard generation failed:', e.message);
+                }
+            }
+
+            // Attempt 3: Mistral
+            if (!responseText && this.mistral) {
+                try {
+                    logger.info('AI Service: Falling back to Mistral for flashcards...');
+                    const chatResponse = await this.mistral.chat.complete({
+                        model: MISTRAL_MODEL,
+                        messages: [{ role: 'user', content: promptSystem }],
+                    });
+                    if (chatResponse?.choices?.[0]?.message) {
+                        responseText = chatResponse.choices[0].message.content;
+                        providerUsed = 'mistral';
+                        modelUsed = MISTRAL_MODEL;
+                        logger.info('✅ AI Service: Success with Mistral');
+                    }
+                } catch (e) {
+                    logger.warn('Mistral Flashcard generation failed:', e.message);
+                }
             }
 
             if (!responseText) throw new Error('AI providers failed to generate flashcards.');
@@ -373,17 +446,22 @@ class AIQuestionGenerator {
             const toParse = jsonMatch ? jsonMatch[0] : cleanJson;
             const flashcards = JSON.parse(toParse);
 
+            const finalFlashcards = Array.isArray(flashcards.flashcards) ? flashcards.flashcards : flashcards;
+
             this.logUsage(userId, providerUsed, modelUsed, promptSystem.length, responseText.length, 'success');
-            return flashcards;
+            return finalFlashcards;
 
         } catch (error) {
             logger.error('Flashcard Generation Error:', error);
-            // Minimal fallback - generate enough for a good session
-            const fallbackCount = Math.min(count, 10);
-            return Array.from({ length: fallbackCount }, (_, i) => ({
-                question: `Concept ${i + 1}: ${topic}`,
-                answer: `Study more about this concept in the context of ${subject}. [AI Service is currently over capacity, using fallback items]`
-            }));
+            // Enhanced fallback - actually try to provide some topic-specific questions even in fallback
+            const fallbackCount = Math.min(count, 5);
+            return [
+                { question: `What is the core definition of ${topic}?`, answer: `Definition: ${topic} is a significant concept in ${subject || 'this field'}. [AI capacity reached]` },
+                { question: `How is ${topic} typically applied?`, answer: `Applications vary based on use cases within ${subject || 'the curriculum'}. [AI temporary fallback]` },
+                { question: `Summarize the main advantage of ${topic}.`, answer: `It provides specialized functionality for ${subject || 'targeted tasks'}. [AI temporary fallback]` },
+                { question: `Identify one key limitation of ${topic}.`, answer: `Complexity and resource requirements are common constraints. [AI temporary fallback]` },
+                { question: `Where can I find more technical info on ${topic}?`, answer: `Refer to official documentation and academic resources for ${subject}. [Service over capacity]` }
+            ].slice(0, fallbackCount);
         }
     }
 
