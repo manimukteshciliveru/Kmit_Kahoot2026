@@ -366,10 +366,11 @@ const BattleArena = () => {
                             
                             <div className="flex items-center gap-4">
                                 <button 
-                                    className={`btn-secondary btn-sm border border-slate-600 transition-colors ${showLevelMap ? 'bg-indigo-600 text-white border-indigo-500' : ''}`}
+                                    className={`btn-roadmap-toggle ${showLevelMap ? 'active' : ''}`}
                                     onClick={() => setShowLevelMap(!showLevelMap)}
                                 >
-                                    <LuTrophy /> Map
+                                    <LuTrophy className="icon" />
+                                    <span>Level Map</span>
                                 </button>
                                 <div className="streak-badge animate-glow">
                                     <LuFlame /> {user.rank?.winStreak || 0} Streak
