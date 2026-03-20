@@ -128,14 +128,15 @@ const BattleArena = () => {
     };
 
     const getRankBadge = (tier) => {
-        switch(tier) {
-            case 'Bronze': return <LuShieldCheck style={{color: '#cd7f32'}} />;
-            case 'Silver': return <LuShieldCheck style={{color: '#c0c0c0'}} />;
-            case 'Gold': return <LuCrown style={{color: '#ffd700'}} />;
-            case 'Platinum': return <LuZap style={{color: '#e5e4e2'}} />;
-            case 'Diamond': return <LuTarget style={{color: '#b9f2ff'}} />;
-            case 'Heroic': return <LuSkull style={{color: '#ff4d4d'}} />;
-            case 'Grandmaster': return <LuCrown style={{color: '#ff00ff'}} />;
+        const t = tier?.toLowerCase();
+        switch(t) {
+            case 'bronze': return <LuShieldCheck style={{color: '#cd7f32'}} />;
+            case 'silver': return <LuShieldCheck style={{color: '#c0c0c0'}} />;
+            case 'gold': return <LuCrown style={{color: '#ffd700'}} />;
+            case 'platinum': return <LuZap style={{color: '#e5e4e2'}} />;
+            case 'diamond': return <LuTarget style={{color: '#b9f2ff'}} />;
+            case 'heroic': return <LuSkull style={{color: '#ff4d4d'}} />;
+            case 'grandmaster': return <LuCrown style={{color: '#ff00ff'}} />;
             default: return <LuTrophy />;
         }
     };
@@ -206,11 +207,11 @@ const BattleArena = () => {
                         
                         <div className="hero-stats-card">
                             <div className="rank-summary">
-                                <span className={`rank-badge ${user.rank.tier.toLowerCase()}`}>
-                                    {getRankBadge(user.rank.tier)} {user.rank.tier} {user.rank.level}
+                                <span className={`rank-badge ${user.rank?.tier?.toLowerCase() || 'bronze'}`}>
+                                    {getRankBadge(user.rank?.tier)} {user.rank?.tier || 'Bronze'} {user.rank?.level || 1}
                                 </span>
                                 <div className="points-display">
-                                    <LuTrophy /> {user.rank.points} RP
+                                    <LuTrophy /> {user.rank?.points || 0} RP
                                 </div>
                             </div>
                         </div>
@@ -306,7 +307,7 @@ const BattleArena = () => {
                                     </div>
                                     <div className="player-info">
                                         <h4>{p.name} {p.userId === user._id ? '(You)' : ''}</h4>
-                                        <span className="player-rank">{p.rank.tier} {p.rank.level}</span>
+                                        <span className="player-rank">{p.rank?.tier || 'Bronze'} {p.rank?.level || 1}</span>
                                     </div>
                                     {p.userId !== user._id && (
                                         <button className="challenge-btn" onClick={() => handleChallenge(p.socketId, p.userId)}>

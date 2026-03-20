@@ -81,7 +81,7 @@ module.exports = (io, socket) => {
             avatar: socket.user.avatar,
             socketId: socket.id,
             mode: mode,
-            rank: socket.user.rank,
+            rank: socket.user.rank || { tier: 'Bronze', level: 1, points: 0 },
             joinedAt: Date.now()
         });
 

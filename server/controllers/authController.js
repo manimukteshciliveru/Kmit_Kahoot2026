@@ -42,7 +42,8 @@ const sendTokenResponse = async (user, statusCode, res) => {
                     email: user.email,
                     role: user.role,
                     avatar: user.avatar,
-                    stats: user.stats
+                    stats: user.stats,
+                    rank: user.rank
                 },
                 token: accessToken, // Access token returned for memory storage
                 refreshToken: refreshToken // Also return in body for localStorage storage
@@ -286,6 +287,7 @@ exports.getMe = async (req, res) => {
                     section: user.section,
                     avatar: user.avatar,
                     stats: user.stats,
+                    rank: user.rank,
                     isActive: user.isActive,
                     createdAt: user.createdAt,
                     lastLogin: user.lastLogin
@@ -337,7 +339,8 @@ exports.updateProfile = async (req, res) => {
                     department: user.department,
                     section: user.section,
                     avatar: user.avatar,
-                    stats: user.stats
+                    stats: user.stats,
+                    rank: user.rank
                 }
             }
         });
@@ -443,7 +446,8 @@ exports.refreshToken = async (req, res) => {
                     email: user.email,
                     role: user.role,
                     avatar: user.avatar,
-                    stats: user.stats
+                    stats: user.stats,
+                    rank: user.rank
                 }
             }
         });
