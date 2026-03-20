@@ -139,37 +139,37 @@
 }
 
 .selector-wrapper {
-    background: var(--bg-secondary);
-    border: 2px solid var(--border);
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
     padding: 0 15px;
     transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(15px);
 }
 
 .selector-wrapper:hover {
-    border-color: var(--accent);
+    border-color: #ffffff;
     transform: translateY(-2px);
-    box-shadow: var(--shadow-glow);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
-.selector-icon { color: var(--accent); font-size: 1.2rem; }
+.selector-icon { color: #ffffff; font-size: 1.2rem; }
 
 .battle-topic-dropdown {
     background: transparent;
     border: none;
-    color: var(--text-primary);
+    color: #ffffff;
     padding: 12px 10px;
-    font-size: 1rem;
-    font-weight: 700;
+    font-size: 1.1rem;
+    font-weight: 800;
     outline: none;
-    width: 180px;
+    width: 200px;
     cursor: pointer;
 }
 
 .battle-topic-dropdown option {
-    background: var(--bg-card);
-    color: var(--text-primary);
+    background: #1a0533;
+    color: #ffffff;
     padding: 15px;
 }
 

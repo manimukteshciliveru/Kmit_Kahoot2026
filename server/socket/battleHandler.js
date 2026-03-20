@@ -16,11 +16,31 @@ module.exports = (io, socket) => {
             userId: p.userId,
             name: p.name,
             avatar: p.avatar,
-            socketId: p.socketId, // For legacy frontend compatibility
             mode: p.mode,
+            topic: p.topic,
             rank: p.rank
         }));
         io.emit('battle:lobby_update', lobby);
+    };
+
+    const getSocketsByUserId = (userId) => {
+        const sockets = [];
+        for (const [id, s] of io.sockets.sockets) {
+            if (s.user && s.user._id.toString() === userId) {
+                sockets.push(s);
+            }
+        }
+        return sockets;
+    };
+
+    const emitToUser = (userId, event, data) => {
+        const sockets = getSocketsByUserId(userId);
+        sockets.forEach(s => s.emit(event, data));
+    };
+
+    const joinUserToRoom = (userId, roomID) => {
+        const sockets = getSocketsByUserId(userId);
+        sockets.forEach(s => s.join(roomID));
     };
 
     const createBattle = async (p1, p2, topicStr = null) => {
@@ -51,13 +71,12 @@ module.exports = (io, socket) => {
         });
 
         await newBattle.save();
-        const s1 = io.sockets.sockets.get(p1.socketId);
-        const s2 = io.sockets.sockets.get(p2.socketId);
-        if (s1) s1.join(roomID);
-        if (s2) s2.join(roomID);
+        
+        joinUserToRoom(p1.userId, roomID);
+        joinUserToRoom(p2.userId, roomID);
 
-        waitingPlayers.delete(p1.socketId);
-        waitingPlayers.delete(p2.socketId);
+        waitingPlayers.delete(p1.userId);
+        waitingPlayers.delete(p2.userId);
         broadcastLobbyUpdate();
 
         io.to(roomID).emit('battle:started', {
@@ -76,6 +95,7 @@ module.exports = (io, socket) => {
     socket.on('battle:enter_lobby', (data) => {
         const userId = socket.user._id.toString();
         const mode = data?.mode || 'random';
+        const topic = data?.topic || 'General';
         
         waitingPlayers.set(userId, {
             userId: userId,
@@ -83,27 +103,31 @@ module.exports = (io, socket) => {
             avatar: socket.user.avatar,
             socketId: socket.id,
             mode: mode,
+            topic: topic,
             rank: socket.user.rank || { tier: 'Bronze', level: 1, points: 0 },
             joinedAt: Date.now()
         });
 
         if (mode === 'random') {
+            // Find opponent with SAME topic (and also searching for random)
             const opponent = Array.from(waitingPlayers.values()).find(p => 
-                p.userId !== userId && p.mode === 'random'
+                p.userId !== userId && 
+                p.mode === 'random' && 
+                p.topic === topic
             );
 
             if (opponent) {
-                createBattle(opponent, waitingPlayers.get(userId));
+                createBattle(opponent, waitingPlayers.get(userId), topic);
             } else {
                 socket.emit('battle:searching');
                 setTimeout(() => {
                     const me = waitingPlayers.get(userId);
                     if (me && me.mode === 'random' && me.socketId === socket.id) {
-                        socket.emit('battle:no_players', { message: 'Quick match timed out. Try browsing for players instead.' });
+                        socket.emit('battle:no_players', { message: 'Matchmaking timed out. Try a different topic or browser lobby.' });
                         waitingPlayers.delete(userId);
                         broadcastLobbyUpdate();
                     }
-                }, 40000);
+                }, 60000);
             }
         }
         broadcastLobbyUpdate();
@@ -118,8 +142,8 @@ module.exports = (io, socket) => {
         if (!target) return socket.emit('error', { message: 'Target is no longer in the lobby.' });
         if (target.userId === challenger.userId) return socket.emit('error', { message: "Internal Error: Cannot duel yourself." });
 
-        console.log(`⚔️ [BATTLE] Challenge: ${challenger.name} -> ${target.name}`);
-        io.to(target.socketId).emit('battle:incoming_challenge', {
+        console.log(`⚔️ [BATTLE] Challenge: ${challenger.name} -> ${target.name} Topic: ${topic}`);
+        emitToUser(targetUserId, 'battle:incoming_challenge', {
             challengerName: challenger.name,
             challengerUserId: challenger.userId,
             topic: topic || 'General'
@@ -139,7 +163,7 @@ module.exports = (io, socket) => {
         if (accept) {
             createBattle(challenger, target, topic);
         } else {
-            io.to(challenger.socketId).emit('battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
+            emitToUser(challengerUserId, 'battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
         }
     });
 
@@ -162,13 +186,12 @@ module.exports = (io, socket) => {
             player.answers.push({ questionIndex, isCorrect, timeSpent: timeTaken });
 
             socket.emit('battle:score_sync', { newScore: player.score });
-            if (opponent.socketId) {
-                io.to(opponent.socketId).emit('battle:opponent_update', {
-                    opponentScore: player.score,
-                    questionIndex,
-                    isCorrect
-                });
-            }
+            
+            emitToUser(opponent.userId, 'battle:opponent_update', {
+                opponentScore: player.score,
+                questionIndex,
+                isCorrect
+            });
 
             if (battle.players.every(p => p.answers.length === battle.quizId.questions.length)) {
                 battle.status = 'completed';
@@ -214,11 +237,11 @@ module.exports = (io, socket) => {
                         loserDoc.rank.level = lInfo.level;
                         await loserDoc.save();
 
-                        io.to(winner.socketId).emit('battle:rank_update', { 
+                        emitToUser(winner.userId, 'battle:rank_update', { 
                             change: winPoints, 
                             rank: winnerDoc.rank 
                         });
-                        io.to(loser.socketId).emit('battle:rank_update', { 
+                        emitToUser(loser.userId, 'battle:rank_update', { 
                             change: lossPoints, 
                             rank: loserDoc.rank 
                         });
@@ -262,7 +285,7 @@ module.exports = (io, socket) => {
                 const opponent = activeBattle.players.find(p => p.socketId !== socket.id);
                 
                 if (opponent && opponent.socketId) {
-                    io.to(opponent.socketId).emit('battle:opponent_left', {
+                    emitToUser(opponent.userId.toString(), 'battle:opponent_left', {
                         message: 'Winner by forfeit! Your opponent has retreated.'
                     });
                     
@@ -277,7 +300,7 @@ module.exports = (io, socket) => {
                         user.rank.level = rInfo.level;
                         await user.save();
                         
-                        io.to(opponent.socketId).emit('battle:rank_update', {
+                        emitToUser(opponent.userId.toString(), 'battle:rank_update', {
                             change: winPoints,
                             rank: user.rank
                         });
