@@ -215,10 +215,9 @@ module.exports = (io, socket) => {
                 // Wait 3 seconds then signal next question or end
                 setTimeout(async () => {
                     const refreshedBattle = await Battle.findOne({ battleId });
-                    const knockout = refreshedBattle.players.some(p => p.hp <= 0);
                     const lastQuestion = questionIndex === refreshedBattle.quizId.questions.length - 1;
 
-                    if (knockout || lastQuestion) {
+                    if (lastQuestion) {
                         await concludeBattle(refreshedBattle);
                     } else {
                         io.to(battle.roomID).emit('battle:next_question', { nextIndex: questionIndex + 1 });

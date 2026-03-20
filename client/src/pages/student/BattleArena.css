@@ -108,6 +108,12 @@
   transition: all 0.3s;
 }
 
+.path-picker select option,
+.form-select option {
+  background: #1E293B;
+  color: #F8FAFC;
+}
+
 .action-buttons {
   display: flex;
   gap: 1.5rem;
