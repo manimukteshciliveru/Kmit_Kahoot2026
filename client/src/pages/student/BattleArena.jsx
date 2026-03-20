@@ -370,7 +370,7 @@ const BattleArena = () => {
                                     onClick={() => setShowLevelMap(!showLevelMap)}
                                 >
                                     <LuTrophy className="icon" />
-                                    <span>Map</span>
+                                    <span>Level Map</span>
                                 </button>
                                 <div className="streak-badge animate-glow">
                                     <LuFlame /> {user.rank?.winStreak || 0} Streak
