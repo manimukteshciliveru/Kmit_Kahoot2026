@@ -516,7 +516,7 @@ const BattleArena = () => {
                             </button>
                             <div className="lobby-stats-mini">
                                 <span className="live-dot"></span> 
-                                {lobbyPlayers.length} Legends Active
+                                {lobbyPlayers.length} Students Online
                             </div>
                         </div>
 
