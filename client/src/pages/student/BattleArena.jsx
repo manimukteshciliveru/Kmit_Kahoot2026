@@ -165,13 +165,19 @@ const BattleArena = () => {
         setTimeout(() => setDamageEffect(null), 500);
     };
 
+    useEffect(() => {
+        if (timer === 0 && roundStatus === 'answering') {
+            handleAnswer(null);
+        }
+    }, [timer, roundStatus]);
+
     const startQuestionTimer = () => {
-        setTimer(20);
+        setTimer(battleData?.questionTimer || 20);
         clearInterval(timerRef.current);
         timerRef.current = setInterval(() => {
             setTimer(prev => {
-                if (prev <= 1) {
-                    handleAnswer(null);
+                if (prev <= 0) {
+                    clearInterval(timerRef.current);
                     return 0;
                 }
                 return prev - 1;
@@ -181,6 +187,7 @@ const BattleArena = () => {
 
     const handleAnswer = (answerIndex) => {
         if (roundStatus !== 'answering') return;
+        setRoundStatus('waiting');
         
         clearInterval(timerRef.current);
         if (socket && battleData) {
@@ -286,7 +293,9 @@ const BattleArena = () => {
                         {roundStatus === 'answering' && (
                             <div className="question-box glass">
                                 <div className="q-indicator">Question {currentQuestionIndex + 1} / {battleData.quiz.questions.length}</div>
-                                <h2>{battleData.quiz.questions[currentQuestionIndex].questionText}</h2>
+                                <h2 style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', textAlign: 'left', lineHeight: '1.6', fontSize: '1.2rem', margin: '1rem 0 2rem 0' }}>
+                                    {battleData.quiz.questions[currentQuestionIndex].questionText}
+                                </h2>
                                 <div className="options-grid-v2">
                                     {battleData.quiz.questions[currentQuestionIndex].options.map((opt, idx) => (
                                         <button key={idx} className="opt-v2" onClick={() => handleAnswer(idx)}>
@@ -346,14 +355,25 @@ const BattleArena = () => {
                     </div>
 
                     <div className="user-rank-status">
-                        <div className="rank-card-v2 glass">
-                            {getRankIcon(user.rank?.tier)}
-                            <div className="rank-details">
-                                <h3>{user.rank?.tier || 'Bronze'} {user.rank?.level || 'I'}</h3>
-                                <p>{user.rank?.points || 0} Rating Points</p>
+                        <div className="rank-card-v2 glass relative flex items-center gap-6 justify-between p-6">
+                            <div className="flex items-center gap-4">
+                                {getRankIcon(user.rank?.tier)}
+                                <div className="rank-details">
+                                    <h3>{user.rank?.tier || 'Bronze'} {user.rank?.level || 'I'}</h3>
+                                    <p>{user.rank?.points || 0} Rating Points</p>
+                                </div>
                             </div>
-                            <div className="streak-badge animate-glow">
-                                <LuFlame /> {user.rank?.winStreak || 0} Streak
+                            
+                            <div className="flex items-center gap-4">
+                                <button 
+                                    className={`btn-secondary btn-sm border border-slate-600 transition-colors ${showLevelMap ? 'bg-indigo-600 text-white border-indigo-500' : ''}`}
+                                    onClick={() => setShowLevelMap(!showLevelMap)}
+                                >
+                                    <LuTrophy /> Map
+                                </button>
+                                <div className="streak-badge animate-glow">
+                                    <LuFlame /> {user.rank?.winStreak || 0} Streak
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -406,9 +426,6 @@ const BattleArena = () => {
                                 <LuUsers /> Matchmaking Lobby
                             </button>
                         </div>
-                        <button className="btn-secondary mt-4 w-full" onClick={() => setShowLevelMap(!showLevelMap)}>
-                            <LuTrophy /> {showLevelMap ? 'Hide Level Map' : 'Show Level Map'}
-                        </button>
                     </div>
 
                     {showLevelMap && (
