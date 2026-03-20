@@ -1,13 +1,23 @@
-import OpenAI from 'openai';
-import dotenv from 'dotenv';
-import Quiz from '../models/Quiz.js'; // Assuming .js extension for imports
-import logger from '../utils/logger.js';
+const OpenAI = require('openai');
+const dotenv = require('dotenv');
+const Quiz = require('../models/Quiz');
+const logger = require('../utils/logger');
 
 dotenv.config();
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-});
+let openai = null;
+if (process.env.OPENAI_API_KEY) {
+    try {
+        openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY
+        });
+        logger.info('✅ AI Service: OpenAI initialized for Battle Arena');
+    } catch (error) {
+        logger.error('❌ AI Service: Failed to initialize OpenAI', error);
+    }
+} else {
+    logger.warn('⚠️ OPENAI_API_KEY is missing. AI-powered battle features will be disabled.');
+}
 
 /**
  * AI Service for Battle Arena
@@ -34,6 +44,11 @@ class BattleAIService {
             ]
             
             Ensure the code examples (if any) are correctly formatted and the questions are technically accurate.`;
+
+            if (!openai) {
+                logger.warn('OpenAI client not initialized. Using fallback quiz.');
+                return await Quiz.findOne({ status: 'live' });
+            }
 
             const response = await openai.chat.completions.create({
                 model: "gpt-4o",
@@ -75,4 +90,4 @@ class BattleAIService {
     }
 }
 
-export default new BattleAIService();
+module.exports = new BattleAIService();
