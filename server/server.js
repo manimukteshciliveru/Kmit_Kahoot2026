@@ -49,6 +49,9 @@ requiredEnv.forEach((key) => {
 const app = express();
 const server = http.createServer(app);
 
+// Trust proxy for Render/load balancers
+app.set('trust proxy', 1);
+
 // --- 0. DEPLOYMENT VERIFICATION (ABSOLUTE TOP) ---
 app.get("/deploy-check", (req, res) => {
     res.json({

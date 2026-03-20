@@ -9,11 +9,10 @@ import {
 } from 'react-icons/lu';
 import './BattleArena.css';
 
-const socket = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
-    auth: { token: localStorage.getItem('token') }
-});
+import { useSocket } from '../../context/SocketContext';
 
 const BattleArena = () => {
+    const { socket, connected } = useSocket();
     const { user } = useAuth();
     const [view, setView] = useState('selection'); // selection, searching, lobby, playing, results
     const [lobbyPlayers, setLobbyPlayers] = useState([]);
@@ -41,6 +40,8 @@ const BattleArena = () => {
     };
 
     useEffect(() => {
+        if (!socket || !connected) return;
+
         socket.on('battle:lobby_update', setLobbyPlayers);
         socket.on('battle:incoming_challenge', setIncomingChallenge);
         socket.on('battle:started', (data) => {
@@ -65,7 +66,7 @@ const BattleArena = () => {
             socket.off('battle:rank_update');
             socket.off('battle:ended');
         };
-    }, []);
+    }, [socket, connected]);
 
     const startQuestionTimer = () => {
         setTimer(20);
@@ -83,12 +84,14 @@ const BattleArena = () => {
 
     const handleAnswer = (answerIndex, isTimeout = false) => {
         clearInterval(timerRef.current);
-        socket.emit('battle:submit_answer', {
-            battleId: battleData.battleId,
-            questionIndex: currentQuestionIndex,
-            answer: answerIndex,
-            timeTaken: (20 - timer) * 1000
-        });
+        if (socket) {
+            socket.emit('battle:submit_answer', {
+                battleId: battleData.battleId,
+                questionIndex: currentQuestionIndex,
+                answer: answerIndex,
+                timeTaken: (20 - timer) * 1000
+            });
+        }
 
         if (currentQuestionIndex < battleData.quiz.questions.length - 1) {
             setTimeout(() => {
@@ -107,16 +110,20 @@ const BattleArena = () => {
         setView(mode === 'random' ? 'searching' : 'lobby');
         setSearchTime(0);
         searchInterval.current = setInterval(() => setSearchTime(prev => prev + 1), 1000);
-        socket.emit('battle:enter_lobby', { 
-            mode, 
-            topic: `${selectedCategory}: ${selectedSubTopic}` 
-        });
+        if (socket) {
+            socket.emit('battle:enter_lobby', { 
+                mode, 
+                topic: `${selectedCategory}: ${selectedSubTopic}` 
+            });
+        }
     };
 
     const handleChallenge = (targetSocketId, targetUserId) => {
         if (targetUserId === user._id) return toast.error("Self-duel is prohibited.");
         const fullTopic = `${selectedCategory}: ${selectedSubTopic}`;
-        socket.emit('battle:challenge_player', { targetSocketId, topic: fullTopic });
+        if (socket) {
+            socket.emit('battle:challenge_player', { targetSocketId, topic: fullTopic });
+        }
         toast.success(`Challenging for ${selectedSubTopic}...`);
     };
 
@@ -328,7 +335,11 @@ const BattleArena = () => {
                         <h3>{incomingChallenge.challengerName} has challenged you!</h3>
                         <p>Topic: {incomingChallenge.topic}</p>
                         <div className="challenge-actions">
-                            <button className="accept-btn" onClick={() => socket.emit('battle:respond_challenge', { challengerSocketId: incomingChallenge.challengerSocketId, accept: true, topic: incomingChallenge.topic })}>Accept</button>
+                            <button className="accept-btn" onClick={() => {
+                                if (socket) {
+                                    socket.emit('battle:respond_challenge', { challengerSocketId: incomingChallenge.challengerSocketId, accept: true, topic: incomingChallenge.topic });
+                                }
+                            }}>Accept</button>
                             <button className="reject-btn" onClick={() => setIncomingChallenge(null)}>Decline</button>
                         </div>
                     </div>
