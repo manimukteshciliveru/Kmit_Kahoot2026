@@ -46,15 +46,53 @@
     font-size: 1.1rem;
 }
 
+.hub-stats {
+    display: flex;
+    gap: 1.5rem;
+}
+
 .hub-stat-item {
     display: flex;
     align-items: center;
-    gap: 0.8rem;
-    background: rgba(253, 224, 71, 0.1);
+    gap: 1rem;
+    padding: 1rem 1.8rem;
+    border-radius: 20px;
+    font-weight: 700;
+    transition: all 0.3s;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.hub-stat-item.arena {
+    border-color: rgba(255, 204, 2, 0.2);
     color: #FDE047;
-    padding: 0.8rem 1.5rem;
-    border-radius: 12px;
-    font-weight: 600;
+    background: rgba(253, 224, 71, 0.05);
+}
+
+.hub-stat-item.streak {
+    border-color: rgba(239, 68, 68, 0.2);
+    color: #F87171;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.hub-stat-item svg {
+    font-size: 1.8rem;
+}
+
+.hub-stat-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.hub-stat-text .label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.7;
+}
+
+.hub-stat-text .value {
+    font-size: 1.1rem;
 }
 
 /* CARDS GRID */

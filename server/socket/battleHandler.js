@@ -224,8 +224,14 @@ module.exports = (io, socket) => {
         const winnerUser = await User.findById(winner.userId);
         const loserUser = await User.findById(loser.userId);
 
-        const winPoints = calculatePoints(winnerUser.rank.points, true, winnerUser.rank.winStreak);
+        let winPoints = calculatePoints(winnerUser.rank.points, true, winnerUser.rank.winStreak);
         const lossPoints = calculatePoints(loserUser.rank.points, false, loserUser.rank.winStreak);
+
+        // --- Additional Performance Bonuses ---
+        // 1. Fast Win Bonus: If average time was low or match ended quickly (Score > 60)
+        if (winner.score >= 50) winPoints += 5;
+        // 2. Perfect Win Bonus: If winner has 100 HP still
+        if (winner.hp === 100) winPoints += 10;
 
         winnerUser.rank.points += winPoints;
         winnerUser.rank.winStreak += 1;

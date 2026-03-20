@@ -50,11 +50,24 @@ const GamesHub = () => {
                     </div>
                 </div>
                 <div className="hub-stats">
-                    <div className="hub-stat-item">
+                    <div className="hub-stat-item arena">
                         <FiAward />
-                        <span>Arena Rank: {user?.rank?.tier || 'Bronze'} {user?.rank?.level || 'I'}</span>
+                        <div className="hub-stat-text">
+                            <span className="label">Arena Rank</span>
+                            <span className="value">{user?.rank?.tier || 'Bronze'} {user?.rank?.level || 'I'}</span>
+                        </div>
                     </div>
-                </div>            </header>
+                    {user?.rank?.winStreak > 0 && (
+                        <div className="hub-stat-item streak">
+                            <FiZap />
+                            <div className="hub-stat-text">
+                                <span className="label">Win Streak</span>
+                                <span className="value">{user?.rank?.winStreak} WINS</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </header>
 
             <div className="games-grid">
                 {games.map((game) => (
