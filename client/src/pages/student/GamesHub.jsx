@@ -1,9 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { FiZap, FiLayers, FiTarget, FiTrendingUp, FiAward } from 'react-icons/fi';
 import './GamesHub.css';
 
 const GamesHub = () => {
+    const { user } = useAuth();
     const navigate = useNavigate();
 
     const games = [
