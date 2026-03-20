@@ -1,9 +1,13 @@
 require("dotenv").config();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { OpenAI } = require("openai");
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || "dummy");
+
+let openai;
+if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined') {
+    const { OpenAI } = require("openai");
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 const formatQuestionsArray = (topic, parsedQuestions, targetCount) => {
     let questions = mapOptions(parsedQuestions).slice(0, targetCount);
@@ -42,7 +46,7 @@ const generateBattleQuiz = async (topic, count = 5) => {
         } catch (geminiError) {
             console.error('Gemini Failed:', geminiError.message);
             // Secondary Attempt: OpenAI
-            if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined') {
+            if (openai) {
                 const completion = await openai.chat.completions.create({
                     model: "gpt-3.5-turbo",
                     messages: [{ role: "user", content: prompt }],

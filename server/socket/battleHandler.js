@@ -40,23 +40,25 @@ module.exports = (io, socket) => {
         sockets.forEach(s => s.join(roomID));
     };
 
-    const createBattle = async (p1, p2, topicStr = null, questionCount = 5) => {
-        const roomID = `battle_${Date.now()}_${p1.userId}`;
+    const createBattle = async (p1, p2, topicStr = null, questionCount = 5, questionTimer = 20) => {
+        const roomID = `room_${Date.now()}_${p1.userId.substring(0, 4)}`;
         const topic = topicStr || "General";
 
         try {
-            const quizData = await generateBattleQuiz(topic, questionCount);
-            const battleId = `B-${Math.floor(1000 + Math.random() * 9000)}`;
+            const quiz = await generateBattleQuiz(topic, questionCount);
+            const battleId = `btl_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
             const newBattle = new Battle({
                 battleId: battleId,
                 topic: topic,
                 roomID: roomID,
+                status: 'active',
+                questionTimer: questionTimer,
                 players: [
-                    { userId: p1.userId, name: p1.name, socketId: p1.socketId },
-                    { userId: p2.userId, name: p2.name, socketId: p2.socketId }
+                    { userId: p1.userId, name: p1.name },
+                    { userId: p2.userId, name: p2.name }
                 ],
-                quizId: quizData
+                quizId: { questions: quiz.questions }
             });
 
             await newBattle.save();
@@ -72,7 +74,10 @@ module.exports = (io, socket) => {
                 battleId: battleId,
                 roomID: roomID,
                 players: newBattle.players,
-                quiz: quizData
+                topic: newBattle.topic,
+                questionTimer: newBattle.questionTimer,
+                totalQuestions: quiz.questions.length,
+                quiz: quiz
             });
 
             logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
@@ -89,6 +94,7 @@ module.exports = (io, socket) => {
         const mode = data?.mode || 'random';
         const topicRaw = data?.topic || 'General';
         const qCount = parseInt(data?.questionCount) || 5;
+        const qTimer = parseInt(data?.questionTimer) || 20; // Default to 20 seconds
         const topic = topicRaw.toLowerCase().replace(/\s+/g, ''); // Normalize
         
         waitingPlayers.set(userId, {
@@ -99,6 +105,7 @@ module.exports = (io, socket) => {
             mode: mode,
             topic: topic,
             questionCount: qCount,
+            questionTimer: qTimer,
             rank: socket.user.rank || { tier: 'Bronze', level: 'I', points: 0 },
             joinedAt: Date.now()
         });
@@ -108,11 +115,12 @@ module.exports = (io, socket) => {
                 p.userId !== userId && 
                 p.mode === 'random' && 
                 p.topic === topic &&
-                p.questionCount === qCount
+                p.questionCount === qCount &&
+                p.questionTimer === qTimer
             );
 
             if (opponent) {
-                createBattle(opponent, waitingPlayers.get(userId), topicRaw, qCount);
+                createBattle(opponent, waitingPlayers.get(userId), topicRaw, qCount, qTimer);
             } else {
                 socket.emit('battle:searching');
             }
@@ -121,7 +129,7 @@ module.exports = (io, socket) => {
     });
 
     socket.on('battle:challenge_player', async (data) => {
-        const { targetUserId, topic, questionCount } = data;
+        const { targetUserId, topic, questionCount, questionTimer } = data;
         const challenger = waitingPlayers.get(socket.user._id.toString());
         const target = waitingPlayers.get(targetUserId);
 
@@ -131,19 +139,20 @@ module.exports = (io, socket) => {
             challengerName: challenger.name,
             challengerUserId: challenger.userId,
             topic: topic || 'General',
-            questionCount: questionCount || 5
+            questionCount: questionCount || 5,
+            questionTimer: questionTimer || 20
         });
     });
 
     socket.on('battle:respond_challenge', async (data) => {
-        const { challengerUserId, accept, topic, questionCount } = data;
+        const { challengerUserId, accept, topic, questionCount, questionTimer } = data;
         const target = waitingPlayers.get(socket.user._id.toString());
         const challenger = waitingPlayers.get(challengerUserId);
 
         if (!challenger || !target) return socket.emit('error', { message: 'Duel setup expired.' });
 
         if (accept) {
-            createBattle(challenger, target, topic, questionCount || 5);
+            createBattle(challenger, target, topic, questionCount || 5, questionTimer || 20);
         } else {
             emitToUser(challengerUserId, 'battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
         }

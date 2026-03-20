@@ -17,6 +17,7 @@ const BattleArena = () => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSubTopic, setSelectedSubTopic] = useState('');
     const [questionCount, setQuestionCount] = useState(5);
+    const [questionTimer, setQuestionTimer] = useState(20);
     const [incomingChallenge, setIncomingChallenge] = useState(null);
     const [battleData, setBattleData] = useState(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -191,7 +192,8 @@ const BattleArena = () => {
             socket.emit('battle:enter_lobby', { 
                 mode, 
                 topic: selectedSubTopic ? `${selectedCategory}: ${selectedSubTopic}` : 'General',
-                questionCount
+                questionCount,
+                questionTimer
             });
         }
     };
@@ -202,7 +204,8 @@ const BattleArena = () => {
             socket.emit('battle:challenge_player', { 
                 targetUserId, 
                 topic: `${selectedCategory}: ${selectedSubTopic}`,
-                questionCount
+                questionCount,
+                questionTimer
             });
             toast.success('Challenge Dispatched!');
         }
@@ -228,19 +231,17 @@ const BattleArena = () => {
                         <div className={`hud-side self ${damageEffect === 'self' ? 'damaged' : ''}`}>
                             <div className="hud-meta">
                                 <span className="hud-name text-blue-400 font-bold">{user.name}</span>
-                                <span className="hud-score">{syncData.players.find(p => p.userId.toString() === (user.id || user._id).toString())?.score || 0} XP</span>
-                            </div>
-                            <div className="hp-container">
-                                <div className="hp-bar" style={{ width: `${syncData.players.find(p => p.userId.toString() === (user.id || user._id).toString())?.hp || 100}%` }}></div>
-                                <LuHeart className="hp-icon" />
                             </div>
                         </div>
 
                         <div className="match-timer-ring">
-                            <svg viewBox="0 0 100 100">
+                            <svg viewBox="0 0 100 100" className="w-full h-full">
                                 <circle cx="50" cy="50" r="45" className="timer-bg" />
-                                <circle cx="50" cy="50" r="45" className="timer-progress"
-                                    style={{ strokeDashoffset: (1 - timer/20) * 283 }} />
+                                <circle 
+                                    cx="50" cy="50" r="45" 
+                                    className="timer-progress" 
+                                    style={{ strokeDashoffset: 283 - (283 * (timer / (battleData?.questionTimer || 20))) }}
+                                />
                             </svg>
                             <span className="timer-val">{timer}</span>
                         </div>
@@ -248,11 +249,6 @@ const BattleArena = () => {
                         <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
                             <div className="hud-meta">
                                 <span className="hud-name text-white font-bold">Opponent</span>
-                                <span className="hud-score">{syncData.players.find(p => p.userId.toString() !== (user.id || user._id).toString())?.score || 0} XP</span>
-                            </div>
-                            <div className="hp-container">
-                                <div className="hp-bar" style={{ width: `${syncData.players.find(p => p.userId.toString() !== (user.id || user._id).toString())?.hp || 100}%` }}></div>
-                                <LuHeart className="hp-icon" />
                             </div>
                         </div>
                     </div>
@@ -352,13 +348,24 @@ const BattleArena = () => {
                                 </div>
                             )}
                             {selectedSubTopic && (
-                                <div className="form-group animate-slideDown">
-                                    <label className="form-label">Questions</label>
-                                    <select className="form-select" value={questionCount} onChange={(e) => setQuestionCount(Number(e.target.value))}>
-                                        <option value={5}>5 Questions</option>
-                                        <option value={10}>10 Questions</option>
-                                        <option value={15}>15 Questions</option>
-                                    </select>
+                                <div className="form-group animate-slideDown flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="form-label">Questions</label>
+                                        <select className="form-select" value={questionCount} onChange={(e) => setQuestionCount(Number(e.target.value))}>
+                                            <option value={5}>5 Questions</option>
+                                            <option value={10}>10 Questions</option>
+                                            <option value={15}>15 Questions</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="form-label">Duration</label>
+                                        <select className="form-select" value={questionTimer} onChange={(e) => setQuestionTimer(Number(e.target.value))}>
+                                            <option value={10}>10s / q</option>
+                                            <option value={20}>20s / q</option>
+                                            <option value={30}>30s / q</option>
+                                            <option value={60}>60s / q</option>
+                                        </select>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -549,10 +556,10 @@ const BattleArena = () => {
                     <LuSword />
                     <div className="c-text">
                         <strong>{incomingChallenge.challengerName}</strong> wants to duel!
-                        <p>{incomingChallenge.topic} • {incomingChallenge.questionCount} Questions</p>
+                        <p>{incomingChallenge.topic} • {incomingChallenge.questionCount} Qs • {incomingChallenge.questionTimer}s Timer</p>
                     </div>
                     <div className="c-btns">
-                        <button className="acc" onClick={() => socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic, questionCount: incomingChallenge.questionCount })}>Accept</button>
+                        <button className="acc" onClick={() => socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic, questionCount: incomingChallenge.questionCount, questionTimer: incomingChallenge.questionTimer })}>Accept</button>
                         <button className="dec" onClick={() => setIncomingChallenge(null)}>Reject</button>
                     </div>
                 </div>
