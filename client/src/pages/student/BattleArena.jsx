@@ -41,6 +41,13 @@ const BattleArena = () => {
         'Web': ['HTML5 Semantic', 'CSS Grid/Flexbox', 'Responsive Design', 'SASS/SCSS', 'React Basics', 'State Management', 'React Hooks', 'Routing', 'API Integration', 'Next.js']
     };
 
+    // --- Automatic Lobby Entry ---
+    useEffect(() => {
+        if (socket && connected && user) {
+            socket.emit('battle:enter_lobby', { mode: 'idle', topic: 'General' });
+        }
+    }, [socket, connected, user]);
+
     useEffect(() => {
         if (!socket || !connected) return;
 
@@ -53,17 +60,18 @@ const BattleArena = () => {
                 players: data.players.map(p => ({ userId: p.userId, hp: 100, score: 0 }))
             });
             setView('playing');
+            setCurrentQuestionIndex(0); // Reset index for safety
             startQuestionTimer();
             toast.success('Battle Started!', { icon: '⚔️' });
         });
 
         socket.on('battle:sync', (data) => {
-            // Check for HP drops to trigger damage animations
             if (syncData) {
-                const myPrevHp = syncData.players.find(p => p.userId === user.id)?.hp;
-                const myNewHp = data.players.find(p => p.userId === user.id)?.hp;
-                const oppPrevHp = syncData.players.find(p => p.userId !== user.id)?.hp;
-                const oppNewHp = data.players.find(p => p.userId !== user.id)?.hp;
+                const myId = user.id || user._id; // Handle both id formats
+                const myPrevHp = syncData.players.find(p => p.userId.toString() === myId.toString())?.hp;
+                const myNewHp = data.players.find(p => p.userId.toString() === myId.toString())?.hp;
+                const oppPrevHp = syncData.players.find(p => p.userId.toString() !== myId.toString())?.hp;
+                const oppNewHp = data.players.find(p => p.userId.toString() !== myId.toString())?.hp;
 
                 if (myNewHp < myPrevHp) triggerDamageEffect('self');
                 if (oppNewHp < oppPrevHp) triggerDamageEffect('opponent');
@@ -84,6 +92,12 @@ const BattleArena = () => {
             searchInterval.current = setInterval(() => setSearchTime(p => p + 1), 1000);
         });
 
+        socket.on('battle:opponent_left', (data) => {
+            toast.success(data.message, { icon: '🏆', duration: 5000 });
+            clearInterval(timerRef.current);
+            setView('selection');
+        });
+
         return () => {
             socket.off('battle:lobby_update');
             socket.off('battle:incoming_challenge');
@@ -91,9 +105,11 @@ const BattleArena = () => {
             socket.off('battle:sync');
             socket.off('battle:ended');
             socket.off('battle:searching');
+            socket.off('battle:opponent_left');
+            clearInterval(timerRef.current);
             clearInterval(searchInterval.current);
         };
-    }, [socket, connected, syncData]);
+    }, [socket, connected, syncData, user]);
 
     const triggerDamageEffect = (target) => {
         setDamageEffect(target);
@@ -125,6 +141,7 @@ const BattleArena = () => {
             });
         }
 
+        // Wait brief second to show selection before next Q
         if (currentQuestionIndex < battleData.quiz.questions.length - 1) {
             setTimeout(() => {
                 setCurrentQuestionIndex(prev => prev + 1);
@@ -134,9 +151,12 @@ const BattleArena = () => {
     };
 
     const startSearch = (mode = 'random') => {
-        if (!selectedSubTopic) return toast.error("Select a path first!");
+        if (!selectedSubTopic && mode !== 'idle') {
+            return toast.error("Select a path first!");
+        }
         
         if (socket) {
+            if (mode === 'lobby') setView('lobby');
             socket.emit('battle:enter_lobby', { 
                 mode, 
                 topic: `${selectedCategory}: ${selectedSubTopic}` 
@@ -145,12 +165,13 @@ const BattleArena = () => {
     };
 
     const handleChallenge = (targetUserId) => {
+        if (!selectedSubTopic) return toast.error("Select your battle topic first!");
         if (socket) {
             socket.emit('battle:challenge_player', { 
                 targetUserId, 
                 topic: `${selectedCategory}: ${selectedSubTopic}` 
             });
-            toast.success('Challenge Sent!');
+            toast.success('Challenge Dispatched!');
         }
     };
 
@@ -168,8 +189,9 @@ const BattleArena = () => {
 
     if (view === 'playing' && battleData && syncData) {
         const q = battleData.quiz.questions[currentQuestionIndex];
-        const selfMatch = syncData.players.find(p => p.userId === user.id);
-        const oppoMatch = syncData.players.find(p => p.userId !== user.id);
+        const myId = user.id || user._id;
+        const selfMatch = syncData.players.find(p => p.userId.toString() === myId.toString());
+        const oppoMatch = syncData.players.find(p => p.userId.toString() !== myId.toString());
 
         return (
             <div className={`battle-playing-screen ${damageEffect ? `shake-${damageEffect}` : ''}`}>
@@ -208,7 +230,7 @@ const BattleArena = () => {
 
                 <div className="combat-stage">
                     <div className="question-box">
-                        <div className="q-indicator">Question {currentQuestionIndex+1} / 5</div>
+                        <div className="q-indicator">Question {currentQuestionIndex+1} / {battleData.quiz.questions.length}</div>
                         <h2>{q.questionText}</h2>
                         <div className="options-grid-v2">
                             {q.options.map((opt, idx) => (
@@ -264,7 +286,7 @@ const BattleArena = () => {
                             <button className="btn-match random" disabled={!selectedSubTopic} onClick={() => startSearch('random')}>
                                 <LuSword /> Quick Match
                             </button>
-                            <button className="btn-match browse" disabled={!selectedSubTopic} onClick={() => startSearch('lobby')}>
+                            <button className="btn-match browse" onClick={() => startSearch('lobby')}>
                                 <LuUsers /> Browse Lobby
                             </button>
                         </div>
@@ -290,21 +312,29 @@ const BattleArena = () => {
                 <div className="lobby-v2 animate-slide-up">
                     <div className="lobby-head">
                         <h2>Battle Lobby</h2>
+                        <p>{lobbyPlayers.length} online</p>
                         <button className="close-lobby" onClick={() => setView('selection')}><LuX /></button>
                     </div>
                     <div className="lobby-list">
-                        {lobbyPlayers.map(p => (
-                            <div key={p.userId} className={`lobby-item ${p.userId === user.id ? 'me' : ''}`}>
-                                <img src={p.avatar} alt={p.name} />
-                                <div className="p-info">
-                                    <h4>{p.name}</h4>
-                                    <span>{p.rank?.tier} {p.rank?.level}</span>
+                        {lobbyPlayers.length === 0 ? (
+                            <p className="no-players">Checking area... everyone is preparing.</p>
+                        ) : (
+                            lobbyPlayers.map(p => {
+                                const myId = user.id || user._id;
+                                return (
+                                <div key={p.userId} className={`lobby-item ${p.userId === myId.toString() ? 'me' : ''}`}>
+                                    <img src={p.avatar} alt={p.name} />
+                                    <div className="p-info">
+                                        <h4>{p.name}</h4>
+                                        <span>{p.rank?.tier} {p.rank?.level}</span>
+                                    </div>
+                                    {p.userId !== myId.toString() && (
+                                        <button className="challenge-btn-v2" onClick={() => handleChallenge(p.userId)}>Challenge</button>
+                                    )}
                                 </div>
-                                {p.userId !== user.id && (
-                                    <button className="challenge-btn-v2" onClick={() => handleChallenge(p.userId)}>Challenge</button>
-                                )}
-                            </div>
-                        ))}
+                                );
+                            })
+                        )}
                     </div>
                 </div>
             )}
@@ -316,15 +346,18 @@ const BattleArena = () => {
                         <h1>{finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT'}</h1>
                         
                         <div className="score-summary-v2">
-                            {finalResults.results.map(r => (
-                                <div key={r.userId} className={`summary-row ${r.userId === user.id ? 'highlight' : ''}`}>
+                            {finalResults.results.map(r => {
+                                const myId = user.id || user._id;
+                                return (
+                                <div key={r.userId} className={`summary-row ${r.userId === myId.toString() ? 'highlight' : ''}`}>
                                     <span>{r.name}</span>
                                     <span className={`delta ${r.rankDelta >= 0 ? 'pos' : 'neg'}`}>
                                         {r.rankDelta >= 0 ? '+' : ''}{r.rankDelta} RP
                                     </span>
                                     <span className="new-tier">{r.tier} {r.lvl}</span>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                         
                         <button className="btn-return" onClick={() => setView('selection')}>Return to Base</button>

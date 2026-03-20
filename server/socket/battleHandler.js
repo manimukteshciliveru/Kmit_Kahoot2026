@@ -10,7 +10,7 @@ module.exports = (io, socket) => {
 
     const broadcastLobbyUpdate = () => {
         const lobby = Array.from(waitingPlayers.values()).map(p => ({
-            userId: p.userId,
+            userId: p.userId.toString(),
             name: p.name,
             avatar: p.avatar,
             mode: p.mode,
@@ -156,6 +156,11 @@ module.exports = (io, socket) => {
             const player = battle.players.find(p => p.userId._id.toString() === socket.user._id.toString());
             const opponent = battle.players.find(p => p.userId._id.toString() !== socket.user._id.toString());
             
+            if (!player || !opponent) {
+                logger.error('Battle Sync Error: Player or Opponent not found');
+                return;
+            }
+            
             const question = battle.quizId.questions[questionIndex];
             const isCorrect = answer === question.correctAnswer;
             const perfectTimeBonus = timeTaken < 3000; // <3s for perfect damage
@@ -178,7 +183,7 @@ module.exports = (io, socket) => {
             // Live Sync
             io.to(battle.roomID).emit('battle:sync', {
                 players: battle.players.map(p => ({
-                    userId: p.userId._id,
+                    userId: p.userId._id.toString(),
                     hp: p.hp,
                     score: p.score,
                     lastAnswer: { questionIndex, isCorrect }

@@ -38,15 +38,29 @@ const generateBattleQuiz = async (topic) => {
             topic: topic,
             questions: [
                 {
-                    questionText: `Challenge Question: Deep dive into ${topic}.`,
-                    options: [
-                        { text: "Correct Architecture Choice", isCorrect: true },
-                        { text: "Scaling Bottleneck", isCorrect: false },
-                        { text: "Memory Overhead", isCorrect: false },
-                        { text: "Non-standard implementation", isCorrect: false }
-                    ],
-                    correctAnswer: 0,
-                    difficulty: 'medium'
+                    questionText: `Challenge Question 1: Deep dive into ${topic}.`,
+                    options: [{ text: "Correct", isCorrect: true }, { text: "Wrong", isCorrect: false }, { text: "Wrong", isCorrect: false }, { text: "Wrong", isCorrect: false }],
+                    correctAnswer: 0, difficulty: 'medium'
+                },
+                {
+                    questionText: `Challenge Question 2: Architecture of ${topic}.`,
+                    options: [{ text: "Wrong", isCorrect: false }, { text: "Correct", isCorrect: true }, { text: "Wrong", isCorrect: false }, { text: "Wrong", isCorrect: false }],
+                    correctAnswer: 1, difficulty: 'hard'
+                },
+                {
+                    questionText: `Challenge Question 3: Performance of ${topic}.`,
+                    options: [{ text: "Wrong", isCorrect: false }, { text: "Wrong", isCorrect: false }, { text: "Correct", isCorrect: true }, { text: "Wrong", isCorrect: false }],
+                    correctAnswer: 2, difficulty: 'medium'
+                },
+                {
+                    questionText: `Challenge Question 4: Security of ${topic}.`,
+                    options: [{ text: "Correct", isCorrect: true }, { text: "Wrong", isCorrect: false }, { text: "Wrong", isCorrect: false }, { text: "Wrong", isCorrect: false }],
+                    correctAnswer: 0, difficulty: 'hard'
+                },
+                {
+                    questionText: `Challenge Question 5: Scaling ${topic}.`,
+                    options: [{ text: "Wrong", isCorrect: false }, { text: "Correct", isCorrect: true }, { text: "Wrong", isCorrect: false }, { text: "Wrong", isCorrect: false }],
+                    correctAnswer: 1, difficulty: 'hard'
                 }
             ]
         };
