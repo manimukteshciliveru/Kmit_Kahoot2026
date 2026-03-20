@@ -381,7 +381,7 @@ const BattleArena = () => {
                     </div>
 
                     {showLevelMap && (
-                        <div className="rank-roadmap-container glass mb-8 p-6 animate-slideDown w-full">
+                        <div className="rank-roadmap-container glass mb-8 p-6 pl-12 animate-slideDown w-full">
                             <div className="roadmap-header">
                                 <LuTrophy className="text-yellow-400" />
                                 <h3>Battle Rank Roadmap</h3>
