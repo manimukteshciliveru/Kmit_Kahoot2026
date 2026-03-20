@@ -610,13 +610,11 @@
   align-items: center;
   gap: 0.5rem;
   transition: all 0.3s;
-  opacity: 0.4;
-  filter: grayscale(1);
+  opacity: 0.6;
 }
 
 .roadmap-node.reached .node-icon-wrapper {
   opacity: 1;
-  filter: none;
   transform: scale(1.1);
 }
 
@@ -637,7 +635,22 @@
   color: #64748B;
 }
 
-.roadmap-node.reached .node-label { color: #F8FAFC; }
+.roadmap-node.reached .node-label { color: #F8FAFC; text-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
+
+/* Per-Rank Colorful Glows */
+.node-bronze.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 8px rgba(205, 127, 50, 0.6)); }
+.node-silver.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 8px rgba(192, 192, 192, 0.6)); }
+.node-gold.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.8)); }
+.node-platinum.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 12px rgba(80, 200, 120, 0.8)); }
+.node-diamond.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 15px rgba(185, 242, 255, 1)); }
+.node-master.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 15px rgba(255, 77, 77, 1)); }
+.node-gm.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 20px rgba(255, 0, 255, 1)); }
+
+.node-gold.reached .node-label { color: #FFD700; }
+.node-platinum.reached .node-label { color: #50C878; }
+.node-diamond.reached .node-label { color: #B9F2FF; }
+.node-master.reached .node-label { color: #FF4D4D; }
+.node-gm.reached .node-label { color: #FF00FF; }
 
 .roadmap-connector {
   position: absolute;

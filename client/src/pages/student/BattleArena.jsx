@@ -50,13 +50,13 @@ const BattleArena = () => {
     };
 
     const TIER_ROADMAP = [
-        { name: 'Bronze', min: 0, icon: <LuShieldCheck className="text-orange-600" /> },
-        { name: 'Silver', min: 600, icon: <LuShieldCheck className="text-gray-400" /> },
-        { name: 'Gold', min: 1500, icon: <LuCrown className="text-yellow-400" /> },
-        { name: 'Platinum', min: 2700, icon: <LuZap className="text-cyan-400" /> },
-        { name: 'Diamond', min: 3900, icon: <LuTarget className="text-blue-500" /> },
-        { name: 'Master', min: 4800, icon: <LuFlame className="text-purple-500" /> },
-        { name: 'Grandmaster', min: 5000, icon: <LuCrown className="text-red-500" /> }
+        { name: 'Bronze', min: 0, slug: 'bronze', icon: <LuShieldCheck style={{ color: '#CD7F32' }} /> },
+        { name: 'Silver', min: 600, slug: 'silver', icon: <LuShieldCheck style={{ color: '#C0C0C0' }} /> },
+        { name: 'Gold', min: 1500, slug: 'gold', icon: <LuCrown style={{ color: '#FFD700' }} /> },
+        { name: 'Platinum', min: 2700, slug: 'platinum', icon: <LuZap style={{ color: '#50C878' }} /> },
+        { name: 'Diamond', min: 3900, slug: 'diamond', icon: <LuTarget style={{ color: '#B9F2FF' }} /> },
+        { name: 'Master', min: 4800, slug: 'master', icon: <LuFlame style={{ color: '#FF4D4D' }} /> },
+        { name: 'Grandmaster', min: 5000, slug: 'gm', icon: <LuCrown style={{ color: '#FF00FF' }} /> }
     ];
 
     useEffect(() => {
@@ -401,7 +401,7 @@ const BattleArena = () => {
                                     }
 
                                     return (
-                                        <div key={t.name} className={`roadmap-node ${isReached ? 'reached' : ''}`}>
+                                        <div key={t.name} className={`roadmap-node node-${t.slug} ${isReached ? 'reached' : ''}`}>
                                             <div className="node-icon-wrapper">
                                                 {t.icon}
                                                 <div className="node-label">{t.name}</div>
