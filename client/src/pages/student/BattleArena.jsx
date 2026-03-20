@@ -38,6 +38,7 @@ const BattleArena = () => {
     const timerRef = useRef(null);
     const searchInterval = useRef(null);
     const syncDataRef = useRef(null);
+    const [showLevelMap, setShowLevelMap] = useState(false);
 
     const TOPIC_STRUCTURE = {
         'Python': ['Basics', 'Loops', 'Arrays', 'Classes', 'Dictionaries', 'Functions', 'Decorators', 'Generators', 'Iterators', 'Exception Handling', 'File I/O', 'Regex', 'OOPs', 'Multithreading', 'Networking', 'Web Scrapping'],
@@ -397,8 +398,7 @@ const BattleArena = () => {
                                 </div>
                             )}
                         </div>
-
-                        <div className="action-buttons">
+                        <div className="action-buttons mt-6">
                             <button className="btn-match random btn-lg" disabled={!selectedSubTopic} onClick={() => startSearch('random')}>
                                 <LuSword className="animate-bounce" /> Find Match
                             </button>
@@ -406,7 +406,57 @@ const BattleArena = () => {
                                 <LuUsers /> Matchmaking Lobby
                             </button>
                         </div>
+                        <button className="btn-secondary mt-4 w-full" onClick={() => setShowLevelMap(!showLevelMap)}>
+                            <LuTrophy /> {showLevelMap ? 'Hide Level Map' : 'Show Level Map'}
+                        </button>
                     </div>
+
+                    {showLevelMap && (
+                        <div className="rank-roadmap-container glass mt-8 p-6 animate-slideDown">
+                            <div className="roadmap-header">
+                                <LuTrophy className="text-yellow-400" />
+                                <h3>Battle Rank Roadmap</h3>
+                                <span className="current-pts">{user.rank?.points || 0} RP</span>
+                            </div>
+                            <div className="roadmap-steps">
+                                {TIER_ROADMAP.map((t, idx) => {
+                                    const currentPoints = user.rank?.points || 0;
+                                    const isReached = currentPoints >= t.min;
+                                    const nextLevel = TIER_ROADMAP[idx + 1];
+                                    let progress = 0;
+                                    
+                                    if (nextLevel && currentPoints >= t.min) {
+                                        progress = Math.min(100, ((currentPoints - t.min) / (nextLevel.min - t.min)) * 100);
+                                    } else if (!nextLevel && currentPoints >= t.min) {
+                                        progress = 100;
+                                    }
+
+                                    return (
+                                        <div key={t.name} className={`roadmap-node ${isReached ? 'reached' : ''}`}>
+                                            <div className="node-icon-wrapper">
+                                                {t.icon}
+                                                <div className="node-label">{t.name}</div>
+                                                <div className="node-threshold">{t.min}</div>
+                                            </div>
+                                            {idx < TIER_ROADMAP.length - 1 && (
+                                                <div className="roadmap-connector">
+                                                    <div className="connector-fill" style={{ width: `${progress}%` }}></div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="roadmap-footer">
+                                {(() => {
+                                    const currentPoints = user.rank?.points || 0;
+                                    const nextTier = TIER_ROADMAP.find(t => t.min > currentPoints);
+                                    if (!nextTier) return <span>Maximum Rank Achieved!</span>;
+                                    return <span><strong>{nextTier.min - currentPoints} RP</strong> needed for {nextTier.name}</span>;
+                                })()}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -449,54 +499,6 @@ const BattleArena = () => {
                             <div className="lobby-stats-mini">
                                 <span className="live-dot"></span> 
                                 {lobbyPlayers.length} Legends Active
-                            </div>
-                        </div>
-
-                        {/* Rank Roadmap Integration */}
-                        <div className="rank-roadmap-container glass mb-8 p-6">
-                            <div className="roadmap-header">
-                                <LuTrophy className="text-yellow-400" />
-                                <h3>Battle Rank Roadmap</h3>
-                                <span className="current-pts">{user.rank?.points || 0} RP</span>
-                            </div>
-                            <div className="roadmap-steps">
-                                {TIER_ROADMAP.map((t, idx) => {
-                                    const currentPoints = user.rank?.points || 0;
-                                    const isReached = currentPoints >= t.min;
-                                    const nextLevel = TIER_ROADMAP[idx + 1];
-                                    let progress = 0;
-                                    
-                                    if (nextLevel && currentPoints >= t.min) {
-                                        progress = Math.min(100, ((currentPoints - t.min) / (nextLevel.min - t.min)) * 100);
-                                    } else if (!nextLevel && currentPoints >= t.min) {
-                                        progress = 100;
-                                    }
-
-                                    return (
-                                        <div key={t.name} className={`roadmap-node ${isReached ? 'reached' : ''}`}>
-                                            <div className="node-icon-wrapper">
-                                                {t.icon}
-                                                <div className="node-label">{t.name}</div>
-                                                <div className="node-threshold">{t.min}</div>
-                                            </div>
-                                            {idx < TIER_ROADMAP.length - 1 && (
-                                                <div className="roadmap-connector">
-                                                    <div className="connector-fill" style={{ width: `${progress}%` }}></div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="roadmap-footer">
-                                {(() => {
-                                    const currentPoints = user.rank?.points || 0;
-                                    const nextTier = TIER_ROADMAP.find(t => t.min > currentPoints);
-                                    if (nextTier) {
-                                        return <p>You are <strong>{nextTier.min - currentPoints} RP</strong> away from <span>{nextTier.name} League</span>!</p>;
-                                    }
-                                    return <p>Grandmaster Status Attained! You are amongst the Elite.</p>;
-                                })()}
                             </div>
                         </div>
 

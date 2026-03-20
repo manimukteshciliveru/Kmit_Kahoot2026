@@ -294,8 +294,9 @@ module.exports = (io, socket) => {
         if (winner.score >= 50 && !isDraw) winnerBonus += 5; // Fast Win
         if (winner.hp === 100 && !isDraw) winnerBonus += 10; // Perfect Win
 
-        const winPoints  = isDraw ? 0 : calculatePoints(winnerUser.rank.points, loserUser.rank.points, true, winnerBonus);
-        const lossPoints = isDraw ? 0 : calculatePoints(loserUser.rank.points, winnerUser.rank.points, false, 0);
+        const baseDrawPts = winner.score > 0 ? 15 : 0;
+        const winPoints  = isDraw ? baseDrawPts : calculatePoints(winnerUser.rank.points, loserUser.rank.points, true, winnerBonus);
+        const lossPoints = isDraw ? baseDrawPts : calculatePoints(loserUser.rank.points, winnerUser.rank.points, false, 0);
 
         winnerUser.rank.points += winPoints;
         winnerUser.rank.winStreak += 1;
