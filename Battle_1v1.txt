@@ -97,7 +97,7 @@ const BattleArena = () => {
             }
             questionStartTimeRef.current = Date.now();
             currentMaxTimerRef.current = data.questionTimer;
-            startQuestionTimer(data.questionTimer);
+            startQuestionTimer(data.questionTimer, data.startTime);
             toast.success('Duel Started!', { icon: 'âš”ï¸' });
         });
 
@@ -133,9 +133,9 @@ const BattleArena = () => {
             setRoundStatus('answering');
             setRoundResult(null);
             hasSubmittedRef.current = false;
-            questionStartTimeRef.current = Date.now();
+            questionStartTimeRef.current = data.startTime || Date.now();
             currentMaxTimerRef.current = serverTimer;
-            startQuestionTimer(serverTimer);
+            startQuestionTimer(serverTimer, data.startTime);
         });
 
         socket.on('battle:ended', (data) => {
@@ -258,9 +258,10 @@ const BattleArena = () => {
         }
     }, [timer, roundStatus]);
 
-    const startQuestionTimer = (duration) => {
+    const startQuestionTimer = (duration, serverStartTime) => {
         cancelAnimationFrame(timerRef.current);
-        questionEndTimeRef.current = Date.now() + (duration * 1000);
+        const baseTime = serverStartTime || Date.now();
+        questionEndTimeRef.current = baseTime + (duration * 1000);
         
         const tick = () => {
             const now = Date.now();
@@ -945,6 +946,7 @@ module.exports = (io, socket) => {
                 questionTimer: newBattle.questionTimer,
                 totalQuestions: quiz.questions.length,
                 battleTimer: newBattle.battleTimer,
+                startTime: Date.now(), // âš¡ Authorized Sync Point
                 quiz: quiz
             });
 
@@ -1155,11 +1157,12 @@ module.exports = (io, socket) => {
                         roomQuestionIndex.set(battle.roomID, questionIndex + 1);
                         io.to(battle.roomID).emit('battle:next_question', { 
                             nextIndex: questionIndex + 1,
-                            timer: battle.questionTimer
+                            timer: battle.questionTimer,
+                            startTime: Date.now() // âš¡ Authorized Sync Point
                         });
                         startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, battle.questionTimer);
                     }
-                }, 4000);
+                }, 1500); // ðŸš€ Lightning fast transition 1.5s instead of 4s
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait
