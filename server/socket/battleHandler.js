@@ -8,6 +8,7 @@ const waitingPlayers = new Map(); // userId -> player stats
 const activeRoundTimers = new Map(); // roomID -> timeout
 
 module.exports = (io, socket) => {
+    if (!socket.user) return;
 
     const startServerRoundTimer = (roomID, battleId, questionIndex, duration) => {
         if (activeRoundTimers.has(roomID)) {
@@ -192,6 +193,7 @@ module.exports = (io, socket) => {
             socketId: socket.id,
             mode: mode,
             topic: topic,
+            displayTopic: topicRaw,
             questionCount: qCount,
             questionTimer: qTimer,
             battleTimer: bTimer,
@@ -210,7 +212,7 @@ module.exports = (io, socket) => {
             );
 
             if (opponent) {
-                createBattle(opponent, waitingPlayers.get(userId), topicRaw, qCount, qTimer, bTimer);
+                createBattle(opponent, waitingPlayers.get(userId), opponent.displayTopic, qCount, qTimer, bTimer);
             } else {
                 socket.emit('battle:searching');
             }
@@ -308,6 +310,7 @@ module.exports = (io, socket) => {
             if (opponentAnswer) {
                 if (activeRoundTimers.has(battle.roomID)) {
                     clearTimeout(activeRoundTimers.get(battle.roomID));
+                    activeRoundTimers.delete(battle.roomID);
                 }
                 // ROUND RESOLVED: Both answered
                 const resolution = {
@@ -388,7 +391,10 @@ module.exports = (io, socket) => {
         });
     });
 
-    const concludeBattle = async (battle) => {
+    const concludeBattle = async (battleInput) => {
+        const battle = await Battle.findOne({ battleId: battleInput.battleId });
+        if (!battle || battle.status === 'completed') return;
+
         if (activeRoundTimers.has(battle.roomID)) {
             clearTimeout(activeRoundTimers.get(battle.roomID));
             activeRoundTimers.delete(battle.roomID);
@@ -449,7 +455,7 @@ module.exports = (io, socket) => {
             winner: winner.name,
             results: [
                 { userId: winnerUser._id, name: winnerUser.name, rankDelta: winPoints, newPoints: winnerUser.rank.points, tier: winnerUser.rank.tier, lvl: winnerUser.rank.level },
-                { userId: loserUser._id, name: loserUser.name, rankDelta: lossPoints, newPoints: loserUser.rank.points, tier: loserUser.rank.tier, lvl: loserUser.rank.level }
+                { userId: loserUser._id, name: loserUser.name, rankDelta: isDraw ? lossPoints : -Math.abs(lossPoints), newPoints: loserUser.rank.points, tier: loserUser.rank.tier, lvl: loserUser.rank.level }
             ]
         });
 
@@ -468,7 +474,7 @@ module.exports = (io, socket) => {
                 'players.userId': socket.user._id
             });
 
-            if (activeBattle) {
+            if (activeBattle && activeBattle.status === 'active') {
                 const player = activeBattle.players.find(p => p.userId.toString() === userId);
                 const opponent = activeBattle.players.find(p => p.userId.toString() !== userId);
                 
