@@ -343,7 +343,7 @@ module.exports = (io, socket) => {
                 const resolution = {
                     questionIndex,
                     correctAnswer: question.correctAnswer,
-                    players: battle.players.map(p => {
+                    players: freshBattle.players.map(p => {
                         const ans = p.answers.find(a => a.questionIndex === questionIndex);
                         return {
                             userId: p.userId.toString(),
@@ -355,27 +355,33 @@ module.exports = (io, socket) => {
                         };
                     })
                 };
-
+                
                 io.to(battle.roomID).emit('battle:round_resolved', resolution);
 
-                // Wait 3 seconds then signal next question or end
+                // 🔥 Gate check: Only one submitter triggers the next round
+                const currentStoredIdx = roomQuestionIndex.get(battle.roomID);
+                if (currentStoredIdx !== undefined && currentStoredIdx > questionIndex) return;
+                
+                // Mark round as transitioning
+                roomQuestionIndex.set(battle.roomID, questionIndex + 1);
+
                 setTimeout(async () => {
                     const refreshedBattle = await Battle.findOne({ battleId });
+                    if (!refreshedBattle) return;
                     const lastQuestion = questionIndex === refreshedBattle.quiz.questions.length - 1;
 
                     if (lastQuestion) {
                         await concludeBattle(refreshedBattle);
                     } else {
-                        roomQuestionIndex.set(battle.roomID, questionIndex + 1);
                         io.to(battle.roomID).emit('battle:next_question', { 
                             nextIndex: questionIndex + 1,
-                            timer: battle.questionTimer,
+                            timer: refreshedBattle.questionTimer,
                             startTime: Date.now(),
-                            serverTime: Date.now() // 🕒 For Clock Sync
+                            serverTime: Date.now()
                         });
-                        startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, battle.questionTimer);
+                        startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, refreshedBattle.questionTimer);
                     }
-                }, 1000); // Super fast 1s loading after both submit!
+                }, 500); // Super fast 0.5s loading after both submit!
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait
@@ -383,7 +389,7 @@ module.exports = (io, socket) => {
                 
                 if (hpChanged || scoreChanged) {
                     io.to(battle.roomID).emit('battle:sync', {
-                        players: battle.players.map(p => ({
+                        players: freshBattle.players.map(p => ({ // Send from FRESH state
                             userId: p.userId.toString(),
                             name: p.name,
                             hp: p.hp,

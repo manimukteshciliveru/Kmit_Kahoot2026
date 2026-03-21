@@ -355,6 +355,11 @@ const BattleArena = () => {
                         <div className={`hud-side self ${damageEffect === 'self' ? 'damaged' : ''}`}>
                             <div className="hud-meta">
                                 <span className="hud-name text-blue-400 font-bold">{user.name}</span>
+                                {(() => {
+                                    const myId = (user.id || user._id)?.toString();
+                                    const myData = syncData?.players?.find(p => p.userId === myId);
+                                    return <span className="hud-score text-blue-300/80 text-xs ml-2">({myData?.score ?? 0} pts)</span>;
+                                })()}
                             </div>
                             {(() => {
                                 const myId = (user.id || user._id)?.toString();
@@ -380,11 +385,16 @@ const BattleArena = () => {
                         </div>
 
                         <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
-                            <div className="hud-meta">
+                            <div className="hud-meta flex items-center gap-2">
                                 {(() => {
                                     const myId = (user.id || user._id)?.toString();
                                     const oppData = syncData?.players?.find(p => p.userId !== myId);
-                                    return <span className="hud-name text-white font-bold">{oppData?.name || 'Opponent'}</span>;
+                                    return (
+                                        <>
+                                            <span className="hud-name text-white font-bold">{oppData?.name || 'Opponent'}</span>
+                                            <span className="hud-score text-white/60 text-xs shadow-glow-sm">({oppData?.score ?? 0} pts)</span>
+                                        </>
+                                    );
                                 })()}
                             </div>
                             {(() => {

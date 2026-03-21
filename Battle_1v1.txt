@@ -45,6 +45,7 @@ const BattleArena = () => {
     const hasSubmittedRef = useRef(false);
     const questionStartTimeRef = useRef(Date.now());
     const questionEndTimeRef = useRef(0);
+    const timeOffsetRef = useRef(0); // ðŸ•’ Server-Client Clock Offset
     const currentMaxTimerRef = useRef(20);
     const [lastTimeTaken, setLastTimeTaken] = useState(0);
     const [opponentName, setOpponentName] = useState('Opponent');
@@ -95,9 +96,9 @@ const BattleArena = () => {
                 setTotalRemaining(data.battleTimer);
                 startOverallTimer();
             }
-            questionStartTimeRef.current = Date.now();
+            questionStartTimeRef.current = data.startTime || Date.now();
             currentMaxTimerRef.current = data.questionTimer;
-            startQuestionTimer(data.questionTimer, data.startTime);
+            startQuestionTimer(data.questionTimer, data.startTime, data.serverTime);
             toast.success('Duel Started!', { icon: 'âš”ï¸' });
         });
 
@@ -135,7 +136,7 @@ const BattleArena = () => {
             hasSubmittedRef.current = false;
             questionStartTimeRef.current = data.startTime || Date.now();
             currentMaxTimerRef.current = serverTimer;
-            startQuestionTimer(serverTimer, data.startTime);
+            startQuestionTimer(serverTimer, data.startTime, data.serverTime);
         });
 
         socket.on('battle:ended', (data) => {
@@ -201,6 +202,7 @@ const BattleArena = () => {
         socket.on('battle:timer_extended', () => {
             currentMaxTimerRef.current += 15;
             questionEndTimeRef.current += 15000;
+            // Recalculate immediate offset logic if needed, but end-time is now absolute
             toast.success('Time Extended by 15s!', { icon: 'âž•' });
         });
 
@@ -258,14 +260,19 @@ const BattleArena = () => {
         }
     }, [timer, roundStatus]);
 
-    const startQuestionTimer = (duration, serverStartTime) => {
+    const startQuestionTimer = (duration, serverStartTime, serverRecordTime) => {
         cancelAnimationFrame(timerRef.current);
-        const baseTime = serverStartTime || Date.now();
-        questionEndTimeRef.current = baseTime + (duration * 1000);
+        
+        if (serverRecordTime) {
+            timeOffsetRef.current = serverRecordTime - Date.now();
+        }
+
+        const baseTimeAtServer = serverStartTime || (Date.now() + timeOffsetRef.current);
+        questionEndTimeRef.current = baseTimeAtServer + (duration * 1000);
         
         const tick = () => {
-            const now = Date.now();
-            const remaining = Math.max(0, Math.ceil((questionEndTimeRef.current - now) / 1000));
+            const nowAtServer = Date.now() + timeOffsetRef.current;
+            const remaining = Math.max(0, Math.ceil((questionEndTimeRef.current - nowAtServer) / 1000));
             setTimer(remaining);
             if (remaining > 0) {
                 timerRef.current = requestAnimationFrame(tick);
@@ -349,6 +356,11 @@ const BattleArena = () => {
                         <div className={`hud-side self ${damageEffect === 'self' ? 'damaged' : ''}`}>
                             <div className="hud-meta">
                                 <span className="hud-name text-blue-400 font-bold">{user.name}</span>
+                                {(() => {
+                                    const myId = (user.id || user._id)?.toString();
+                                    const myData = syncData?.players?.find(p => p.userId === myId);
+                                    return <span className="hud-score text-blue-300/80 text-xs ml-2">({myData?.score ?? 0} pts)</span>;
+                                })()}
                             </div>
                             {(() => {
                                 const myId = (user.id || user._id)?.toString();
@@ -374,11 +386,16 @@ const BattleArena = () => {
                         </div>
 
                         <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
-                            <div className="hud-meta">
+                            <div className="hud-meta flex items-center gap-2">
                                 {(() => {
                                     const myId = (user.id || user._id)?.toString();
                                     const oppData = syncData?.players?.find(p => p.userId !== myId);
-                                    return <span className="hud-name text-white font-bold">{oppData?.name || 'Opponent'}</span>;
+                                    return (
+                                        <>
+                                            <span className="hud-name text-white font-bold">{oppData?.name || 'Opponent'}</span>
+                                            <span className="hud-score text-white/60 text-xs shadow-glow-sm">({oppData?.score ?? 0} pts)</span>
+                                        </>
+                                    );
                                 })()}
                             </div>
                             {(() => {
@@ -946,7 +963,8 @@ module.exports = (io, socket) => {
                 questionTimer: newBattle.questionTimer,
                 totalQuestions: quiz.questions.length,
                 battleTimer: newBattle.battleTimer,
-                startTime: Date.now(), // âš¡ Authorized Sync Point
+                startTime: Date.now(),
+                serverTime: Date.now(), // ðŸ•’ For Clock Sync
                 quiz: quiz
             });
 
@@ -1119,8 +1137,13 @@ module.exports = (io, socket) => {
 
             await battle.save();
 
-            // Check if BOTH have answered THIS question
-            const opponentAnswer = opponent.answers.find(a => a.questionIndex === questionIndex);
+            // ðŸ”¥ Race Condition Fix: Fetch FRESH state to see if other player answered
+            const freshBattle = await Battle.findOne({ battleId }).populate('players.userId');
+            if (!freshBattle) return;
+
+            const freshMe = freshBattle.players.find(p => p.userId._id.toString() === myId);
+            const freshOpp = freshBattle.players.find(p => p.userId._id.toString() !== myId);
+            const opponentAnswer = freshOpp.answers.find(a => a.questionIndex === questionIndex);
 
             if (opponentAnswer) {
                 if (activeRoundTimers.has(battle.roomID)) {
@@ -1131,7 +1154,7 @@ module.exports = (io, socket) => {
                 const resolution = {
                     questionIndex,
                     correctAnswer: question.correctAnswer,
-                    players: battle.players.map(p => {
+                    players: freshBattle.players.map(p => {
                         const ans = p.answers.find(a => a.questionIndex === questionIndex);
                         return {
                             userId: p.userId.toString(),
@@ -1143,26 +1166,33 @@ module.exports = (io, socket) => {
                         };
                     })
                 };
-
+                
                 io.to(battle.roomID).emit('battle:round_resolved', resolution);
 
-                // Wait 3 seconds then signal next question or end
+                // ðŸ”¥ Gate check: Only one submitter triggers the next round
+                const currentStoredIdx = roomQuestionIndex.get(battle.roomID);
+                if (currentStoredIdx !== undefined && currentStoredIdx > questionIndex) return;
+                
+                // Mark round as transitioning
+                roomQuestionIndex.set(battle.roomID, questionIndex + 1);
+
                 setTimeout(async () => {
                     const refreshedBattle = await Battle.findOne({ battleId });
+                    if (!refreshedBattle) return;
                     const lastQuestion = questionIndex === refreshedBattle.quiz.questions.length - 1;
 
                     if (lastQuestion) {
                         await concludeBattle(refreshedBattle);
                     } else {
-                        roomQuestionIndex.set(battle.roomID, questionIndex + 1);
                         io.to(battle.roomID).emit('battle:next_question', { 
                             nextIndex: questionIndex + 1,
-                            timer: battle.questionTimer,
-                            startTime: Date.now() // âš¡ Authorized Sync Point
+                            timer: refreshedBattle.questionTimer,
+                            startTime: Date.now(),
+                            serverTime: Date.now()
                         });
-                        startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, battle.questionTimer);
+                        startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, refreshedBattle.questionTimer);
                     }
-                }, 1500); // ðŸš€ Lightning fast transition 1.5s instead of 4s
+                }, 500); // Super fast 0.5s loading after both submit!
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait
@@ -1170,7 +1200,7 @@ module.exports = (io, socket) => {
                 
                 if (hpChanged || scoreChanged) {
                     io.to(battle.roomID).emit('battle:sync', {
-                        players: battle.players.map(p => ({
+                        players: freshBattle.players.map(p => ({ // Send from FRESH state
                             userId: p.userId.toString(),
                             name: p.name,
                             hp: p.hp,
@@ -1797,7 +1827,11 @@ module.exports = { generateBattleQuiz };
 }
 
 .hud-name { font-weight: 700; color: #94A3B8; }
-.hud-score { color: #60A5FA; font-weight: 600; }
+.hud-score { 
+  color: #60A5FA; 
+  font-weight: 600; 
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.4); 
+}
 
 .hp-container {
   height: 12px;
