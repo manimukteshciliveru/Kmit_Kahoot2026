@@ -1,10 +1,17 @@
+﻿# ⚔️ 1V1 BATTLE ARENA - FULL SOURCE CODE & DOCUMENTATION
+Complete system for the 1v1 Battle Arena.
 
+## 🛠️ COMPONENT DIRECTORY:
+1. FRONTEND: BattleArena.jsx
+2. BACKEND: battleHandler.js
+3. DATA: Battle.js
+4. MATH: rankManager.js
+5. AI: battleAI.service.js
+6. CSS: BattleArena.css
 
-=======================================================
-FILE: client/src/pages/student/BattleArena.jsx
-DESCRIPTION: Frontend React Component for the 1v1 Battle Arena UI. Handles lobby, matching, rendering questions, and battle UI.
-=======================================================
+---
 
+--- [1/6] FRONTEND UI: BattleArena.jsx ---
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
@@ -19,7 +26,7 @@ import './BattleArena.css';
 const BattleArena = () => {
     const { socket, connected } = useSocket();
     const { user } = useAuth();
-    const [view, setView] = useState('selection'); // selection, searching, lobby, playing, results
+    const [view, setView] = useState('selection'); // selection, searching, lobby, playing, results, preparing
     const [lobbyPlayers, setLobbyPlayers] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSubTopic, setSelectedSubTopic] = useState('');
@@ -29,6 +36,8 @@ const BattleArena = () => {
     const [battleData, setBattleData] = useState(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [timer, setTimer] = useState(20);
+    const [battleTimer, setBattleTimer] = useState(0); 
+    const [totalRemaining, setTotalRemaining] = useState(0);
     const [searchTime, setSearchTime] = useState(0);
     
     // Synchronized Progression States
@@ -44,6 +53,16 @@ const BattleArena = () => {
 
     const timerRef = useRef(null);
     const searchInterval = useRef(null);
+    const overallTimerRef = useRef(null);
+    const syncDataRef = useRef(null);
+    const hasSubmittedRef = useRef(false);
+    const questionStartTimeRef = useRef(Date.now());
+    const questionEndTimeRef = useRef(0);
+    const timeOffsetRef = useRef(0); // ðŸ•’ Server-Client Clock Offset
+    const currentMaxTimerRef = useRef(20);
+    const [lastTimeTaken, setLastTimeTaken] = useState(0);
+    const [opponentName, setOpponentName] = useState('Opponent');
+    const [showLevelMap, setShowLevelMap] = useState(false);
 
     const TOPIC_STRUCTURE = {
         'Python': ['Basics', 'Loops', 'Arrays', 'Classes', 'Dictionaries', 'Functions', 'Decorators', 'Generators', 'Iterators', 'Exception Handling', 'File I/O', 'Regex', 'OOPs', 'Multithreading', 'Networking', 'Web Scrapping'],
@@ -55,13 +74,13 @@ const BattleArena = () => {
     };
 
     const TIER_ROADMAP = [
-        { name: 'Bronze', min: 0, icon: <LuShieldCheck className="text-orange-600" /> },
-        { name: 'Silver', min: 600, icon: <LuShieldCheck className="text-gray-400" /> },
-        { name: 'Gold', min: 1500, icon: <LuCrown className="text-yellow-400" /> },
-        { name: 'Platinum', min: 2700, icon: <LuZap className="text-cyan-400" /> },
-        { name: 'Diamond', min: 3900, icon: <LuTarget className="text-blue-500" /> },
-        { name: 'Master', min: 4800, icon: <LuFlame className="text-purple-500" /> },
-        { name: 'Grandmaster', min: 5000, icon: <LuCrown className="text-red-500" /> }
+        { name: 'Bronze', min: 0, slug: 'bronze', icon: <LuShieldCheck style={{ color: '#CD7F32' }} /> },
+        { name: 'Silver', min: 600, slug: 'silver', icon: <LuShieldCheck style={{ color: '#C0C0C0' }} /> },
+        { name: 'Gold', min: 1500, slug: 'gold', icon: <LuCrown style={{ color: '#FFD700' }} /> },
+        { name: 'Platinum', min: 2700, slug: 'platinum', icon: <LuZap style={{ color: '#50C878' }} /> },
+        { name: 'Diamond', min: 3900, slug: 'diamond', icon: <LuTarget style={{ color: '#B9F2FF' }} /> },
+        { name: 'Master', min: 4800, slug: 'master', icon: <LuFlame style={{ color: '#FF4D4D' }} /> },
+        { name: 'Grandmaster', min: 5000, slug: 'gm', icon: <LuCrown style={{ color: '#FF00FF' }} /> }
     ];
 
     useEffect(() => {
@@ -85,27 +104,36 @@ const BattleArena = () => {
             setView('playing');
             setCurrentQuestionIndex(0);
             setRoundStatus('answering');
-            startQuestionTimer();
-            toast.success('Duel Started!', { icon: '⚔️' });
+            
+            if (data.battleTimer > 0) {
+                setTotalRemaining(data.battleTimer);
+                startOverallTimer();
+            }
+            questionStartTimeRef.current = data.startTime || Date.now();
+            currentMaxTimerRef.current = data.questionTimer;
+            startQuestionTimer(data.questionTimer, data.startTime, data.serverTime);
+            toast.success('Duel Started!', { icon: 'âš”ï¸' });
         });
 
         socket.on('battle:sync', (data) => {
-            if (syncData) {
-                const myId = user.id || user._id;
-                const myPrevHp = syncData.players.find(p => p.userId.toString() === myId.toString())?.hp;
-                const myNewHp = data.players.find(p => p.userId.toString() === myId.toString())?.hp;
-                const oppPrevHp = syncData.players.find(p => p.userId.toString() !== myId.toString())?.hp;
-                const oppNewHp = data.players.find(p => p.userId.toString() !== myId.toString())?.hp;
-
-                if (myNewHp < myPrevHp) triggerDamageEffect('self');
-                if (oppNewHp < oppPrevHp) triggerDamageEffect('opponent');
+            const prev = syncDataRef.current;
+            if (prev) {
+                const myId = (user.id || user._id).toString();
+                const myPrev  = prev.players.find(p => p.userId === myId);
+                const myNew   = data.players.find(p => p.userId === myId);
+                const oppPrev = prev.players.find(p => p.userId !== myId);
+                const oppNew  = data.players.find(p => p.userId !== myId);
+                if (myNew?.hp  < myPrev?.hp)  triggerDamageEffect('self');
+                if (oppNew?.hp < oppPrev?.hp) triggerDamageEffect('opponent');
             }
+            syncDataRef.current = data;
             setSyncData(data);
         });
 
-        socket.on('battle:waiting_for_opponent', () => {
+        socket.on('battle:waiting_for_opponent', (data) => {
             setRoundStatus('waiting');
-            clearInterval(timerRef.current);
+            if (data?.opponentName) setOpponentName(data.opponentName);
+            cancelAnimationFrame(timerRef.current);
         });
 
         socket.on('battle:round_resolved', (data) => {
@@ -114,15 +142,18 @@ const BattleArena = () => {
             clearInterval(timerRef.current);
         });
 
-        socket.on('battle:next_question', ({ nextIndex }) => {
+        socket.on('battle:next_question', ({ nextIndex, timer: serverTimer }) => {
             setCurrentQuestionIndex(nextIndex);
             setRoundStatus('answering');
             setRoundResult(null);
-            startQuestionTimer();
+            hasSubmittedRef.current = false;
+            questionStartTimeRef.current = data.startTime || Date.now();
+            currentMaxTimerRef.current = serverTimer;
+            startQuestionTimer(serverTimer, data.startTime, data.serverTime);
         });
 
         socket.on('battle:ended', (data) => {
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             setFinalResults(data);
             setView('results');
         });
@@ -134,10 +165,62 @@ const BattleArena = () => {
             searchInterval.current = setInterval(() => setSearchTime(p => p + 1), 1000);
         });
 
+        socket.on('battle:preparing', () => {
+            setView('preparing');
+        });
+
         socket.on('battle:opponent_left', (data) => {
-            toast.success(data.message, { icon: '🏆', duration: 5000 });
-            clearInterval(timerRef.current);
+            toast.success(data.message, { icon: 'ðŸ†', duration: 5000 });
+            cancelAnimationFrame(timerRef.current);
+            clearInterval(overallTimerRef.current);
             setView('selection');
+        });
+
+        socket.on('battle:disconnect', () => {
+            toast.error('Disconnected from battle server. Returning to selection.', { duration: 5000 });
+            cancelAnimationFrame(timerRef.current);
+            clearInterval(searchInterval.current);
+            clearInterval(overallTimerRef.current);
+            setView('selection');
+        });
+
+        socket.on('battle:extension_received', ({ requesterName }) => {
+            toast((t) => (
+                <div className="flex flex-col gap-2">
+                    <span><strong>{requesterName}</strong> wants 15s more for this question!</span>
+                    <div className="flex gap-2">
+                        <button 
+                            className="bg-green-600 px-3 py-1 rounded text-white" 
+                            onClick={() => {
+                                socket.emit('battle:extension_respond', { battleId: battleDataRef.current?.battleId, accept: true });
+                                toast.dismiss(t.id);
+                            }}
+                        >
+                            Allow
+                        </button>
+                        <button 
+                            className="bg-red-600 px-3 py-1 rounded text-white" 
+                            onClick={() => {
+                                socket.emit('battle:extension_respond', { battleId: battleDataRef.current?.battleId, accept: false });
+                                toast.dismiss(t.id);
+                            }}
+                        >
+                            Deny
+                        </button>
+                    </div>
+                </div>
+            ), { duration: 8000, icon: 'â³' });
+        });
+
+        socket.on('battle:timer_extended', () => {
+            currentMaxTimerRef.current += 15;
+            questionEndTimeRef.current += 15000;
+            // Recalculate immediate offset logic if needed, but end-time is now absolute
+            toast.success('Time Extended by 15s!', { icon: 'âž•' });
+        });
+
+        socket.on('battle:extension_denied', () => {
+            toast.error('Extension Request Denied');
         });
 
         return () => {
@@ -151,23 +234,27 @@ const BattleArena = () => {
             socket.off('battle:ended');
             socket.off('battle:searching');
             socket.off('battle:opponent_left');
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             clearInterval(searchInterval.current);
+            clearInterval(overallTimerRef.current);
+            socket.off('battle:disconnect');
+            socket.off('battle:extension_received');
+            socket.off('battle:timer_extended');
+            socket.off('battle:extension_denied');
         };
-    }, [socket, connected, syncData, user]);
+    }, [socket, connected, user]);
 
-    const triggerDamageEffect = (target) => {
-        setDamageEffect(target);
-        setTimeout(() => setDamageEffect(null), 500);
-    };
+    const battleDataRef = useRef(null);
+    useEffect(() => {
+        battleDataRef.current = battleData;
+    }, [battleData]);
 
-    const startQuestionTimer = () => {
-        setTimer(20);
-        clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-            setTimer(prev => {
-                if (prev <= 1) {
-                    handleAnswer(null);
+    const startOverallTimer = () => {
+        clearInterval(overallTimerRef.current);
+        overallTimerRef.current = setInterval(() => {
+            setTotalRemaining(prev => {
+                if (prev <= 0) {
+                    clearInterval(overallTimerRef.current);
                     return 0;
                 }
                 return prev - 1;
@@ -175,16 +262,58 @@ const BattleArena = () => {
         }, 1000);
     };
 
-    const handleAnswer = (answerIndex) => {
-        if (roundStatus !== 'answering') return;
+    const triggerDamageEffect = (target) => {
+        setDamageEffect(target);
+        setTimeout(() => setDamageEffect(null), 500);
+    };
+
+    useEffect(() => {
+        if (timer === 0 && roundStatus === 'answering') {
+            handleAnswer(null);
+        }
+    }, [timer, roundStatus]);
+
+    const startQuestionTimer = (duration, serverStartTime, serverRecordTime) => {
+        cancelAnimationFrame(timerRef.current);
         
-        clearInterval(timerRef.current);
+        if (serverRecordTime) {
+            timeOffsetRef.current = serverRecordTime - Date.now();
+        }
+
+        const baseTimeAtServer = serverStartTime || (Date.now() + timeOffsetRef.current);
+        questionEndTimeRef.current = baseTimeAtServer + (duration * 1000);
+        
+        const tick = () => {
+            const nowAtServer = Date.now() + timeOffsetRef.current;
+            const remaining = Math.max(0, Math.ceil((questionEndTimeRef.current - nowAtServer) / 1000));
+            setTimer(remaining);
+            if (remaining > 0) {
+                timerRef.current = requestAnimationFrame(tick);
+            }
+        };
+        timerRef.current = requestAnimationFrame(tick);
+    };
+
+    const requestExtension = () => {
+        if (socket && battleData) {
+            socket.emit('battle:request_extension', { battleId: battleData.battleId });
+            toast.success('Extension Request Sent');
+        }
+    };
+
+    const handleAnswer = (answerIndex) => {
+        if (roundStatus !== 'answering' || hasSubmittedRef.current) return;
+        hasSubmittedRef.current = true;
+        setRoundStatus('waiting');
+        cancelAnimationFrame(timerRef.current);
+        const timeTaken = Date.now() - questionStartTimeRef.current;
+        setLastTimeTaken(timeTaken);
         if (socket && battleData) {
             socket.emit('battle:submit_answer', {
                 battleId: battleData.battleId,
                 questionIndex: currentQuestionIndex,
                 answer: answerIndex,
-                timeTaken: (20 - timer) * 1000
+                timeTaken
             });
         }
     };
@@ -200,7 +329,8 @@ const BattleArena = () => {
                 mode, 
                 topic: selectedSubTopic ? `${selectedCategory}: ${selectedSubTopic}` : 'General',
                 questionCount,
-                questionTimer
+                questionTimer,
+                battleTimer
             });
         }
     };
@@ -212,7 +342,8 @@ const BattleArena = () => {
                 targetUserId, 
                 topic: `${selectedCategory}: ${selectedSubTopic}`,
                 questionCount,
-                questionTimer
+                questionTimer,
+                battleTimer
             });
             toast.success('Challenge Dispatched!');
         }
@@ -238,7 +369,21 @@ const BattleArena = () => {
                         <div className={`hud-side self ${damageEffect === 'self' ? 'damaged' : ''}`}>
                             <div className="hud-meta">
                                 <span className="hud-name text-blue-400 font-bold">{user.name}</span>
+                                {(() => {
+                                    const myId = (user.id || user._id)?.toString();
+                                    const myData = syncData?.players?.find(p => p.userId === myId);
+                                    return <span className="hud-score text-blue-300/80 text-xs ml-2">({myData?.score ?? 0} pts)</span>;
+                                })()}
                             </div>
+                            {(() => {
+                                const myId = (user.id || user._id)?.toString();
+                                const myData = syncData?.players?.find(p => p.userId === myId);
+                                return (
+                                    <div className="hp-container">
+                                        <div className={`hp-bar ${(myData?.hp ?? 100) > 60 ? 'healthy' : (myData?.hp ?? 100) > 30 ? 'moderate' : 'critical'}`} style={{ width: `${myData?.hp ?? 100}%` }} />
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         <div className="match-timer-ring">
@@ -246,25 +391,52 @@ const BattleArena = () => {
                                 <circle cx="50" cy="50" r="45" className="timer-bg" />
                                 <circle 
                                     cx="50" cy="50" r="45" 
-                                    className="timer-progress" 
-                                    style={{ strokeDashoffset: 283 - (283 * (timer / (battleData?.questionTimer || 20))) }}
+                                    className={`timer-progress ${timer <= 5 ? 'danger' : timer <= 10 ? 'warning' : ''}`} 
+                                    style={{ strokeDashoffset: Math.max(0, 283 - (283 * (timer / currentMaxTimerRef.current))) }}
                                 />
                             </svg>
                             <span className="timer-val">{timer}</span>
                         </div>
 
                         <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
-                            <div className="hud-meta">
-                                <span className="hud-name text-white font-bold">Opponent</span>
+                            <div className="hud-meta flex items-center gap-2">
+                                {(() => {
+                                    const myId = (user.id || user._id)?.toString();
+                                    const oppData = syncData?.players?.find(p => p.userId !== myId);
+                                    return (
+                                        <>
+                                            <span className="hud-name text-white font-bold">{oppData?.name || 'Opponent'}</span>
+                                            <span className="hud-score text-white/60 text-xs shadow-glow-sm">({oppData?.score ?? 0} pts)</span>
+                                        </>
+                                    );
+                                })()}
                             </div>
+                            {(() => {
+                                const myId = (user.id || user._id)?.toString();
+                                const oppData = syncData?.players?.find(p => p.userId !== myId);
+                                return (
+                                    <div className="hp-container">
+                                        <div className={`hp-bar ${(oppData?.hp ?? 100) > 60 ? 'healthy' : (oppData?.hp ?? 100) > 30 ? 'moderate' : 'critical'}`} style={{ width: `${oppData?.hp ?? 100}%` }} />
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
+
+                    {battleData.battleTimer > 0 && (
+                        <div className="overall-match-timer glass">
+                            <span className="label">Match Ends In:</span>
+                            <span className="time">{Math.floor(totalRemaining / 60)}:{(totalRemaining % 60).toString().padStart(2, '0')}</span>
+                        </div>
+                    )}
 
                     <div className="combat-stage animate-scale-in">
                         {roundStatus === 'answering' && (
                             <div className="question-box glass">
                                 <div className="q-indicator">Question {currentQuestionIndex + 1} / {battleData.quiz.questions.length}</div>
-                                <h2>{battleData.quiz.questions[currentQuestionIndex].questionText}</h2>
+                                <h2 style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', textAlign: 'left', lineHeight: '1.6', fontSize: '1.2rem', margin: '1rem 0 2rem 0' }}>
+                                    {battleData.quiz.questions[currentQuestionIndex].questionText}
+                                </h2>
                                 <div className="options-grid-v2">
                                     {battleData.quiz.questions[currentQuestionIndex].options.map((opt, idx) => (
                                         <button key={idx} className="opt-v2" onClick={() => handleAnswer(idx)}>
@@ -273,14 +445,19 @@ const BattleArena = () => {
                                         </button>
                                     ))}
                                 </div>
+                                <div className="q-footer-actions flex justify-end mt-4">
+                                    <button className="btn-extension flex items-center gap-2 text-xs text-orange-400 border border-orange-400/30 px-3 py-2 rounded-lg hover:bg-orange-400/10" onClick={requestExtension}>
+                                        <LuTimer className="animate-pulse" /> Too Tough? Request +15s
+                                    </button>
+                                </div>
                             </div>
                         )}
 
                         {roundStatus === 'waiting' && (
                             <div className="waiting-overlay glass animate-pulse">
                                 <LuTimer className="waiting-icon" />
-                                <h2>Waiting for Opponent...</h2>
-                                <p>You answered in {((20 - timer)).toFixed(1)}s</p>
+                                <h2>Waiting for <span style={{color: '#60A5FA'}}>{opponentName}</span>...</h2>
+                                <p>You answered in {(lastTimeTaken / 1000).toFixed(1)}s</p>
                             </div>
                         )}
 
@@ -324,17 +501,77 @@ const BattleArena = () => {
                     </div>
 
                     <div className="user-rank-status">
-                        <div className="rank-card-v2 glass">
-                            {getRankIcon(user.rank?.tier)}
-                            <div className="rank-details">
-                                <h3>{user.rank?.tier || 'Bronze'} {user.rank?.level || 'I'}</h3>
-                                <p>{user.rank?.points || 0} Rating Points</p>
+                        <div className="rank-card-v2 glass relative flex items-center gap-6 justify-between p-6">
+                            <div className="flex items-center gap-4">
+                                {getRankIcon(user.rank?.tier)}
+                                <div className="rank-details">
+                                    <h3>{user.rank?.tier || 'Bronze'} {user.rank?.level || 'I'}</h3>
+                                    <p>{user.rank?.points || 0} Rating Points</p>
+                                </div>
                             </div>
-                            <div className="streak-badge animate-glow">
-                                <LuFlame /> {user.rank?.winStreak || 0} Streak
+                            
+                            <div className="flex items-center gap-10 relative z-10">
+                                <button 
+                                    className={`btn-roadmap-toggle ${showLevelMap ? 'active' : ''}`}
+                                    onClick={() => setShowLevelMap(!showLevelMap)}
+                                    style={{ margin: '1em' }}
+                                >
+                                    <LuTrophy className="icon" />
+                                    <span>Level Map</span>
+                                </button>
+                                <div className="streak-badge animate-glow">
+                                    <LuFlame /> {user.rank?.winStreak || 0} Streak
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    {showLevelMap && (
+                        <div className="rank-roadmap-container glass mb-8 p-6 pl-12 animate-slideDown w-full">
+                            <div className="roadmap-header">
+                                <LuTrophy className="text-yellow-400" />
+                                <h3>Battle Rank Roadmap</h3>
+                                <span className="current-pts">{user.rank?.points || 0} RP</span>
+                            </div>
+                            <div className="roadmap-steps">
+                                {TIER_ROADMAP.map((t, idx) => {
+                                    const currentPoints = user.rank?.points || 0;
+                                    const isReached = currentPoints >= t.min;
+                                    const nextLevel = TIER_ROADMAP[idx + 1];
+                                    let progress = 0;
+                                    
+                                    if (nextLevel && currentPoints >= t.min) {
+                                        progress = Math.min(100, ((currentPoints - t.min) / (nextLevel.min - t.min)) * 100);
+                                    } else if (!nextLevel && currentPoints >= t.min) {
+                                        progress = 100;
+                                    }
+
+                                    return (
+                                        <div key={t.name} className={`roadmap-node node-${t.slug} ${isReached ? 'reached' : ''}`}>
+                                            <div className="node-icon-wrapper">
+                                                {t.icon}
+                                                <div className="node-label">{t.name}</div>
+                                                <div className="node-threshold">{t.min}</div>
+                                            </div>
+                                            {idx < TIER_ROADMAP.length - 1 && (
+                                                <div className="roadmap-connector">
+                                                    <div className="connector-fill" style={{ width: `${progress}%` }}></div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="roadmap-footer">
+                                {(() => {
+                                    const currentPoints = user.rank?.points || 0;
+                                    const nextTier = TIER_ROADMAP.find(t => t.min > currentPoints);
+                                    if (!nextTier) return <span>Maximum Rank Achieved!</span>;
+                                    return <span><strong>{nextTier.min - currentPoints} RP</strong> needed for {nextTier.name}</span>;
+                                })()}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="arena-controls glass">
                         <div className="path-picker">
@@ -365,19 +602,63 @@ const BattleArena = () => {
                                         </select>
                                     </div>
                                     <div className="flex-1">
-                                        <label className="form-label">Duration</label>
-                                        <select className="form-select" value={questionTimer} onChange={(e) => setQuestionTimer(Number(e.target.value))}>
-                                            <option value={10}>10s / q</option>
-                                            <option value={20}>20s / q</option>
-                                            <option value={30}>30s / q</option>
-                                            <option value={60}>60s / q</option>
-                                        </select>
+                                        <label className="form-label">Duration (s/q)</label>
+                                        <div className="flex gap-2">
+                                            <select 
+                                                className="form-select flex-1" 
+                                                value={[10, 20, 30, 60].includes(questionTimer) ? questionTimer : 'custom'} 
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === 'custom') {
+                                                        const custom = prompt("Enter custom time (seconds per question):", "45");
+                                                        if (custom && !isNaN(custom)) setQuestionTimer(Number(custom));
+                                                    } else {
+                                                        setQuestionTimer(Number(val));
+                                                    }
+                                                }}
+                                            >
+                                                <option value={10}>10s / q</option>
+                                                <option value={20}>20s / q</option>
+                                                <option value={30}>30s / q</option>
+                                                <option value={60}>60s / q</option>
+                                                <option value="custom">Custom...</option>
+                                            </select>
+                                            {![10, 20, 30, 60].includes(questionTimer) && (
+                                                <div className="custom-timer-badge">{questionTimer}s</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="form-label">Battle Timer (optional)</label>
+                                        <div className="flex gap-2">
+                                            <select 
+                                                className="form-select flex-1" 
+                                                value={[0, 120, 300, 600].includes(battleTimer) ? battleTimer : 'custom'} 
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === 'custom') {
+                                                        const min = prompt("Enter custom battle time (minutes):", "15");
+                                                        if (min && !isNaN(min)) setBattleTimer(Number(min) * 60);
+                                                    } else {
+                                                        setBattleTimer(Number(val));
+                                                    }
+                                                }}
+                                            >
+                                                <option value={0}>None</option>
+                                                <option value={120}>2 mins</option>
+                                                <option value={300}>5 mins</option>
+                                                <option value={600}>10 mins</option>
+                                                <option value="custom">Custom...</option>
+                                            </select>
+                                            {![0, 120, 300, 600].includes(battleTimer) && (
+                                                <div className="custom-timer-badge total">{Math.floor(battleTimer/60)}m {battleTimer%60}s</div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
                         </div>
-
-                        <div className="action-buttons">
+                        <div className="action-buttons mt-6">
                             <button className="btn-match random btn-lg" disabled={!selectedSubTopic} onClick={() => startSearch('random')}>
                                 <LuSword className="animate-bounce" /> Find Match
                             </button>
@@ -390,34 +671,46 @@ const BattleArena = () => {
             )}
 
             {view === 'searching' && (
-                <div className="searching-v2 animate-fadeIn">
+                <div className="searching-v2 animate-fade-in flex flex-col items-center justify-center min-h-[60vh]">
                     <div className="radar-v2">
-                        <div className="circle"></div>
-                        <div className="circle"></div>
-                        <div className="circle"></div>
-                        <LuSword className="radar-sword" />
+                        <div className="circle animate-ping"></div>
+                        <LuSword className="radar-sword animate-spin" />
                     </div>
-                    <h2 className="animate-pulse">Finding Opponent...</h2>
-                    <div className="search-meta">
-                        <span className="badge badge-primary">{selectedCategory}</span>
-                        <span className="badge badge-warning">{selectedSubTopic}</span>
+                    <h2 className="text-2xl font-bold mt-8 animate-pulse text-blue-400">Finding Opponent...</h2>
+                    <div className="search-meta flex gap-4 mt-6">
+                        <span className="bg-blue-600/20 text-blue-400 px-4 py-1 rounded-full border border-blue-400/30">{selectedCategory}</span>
+                        <span className="bg-orange-600/20 text-orange-400 px-4 py-1 rounded-full border border-orange-400/30">{selectedSubTopic}</span>
                     </div>
-                    <span className="search-timer">{searchTime}s</span>
-                    <button className="btn btn-danger btn-sm" onClick={() => setView('selection')}>
+                    <span className="text-xl font-mono mt-4 text-slate-300">{searchTime}s</span>
+                    <button className="btn-back-v2 mt-8" onClick={() => setView('selection')}>
                         <LuX /> Stop Searching
                     </button>
+                </div>
+            )}
+
+            {view === 'preparing' && (
+                <div className="preparing-v2 animate-fade-in flex flex-col items-center justify-center min-h-[60vh]">
+                    <div className="radar-v2">
+                        <div className="circle animate-ping"></div>
+                        <LuSword className="radar-sword animate-spin" />
+                    </div>
+                    <h2 className="text-2xl font-bold mt-8 animate-pulse text-blue-400">Battle Preparing...</h2>
+                    <p className="text-slate-400 mt-2">Summoning questions and initializing the arena</p>
+                    <div className="w-64 h-1 bg-slate-800 rounded-full mt-6 overflow-hidden">
+                        <div className="h-full bg-blue-500 animate-loading-bar"></div>
+                    </div>
                 </div>
             )}
 
             {view === 'lobby' && (
                 <div className="lobby-v2 animate-slide-up">
                     <div className="lobby-head glass">
-                        <div className="flex items-center gap-4">
-                            <LuUsers className="text-4xl text-blue-400" />
-                            <div>
-                                <h2>Battle Registry</h2>
-                                <p>Select your opponent to begin the duel</p>
-                            </div>
+                        <div className="flex flex-col gap-1">
+                            <h2 className="flex items-center gap-3 m-0 text-2xl">
+                                <LuUsers className="text-3xl text-blue-400" />
+                                Battle Registry
+                            </h2>
+                            <p className="text-slate-400 m-0 text-sm">Select your opponent to begin the duel</p>
                         </div>
                     </div>
                     <div className="lobby-grid p-4">
@@ -427,55 +720,7 @@ const BattleArena = () => {
                             </button>
                             <div className="lobby-stats-mini">
                                 <span className="live-dot"></span> 
-                                {lobbyPlayers.length} Legends Active
-                            </div>
-                        </div>
-
-                        {/* Rank Roadmap Integration */}
-                        <div className="rank-roadmap-container glass mb-8 p-6">
-                            <div className="roadmap-header">
-                                <LuTrophy className="text-yellow-400" />
-                                <h3>Battle Rank Roadmap</h3>
-                                <span className="current-pts">{user.rank?.points || 0} RP</span>
-                            </div>
-                            <div className="roadmap-steps">
-                                {TIER_ROADMAP.map((t, idx) => {
-                                    const currentPoints = user.rank?.points || 0;
-                                    const isReached = currentPoints >= t.min;
-                                    const nextLevel = TIER_ROADMAP[idx + 1];
-                                    let progress = 0;
-                                    
-                                    if (nextLevel && currentPoints >= t.min) {
-                                        progress = Math.min(100, ((currentPoints - t.min) / (nextLevel.min - t.min)) * 100);
-                                    } else if (!nextLevel && currentPoints >= t.min) {
-                                        progress = 100;
-                                    }
-
-                                    return (
-                                        <div key={t.name} className={`roadmap-node ${isReached ? 'reached' : ''}`}>
-                                            <div className="node-icon-wrapper">
-                                                {t.icon}
-                                                <div className="node-label">{t.name}</div>
-                                                <div className="node-threshold">{t.min}</div>
-                                            </div>
-                                            {idx < TIER_ROADMAP.length - 1 && (
-                                                <div className="roadmap-connector">
-                                                    <div className="connector-fill" style={{ width: `${progress}%` }}></div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="roadmap-footer">
-                                {(() => {
-                                    const currentPoints = user.rank?.points || 0;
-                                    const nextTier = TIER_ROADMAP.find(t => t.min > currentPoints);
-                                    if (nextTier) {
-                                        return <p>You are <strong>{nextTier.min - currentPoints} RP</strong> away from <span>{nextTier.name} League</span>!</p>;
-                                    }
-                                    return <p>Grandmaster Status Attained! You are amongst the Elite.</p>;
-                                })()}
+                                {lobbyPlayers.length} Students Online
                             </div>
                         </div>
 
@@ -537,18 +782,18 @@ const BattleArena = () => {
             {view === 'results' && finalResults && (
                 <div className="results-v2 animate-fade-in">
                     <div className="results-card">
-                        <LuTrophy className={`trophy-icon ${finalResults.winner === user.name ? 'winner' : 'loser'}`} />
-                        <h1>{finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT'}</h1>
+                        <LuTrophy className={`trophy-icon ${finalResults.isDraw ? 'draw' : (finalResults.winner === user.name ? 'winner' : 'loser')}`} />
+                        <h1>{finalResults.isDraw ? 'DRAW' : (finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT')}</h1>
                         <div className="score-summary-v2">
-                            {finalResults.results.map(r => {
+                            {finalResults.results.map((r, idx) => {
                                 const myId = user.id || user._id;
                                 return (
-                                <div key={r.userId} className={`summary-row ${r.userId === myId.toString() ? 'highlight' : ''}`}>
+                                <div key={idx} className={`summary-row ${r.userId?.toString() === (user.id || user._id)?.toString() ? 'highlight' : ''}`}>
                                     <span>{r.name}</span>
                                     <span className={`delta ${r.rankDelta >= 0 ? 'pos' : 'neg'}`}>
-                                        {r.rankDelta >= 0 ? '+' : ''}{r.rankDelta} RP
+                                        {r.rankDelta > 0 ? '+' : ''}{r.rankDelta} RP
                                     </span>
-                                    <span className="new-tier">{r.tier} {r.lvl}</span>
+                                    <span>{r.tier} {r.lvl}</span>
                                 </div>
                                 );
                             })}
@@ -563,10 +808,10 @@ const BattleArena = () => {
                     <LuSword />
                     <div className="c-text">
                         <strong>{incomingChallenge.challengerName}</strong> wants to duel!
-                        <p>{incomingChallenge.topic} • {incomingChallenge.questionCount} Qs • {incomingChallenge.questionTimer}s Timer</p>
+                        <p>{incomingChallenge.topic} â€¢ {incomingChallenge.questionCount} Qs â€¢ {incomingChallenge.questionTimer}s Timer {incomingChallenge.battleTimer > 0 ? `â€¢ ${incomingChallenge.battleTimer/60}m Match` : ''}</p>
                     </div>
                     <div className="c-btns">
-                        <button className="acc" onClick={() => socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic, questionCount: incomingChallenge.questionCount, questionTimer: incomingChallenge.questionTimer })}>Accept</button>
+                        <button className="acc" onClick={() => socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic, questionCount: incomingChallenge.questionCount, questionTimer: incomingChallenge.questionTimer, battleTimer: incomingChallenge.battleTimer })}>Accept</button>
                         <button className="dec" onClick={() => setIncomingChallenge(null)}>Reject</button>
                     </div>
                 </div>
@@ -578,11 +823,839 @@ const BattleArena = () => {
 export default BattleArena;
 
 
-=======================================================
-FILE: client/src/pages/student/BattleArena.css
-DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
-=======================================================
+--- [2/6] BACKEND ENGINE: battleHandler.js ---
+const User = require('../models/User');
+const Battle = require('../models/Battle');
+const { generateBattleQuiz } = require('../services/battleAI.service');
+const { calculatePoints, getTierByPoints } = require('../utils/rankManager');
+const logger = require('../utils/logger');
 
+const waitingPlayers = new Map(); // userId -> player stats
+const activeRoundTimers = new Map(); // roomID -> timeout
+const pendingQuizCache = new Map(); // topic:count -> Promise
+const roomQuestionIndex = new Map(); // roomID -> currentQuestionIndex
+
+module.exports = (io, socket) => {
+    if (!socket.user) return;
+
+    const startServerRoundTimer = (roomID, battleId, questionIndex, duration) => {
+        if (activeRoundTimers.has(roomID)) {
+            clearTimeout(activeRoundTimers.get(roomID));
+        }
+
+        const timeout = setTimeout(async () => {
+            try {
+                const battle = await Battle.findOne({ battleId, status: 'active' });
+                if (!battle) return;
+
+                const allAnswered = battle.players.every(p => p.answers.some(a => a.questionIndex === questionIndex));
+                if (!allAnswered) {
+                    logger.info(`â° [BATTLE] Round Timeout in Room ${roomID}. Advancing...`);
+                    
+                    // Force answers for any player who didn't submit
+                    for (const player of battle.players) {
+                        const hasAns = player.answers.some(a => a.questionIndex === questionIndex);
+                        if (!hasAns) {
+                            player.answers.push({
+                                questionIndex,
+                                isCorrect: false,
+                                timeSpent: duration * 1000,
+                                perfect: false
+                            });
+                            player.hp = Math.max(0, player.hp - 10);
+                        }
+                    }
+                    await battle.save();
+
+                    const resolution = {
+                        questionIndex,
+                        correctAnswer: battle.quiz.questions[questionIndex].correctAnswer,
+                        players: battle.players.map(p => ({
+                            userId: p.userId.toString(),
+                            name: p.name,
+                            isCorrect: p.answers.find(a => a.questionIndex === questionIndex)?.isCorrect || false,
+                            timeTaken: duration * 1000,
+                            hp: p.hp,
+                            score: p.score
+                        }))
+                    };
+                    io.to(roomID).emit('battle:round_resolved', resolution);
+
+                    setTimeout(async () => {
+                        const b = await Battle.findOne({ battleId });
+                        if (!b) return;
+                        const lastQuestion = questionIndex === b.quiz.questions.length - 1;
+                        if (lastQuestion) await concludeBattle(b);
+                        else {
+                            io.to(roomID).emit('battle:next_question', { nextIndex: questionIndex + 1, timer: b.questionTimer });
+                            startServerRoundTimer(roomID, battleId, questionIndex + 1, b.questionTimer);
+                        }
+                    }, 4000);
+                }
+            } catch (err) { logger.error('Round Timeout Error:', err); }
+        }, (duration + 5) * 1000);
+
+        activeRoundTimers.set(roomID, timeout);
+    };
+
+
+    const broadcastLobbyUpdate = () => {
+        const lobby = Array.from(waitingPlayers.values()).map(p => ({
+            userId: p.userId.toString(),
+            name: p.name,
+            avatar: p.avatar,
+            mode: p.mode,
+            topic: p.topic,
+            rank: p.rank
+        }));
+        io.emit('battle:lobby_update', lobby);
+    };
+
+    const getSocketsByUserId = (userId) => {
+        const sockets = [];
+        for (const [id, s] of io.sockets.sockets) {
+            if (s.user && s.user._id.toString() === userId) {
+                sockets.push(s);
+            }
+        }
+        return sockets;
+    };
+
+    const emitToUser = (userId, event, data) => {
+        const sockets = getSocketsByUserId(userId);
+        sockets.forEach(s => s.emit(event, data));
+    };
+
+    const joinUserToRoom = (userId, roomID) => {
+        const sockets = getSocketsByUserId(userId);
+        sockets.forEach(s => s.join(roomID));
+    };
+
+    const createBattle = async (p1, p2, topicStr = null, questionCount = 5, questionTimer = 20, battleTimer = 0) => {
+        const roomID = `room_${Date.now()}_${p1.userId.substring(0, 4)}`;
+        const topic = topicStr || "General";
+
+        try {
+            const quizKey = `${topic}::${questionCount}`;
+            let quiz;
+            if (pendingQuizCache.has(quizKey)) {
+                quiz = await pendingQuizCache.get(quizKey);
+                pendingQuizCache.delete(quizKey); // Use once
+            } else {
+                quiz = await generateBattleQuiz(topic, questionCount);
+            }
+            const battleId = `btl_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+            const newBattle = new Battle({
+                battleId: battleId,
+                topic: topic,
+                roomID: roomID,
+                status: 'active',
+                questionTimer: questionTimer,
+                battleTimer: battleTimer,
+                questionCount: questionCount,
+                players: [
+                    { userId: p1.userId, name: p1.name },
+                    { userId: p2.userId, name: p2.name }
+                ],
+                quiz: { questions: quiz.questions }
+            });
+
+            await newBattle.save();
+            
+            joinUserToRoom(p1.userId, roomID);
+            joinUserToRoom(p2.userId, roomID);
+
+            waitingPlayers.delete(p1.userId);
+            waitingPlayers.delete(p2.userId);
+            broadcastLobbyUpdate();
+
+            io.to(roomID).emit('battle:started', {
+                battleId: battleId,
+                roomID: roomID,
+                players: newBattle.players.map(p => ({ userId: p.userId.toString(), name: p.name })),
+                topic: newBattle.topic,
+                questionTimer: newBattle.questionTimer,
+                totalQuestions: quiz.questions.length,
+                battleTimer: newBattle.battleTimer,
+                startTime: Date.now(),
+                serverTime: Date.now(), // ðŸ•’ For Clock Sync
+                quiz: quiz
+            });
+
+            // Start Server Safety Timer for Round 1
+            roomQuestionIndex.set(roomID, 0);
+            startServerRoundTimer(roomID, battleId, 0, newBattle.questionTimer);
+
+            logger.info(`âš”ï¸ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
+
+            if (battleTimer > 0) {
+                setTimeout(async () => {
+                    const b = await Battle.findOne({ battleId });
+                    if (b && b.status === 'active') {
+                        logger.info(`â° [BATTLE] Time Expired for Room ${roomID}`);
+                        io.to(roomID).emit('battle:sync', { 
+                            message: "Battle time expired! Calculating final results...",
+                            timeExpired: true
+                        });
+                        await concludeBattle(b);
+                    }
+                }, battleTimer * 1000);
+            }
+        } catch (error) {
+            logger.error('Create Battle Error:', error.message);
+            emitToUser(p1.userId, 'error', { 
+                message: 'Question generation failed. Please try again in a moment.' 
+            });
+            emitToUser(p2.userId, 'error', { 
+                message: 'Question generation failed. Please try again in a moment.' 
+            });
+            return;
+        }
+    };
+
+    // --- Lobby ---
+    socket.on('battle:enter_lobby', (data) => {
+        const userId = socket.user._id.toString();
+        const mode = data?.mode || 'random';
+        const topicRaw = data?.topic || 'General';
+        const qCount = parseInt(data?.questionCount) || 5;
+        const qTimer = parseInt(data?.questionTimer) || 20; 
+        const bTimer = parseInt(data?.battleTimer) || 0;
+        const topic = topicRaw.toLowerCase().replace(/\s+/g, ''); // Normalize
+        
+        waitingPlayers.set(userId, {
+            userId: userId,
+            name: socket.user.name,
+            avatar: socket.user.avatar,
+            socketId: socket.id,
+            mode: mode,
+            topic: topic,
+            displayTopic: topicRaw,
+            questionCount: qCount,
+            questionTimer: qTimer,
+            battleTimer: bTimer,
+            rank: socket.user.rank || { tier: 'Bronze', level: 'I', points: 0 },
+            joinedAt: Date.now()
+        });
+
+        if (mode === 'random') {
+            const opponent = Array.from(waitingPlayers.values()).find(p => 
+                p.userId !== userId && 
+                p.mode === 'random' && 
+                p.topic === topic &&
+                p.questionCount === qCount &&
+                p.questionTimer === qTimer &&
+                p.battleTimer === bTimer
+            );
+
+            if (opponent) {
+                const quizKey = `${opponent.displayTopic}::${qCount}`;
+                if (!pendingQuizCache.has(quizKey)) {
+                    pendingQuizCache.set(quizKey, generateBattleQuiz(opponent.displayTopic, qCount));
+                }
+                createBattle(opponent, waitingPlayers.get(userId), opponent.displayTopic, qCount, qTimer, bTimer);
+            } else {
+                socket.emit('battle:searching');
+            }
+        }
+        broadcastLobbyUpdate();
+    });
+
+    socket.on('battle:challenge_player', async (data) => {
+        const { targetUserId, topic, questionCount, questionTimer, battleTimer } = data;
+        const challenger = waitingPlayers.get(socket.user._id.toString());
+        const target = waitingPlayers.get(targetUserId);
+
+        if (!target) return socket.emit('error', { message: 'Target is not in the lobby.' });
+
+        emitToUser(targetUserId, 'battle:incoming_challenge', {
+            challengerName: challenger.name,
+            challengerUserId: challenger.userId,
+            topic: topic || 'General',
+            questionCount: questionCount || 5,
+            questionTimer: questionTimer || 20,
+            battleTimer: battleTimer || 0
+        });
+    });
+
+    socket.on('battle:respond_challenge', async (data) => {
+        const { challengerUserId, accept, topic, questionCount, questionTimer, battleTimer } = data;
+        const target = waitingPlayers.get(socket.user._id.toString());
+        const challenger = waitingPlayers.get(challengerUserId);
+
+        if (!challenger || !target) return socket.emit('error', { message: 'Duel setup expired.' });
+
+        if (accept) {
+            emitToUser(challengerUserId, 'battle:preparing');
+            socket.emit('battle:preparing');
+            createBattle(challenger, target, topic, questionCount || 5, questionTimer || 20, battleTimer || 0);
+        } else {
+            emitToUser(challengerUserId, 'battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
+        }
+    });
+
+    // --- In-Game (Synchronized Progression) ---
+    socket.on('battle:submit_answer', async (data) => {
+        const { battleId, questionIndex, answer, timeTaken } = data;
+        
+        try {
+            const battle = await Battle.findOneAndUpdate(
+                {
+                    battleId,
+                    status: 'active',
+                    'players': { $elemMatch: {
+                        'userId': socket.user._id,
+                        'answers.questionIndex': { $ne: questionIndex }
+                    }}
+                },
+                { $set: { updatedAt: new Date() } },
+                { new: true }
+            ).populate('players.userId');
+
+            if (!battle) return; // duplicate submission blocked atomically
+
+            const myId = socket.user._id.toString();
+            const player = battle.players.find(p => p.userId.toString() === myId);
+            const opponent = battle.players.find(p => p.userId.toString() !== myId);
+
+            
+            if (!player || !opponent) return;
+
+            const question = battle.quiz.questions[questionIndex];
+            const isCorrect = (answer !== null && answer === question.correctAnswer);
+            const perfectTimeBonus = isCorrect && timeTaken < 3000; 
+
+            // Update Player State for THIS Round
+            const roundAnswer = { 
+                questionIndex, 
+                isCorrect, 
+                timeSpent: (timeTaken !== null && timeTaken !== undefined) ? timeTaken : (battle.questionTimer * 1000),
+                perfect: perfectTimeBonus
+            };
+            player.answers.push(roundAnswer);
+
+            const prevHps = battle.players.map(p => p.hp);
+            const prevScores = battle.players.map(p => p.score);
+
+            // Apply HP Logic (Opponent takes damage if I get it right)
+            if (isCorrect) {
+                const damage = perfectTimeBonus ? 30 : 20;
+                opponent.hp = Math.max(0, opponent.hp - damage);
+                player.score += perfectTimeBonus ? 15 : 10;
+            } else {
+                player.hp = Math.max(0, player.hp - 10); // Mishap damage
+            }
+
+            const hpChanged = battle.players.some((p, i) => p.hp !== prevHps[i]);
+            const scoreChanged = battle.players.some((p, i) => p.score !== prevScores[i]);
+
+            await battle.save();
+
+            // ðŸ”¥ Race Condition Fix: Fetch FRESH state to see if other player answered
+            const freshBattle = await Battle.findOne({ battleId }).populate('players.userId');
+            if (!freshBattle) return;
+
+            const freshMe = freshBattle.players.find(p => p.userId._id.toString() === myId);
+            const freshOpp = freshBattle.players.find(p => p.userId._id.toString() !== myId);
+            const opponentAnswer = freshOpp.answers.find(a => a.questionIndex === questionIndex);
+
+            if (opponentAnswer) {
+                if (activeRoundTimers.has(battle.roomID)) {
+                    clearTimeout(activeRoundTimers.get(battle.roomID));
+                    activeRoundTimers.delete(battle.roomID);
+                }
+                // ROUND RESOLVED: Both answered
+                const resolution = {
+                    questionIndex,
+                    correctAnswer: question.correctAnswer,
+                    players: freshBattle.players.map(p => {
+                        const ans = p.answers.find(a => a.questionIndex === questionIndex);
+                        return {
+                            userId: p.userId.toString(),
+                            name: p.name,
+                            isCorrect: ans?.isCorrect || false,
+                            timeTaken: ans?.timeSpent || 0,
+                            hp: p.hp,
+                            score: p.score
+                        };
+                    })
+                };
+                
+                io.to(battle.roomID).emit('battle:round_resolved', resolution);
+
+                // ðŸ”¥ Gate check: Only one submitter triggers the next round
+                const currentStoredIdx = roomQuestionIndex.get(battle.roomID);
+                if (currentStoredIdx !== undefined && currentStoredIdx > questionIndex) return;
+                
+                // Mark round as transitioning
+                roomQuestionIndex.set(battle.roomID, questionIndex + 1);
+
+                setTimeout(async () => {
+                    const refreshedBattle = await Battle.findOne({ battleId });
+                    if (!refreshedBattle) return;
+                    const lastQuestion = questionIndex === refreshedBattle.quiz.questions.length - 1;
+
+                    if (lastQuestion) {
+                        await concludeBattle(refreshedBattle);
+                    } else {
+                        io.to(battle.roomID).emit('battle:next_question', { 
+                            nextIndex: questionIndex + 1,
+                            timer: refreshedBattle.questionTimer,
+                            startTime: Date.now(),
+                            serverTime: Date.now()
+                        });
+                        startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, refreshedBattle.questionTimer);
+                    }
+                }, 500); // Super fast 0.5s loading after both submit!
+
+            } else {
+                // Only one has answered: Notify the other or tell the current one to wait
+                socket.emit('battle:waiting_for_opponent', { questionIndex, opponentName: opponent.name });
+                
+                if (hpChanged || scoreChanged) {
+                    io.to(battle.roomID).emit('battle:sync', {
+                        players: freshBattle.players.map(p => ({ // Send from FRESH state
+                            userId: p.userId.toString(),
+                            name: p.name,
+                            hp: p.hp,
+                            score: p.score
+                        }))
+                    });
+                }
+            }
+
+        } catch (err) { logger.error('Battle Sync Error:', err); }
+    });
+
+    socket.on('battle:request_extension', ({ battleId }) => {
+        const userId = socket.user._id.toString();
+        Battle.findOne({ battleId, status: 'active' }).then(battle => {
+            if (!battle) return;
+            const opponent = battle.players.find(p => p.userId.toString() !== userId);
+            if (opponent) {
+                emitToUser(opponent.userId.toString(), 'battle:extension_received', { 
+                    requesterName: socket.user.name 
+                });
+            }
+        });
+    });
+
+    socket.on('battle:extension_respond', async ({ battleId, accept }) => {
+        const userId = socket.user._id.toString();
+        const battle = await Battle.findOne({ battleId, status: 'active' });
+        if (!battle) return;
+
+        const challenger = battle.players.find(p => p.userId.toString() !== userId);
+        if (accept) {
+            const currentQ = roomQuestionIndex.get(battle.roomID) || 0;
+            // Extend the server safety timer by resetting it with more time
+            // Assuming current remaining time + 15
+            startServerRoundTimer(battle.roomID, battleId, currentQ, battle.questionTimer + 15);
+            io.to(battle.roomID).emit('battle:timer_extended');
+        } else {
+            if (challenger) {
+                emitToUser(challenger.userId.toString(), 'battle:extension_denied');
+            }
+        }
+    });
+
+    const concludeBattle = async (battleInput) => {
+        const battle = await Battle.findOne({ battleId: battleInput.battleId });
+        if (!battle || battle.status === 'completed') return;
+
+        if (activeRoundTimers.has(battle.roomID)) {
+            clearTimeout(activeRoundTimers.get(battle.roomID));
+            activeRoundTimers.delete(battle.roomID);
+        }
+        roomQuestionIndex.delete(battle.roomID);
+        battle.status = 'completed';
+        battle.endedAt = new Date();
+
+        const p1 = battle.players[0];
+        const p2 = battle.players[1];
+
+        // Determine winner
+        let winner, loser, isDraw = false;
+        if (p1.hp > p2.hp)         { winner = p1; loser = p2; }
+        else if (p2.hp > p1.hp)    { winner = p2; loser = p1; }
+        else if (p1.score > p2.score) { winner = p1; loser = p2; }
+        else if (p2.score > p1.score) { winner = p2; loser = p1; }
+        else { isDraw = true; winner = p1; loser = p2; }
+
+        winner.isWinner = true;
+        await battle.save();
+
+        // Points & Streaks Logic
+        const winnerUser = await User.findById(winner.userId);
+        const loserUser = await User.findById(loser.userId);
+
+        // --- Calculate Bonuses for Winner ---
+        let winnerBonus = 0;
+        if (winnerUser.rank.winStreak >= 5) winnerBonus += 20;
+        else if (winnerUser.rank.winStreak >= 3) winnerBonus += 10;
+        
+        if (winner.score >= 50 && !isDraw) winnerBonus += 5; // Fast Win
+        if (winner.hp === 100 && !isDraw) winnerBonus += 10; // Perfect Win
+
+        const baseDrawPts = winner.score > 0 ? 15 : 0;
+        const winPoints  = isDraw ? baseDrawPts : calculatePoints(winnerUser.rank.points, loserUser.rank.points, true, winnerBonus);
+        const lossPoints = isDraw ? baseDrawPts : calculatePoints(loserUser.rank.points, winnerUser.rank.points, false, 0);
+
+        winnerUser.rank.points += winPoints;
+        winnerUser.rank.winStreak += 1;
+        winnerUser.rank.totalWins += 1;
+        
+        loserUser.rank.points = Math.max(0, loserUser.rank.points + lossPoints);
+        loserUser.rank.winStreak = 0;
+        loserUser.rank.totalLosses += 1;
+
+        // Upgrade Tiers
+        const winRank = getTierByPoints(winnerUser.rank.points);
+        const lossRank = getTierByPoints(loserUser.rank.points);
+        winnerUser.rank.tier = winRank.tier;
+        winnerUser.rank.level = winRank.level;
+        loserUser.rank.tier = lossRank.tier;
+        loserUser.rank.level = lossRank.level;
+
+        await winnerUser.save();
+        await loserUser.save();
+
+        io.to(battle.roomID).emit('battle:ended', {
+            winner: winner.name,
+            isDraw: isDraw,
+            results: [
+                { userId: winnerUser._id, name: winnerUser.name, rankDelta: winPoints, newPoints: winnerUser.rank.points, tier: winnerUser.rank.tier, lvl: winnerUser.rank.level },
+                { userId: loserUser._id, name: loserUser.name, rankDelta: isDraw ? lossPoints : -Math.abs(lossPoints), newPoints: loserUser.rank.points, tier: loserUser.rank.tier, lvl: loserUser.rank.level }
+            ]
+        });
+
+        logger.info(`ðŸ† [BATTLE END] ${winner.name} won! Delta Win: ${winPoints} | Delta Loss: ${lossPoints}`);
+    };
+
+    socket.on('disconnect', async () => {
+        const userId = socket.user._id.toString();
+        waitingPlayers.delete(userId);
+        broadcastLobbyUpdate();
+
+        // Check for active battles to apply AFK penalty
+        try {
+            const activeBattle = await Battle.findOne({
+                status: 'active',
+                'players.userId': socket.user._id
+            });
+
+            if (activeBattle && activeBattle.status === 'active') {
+                const player = activeBattle.players.find(p => p.userId.toString() === userId);
+                const opponent = activeBattle.players.find(p => p.userId.toString() !== userId);
+                
+                player.afk = true;
+                player.hp = 0; // Immediate forfeit
+
+                const userModel = await User.findById(userId);
+                userModel.rank.points = Math.max(0, userModel.rank.points - 50);
+                userModel.rank.winStreak = 0;
+                userModel.rank.totalLosses += 1;
+                
+                const rankData = getTierByPoints(userModel.rank.points);
+                userModel.rank.tier = rankData.tier;
+                userModel.rank.level = rankData.level;
+                
+                await userModel.save();
+                
+                io.to(activeBattle.roomID).emit('battle:opponent_left', {
+                    message: `${player.name} has abandoned the field (-50 RP penalty applied).`,
+                    winner: opponent.name
+                });
+
+                const freshBattle = await Battle.findOne({ battleId: activeBattle.battleId });
+                await concludeBattle(freshBattle);
+            }
+        } catch (err) { logger.error('Disconnect Penalty Error:', err); }
+    });
+};
+
+
+--- [3/6] DATA SCHEMA: Battle.js ---
+const mongoose = require('mongoose');
+
+const battleSchema = new mongoose.Schema({
+    battleId: { type: String, required: true, unique: true },
+    topic: { type: String, required: true },
+    mode: { type: String, enum: ['random', 'challenge'], default: 'random' },
+    status: { type: String, enum: ['waiting', 'active', 'completed', 'canceled'], default: 'active' },
+    questionTimer: { type: Number, default: 20 },
+    battleTimer: { type: Number, default: 0 }, // Entire-battle, 0 means not used
+    questionCount: { type: Number, default: 5 },
+    
+    players: [{
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        name: String,
+        socketId: String,
+        hp: { type: Number, default: 100 },
+        score: { type: Number, default: 0 },
+        isWinner: { type: Boolean, default: false },
+        answers: [{
+            questionIndex: Number,
+            isCorrect: Boolean,
+            timeSpent: Number, // in ms
+            perfect: Boolean, // if speed was exceptionally fast
+            answeredAt: { type: Date, default: Date.now }
+        }],
+        afk: { type: Boolean, default: false }
+    }],
+    
+    quiz: {
+        topic: String,
+        questions: [{
+            questionText: String,
+            options: [{ text: String, isCorrect: Boolean }],
+            correctAnswer: Number, // Index of correct option
+            difficulty: String
+        }]
+    },
+    
+    roomID: String,
+    startedAt: { type: Date, default: Date.now },
+    endedAt: Date
+}, { timestamps: true });
+
+module.exports = mongoose.model('Battle', battleSchema);
+
+
+--- [4/6] RP CALCULATION: rankManager.js ---
+const TIER_THRESHOLDS = [
+    { tier: 'Bronze', levels: ['I', 'II', 'III'], thresholds: [0, 200, 400], max: 599 },
+    { tier: 'Silver', levels: ['I', 'II', 'III'], thresholds: [600, 900, 1200], max: 1499 },
+    { tier: 'Gold',   levels: ['I', 'II', 'III'], thresholds: [1500, 1900, 2300], max: 2699 },
+    { tier: 'Platinum', levels: ['I', 'II', 'III'], thresholds: [2700, 3100, 3500], max: 3899 },
+    { tier: 'Diamond',  levels: ['I', 'II', 'III'], thresholds: [3900, 4200, 4500], max: 4799 },
+    { tier: 'Master',   levels: ['Master'], thresholds: [4800], max: 4999 },
+    { tier: 'Grandmaster', levels: ['Grandmaster'], thresholds: [5000], max: 10000000 }
+];
+
+const getTierByPoints = (points) => {
+    const tierConfig = TIER_THRESHOLDS.find(t => points >= t.thresholds[0] && points <= t.max);
+    if (!tierConfig) return TIER_THRESHOLDS[TIER_THRESHOLDS.length - 1]; // Fallback to GM
+
+    let level = tierConfig.levels[0];
+    for (let i = tierConfig.thresholds.length - 1; i >= 0; i--) {
+        if (points >= tierConfig.thresholds[i]) {
+            level = tierConfig.levels[i];
+            break;
+        }
+    }
+    return { tier: tierConfig.tier, level: level };
+};
+
+const expectedScore = (player, opponent) => {
+    return 1.0 / (1 + Math.pow(10, (opponent - player) / 400.0));
+};
+
+const getKFactor = (points) => {
+    if (points < 1500) return 40;        // Bronze-Silver
+    else if (points < 3900) return 30;   // Gold-Platinum
+    else if (points < 4800) return 25;   // Diamond
+    else return 20;                      // Master+
+};
+
+const calculatePoints = (playerPoints, opponentPoints, isWin, bonus) => {
+    const E = expectedScore(playerPoints, opponentPoints);
+    const K = getKFactor(playerPoints);
+
+    const change = K * ((isWin ? 1 : 0) - E);
+
+    const cappedBonus = Math.min(bonus, 25);
+    return Math.round(change + cappedBonus);
+};
+
+module.exports = { calculatePoints, getTierByPoints };
+
+
+--- [5/6] CONTENT GEN: battleAI.service.js ---
+require("dotenv").config();
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// â”€â”€ API Clients â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const genAI = new GoogleGenerativeAI(
+    process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY
+);
+
+let mistral = null;
+if (process.env.MISTRAL_API_KEY) {
+    const { Mistral } = require("@mistralai/mistralai");
+    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+}
+
+let openai = null;
+if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined') {
+    const { OpenAI } = require("openai");
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
+
+// â”€â”€ In-memory question cache (topic:count â†’ questions[]) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const questionCache = new Map();
+const CACHE_TTL_MS  = 24 * 60 * 60 * 1000; // 24 hours
+
+const getCached = (key) => {
+    const entry = questionCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+        questionCache.delete(key);
+        return null;
+    }
+    return entry.questions;
+};
+
+const setCache = (key, questions) => {
+    questionCache.set(key, { questions, timestamp: Date.now() });
+};
+
+// â”€â”€ Master prompt builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const buildPrompt = (topic, count) => `
+You are a senior competitive programming instructor creating exam questions for a 1v1 coding quiz battle.
+
+Generate exactly ${count} multiple choice questions on the topic: "${topic}".
+
+Question style requirements:
+- Questions must be practical and specific â€” no vague theory questions
+- Include code snippets in questions wherever relevant (wrap in backticks)
+- Model your questions after LeetCode, GeeksforGeeks, W3Schools, and CodeChef problem styles
+- Cover: time complexity, output prediction, error spotting, concept application, tricky edge cases
+- Difficulty: 60% medium, 40% hard â€” no easy questions
+- Options must be plausible â€” wrong answers should be common mistakes, not obviously wrong
+- Each question must have exactly one correct answer
+
+Output format: Return ONLY a valid JSON array. No markdown, no backticks, no explanation, no extra text.
+
+Each object must have exactly these keys:
+- "questionText": string (may contain inline code using backticks)
+- "options": array of exactly 4 strings
+- "correctAnswer": integer 0â€“3 (index of correct option in options array)
+- "difficulty": "medium" or "hard"
+- "explanation": string (one sentence explaining why the answer is correct)
+
+Example of ONE good question object:
+{
+  "questionText": "What is the output of this Python code?\\n\`\`\`\\nx = [1, 2, 3]\\nprint(x[-1] * 2)\\n\`\`\`",
+  "options": ["3", "6", "[3, 3]", "Error"],
+  "correctAnswer": 1,
+  "difficulty": "medium",
+  "explanation": "x[-1] accesses the last element (3), and 3 * 2 = 6."
+}
+
+Now generate exactly ${count} questions about "${topic}". Return only the JSON array.
+`.trim();
+
+// â”€â”€ JSON extractor (handles Gemini/Mistral markdown leakage) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const extractJSON = (raw) => {
+    const first = raw.indexOf('[');
+    const last  = raw.lastIndexOf(']');
+    if (first === -1 || last === -1) throw new Error('No JSON array found in response');
+    return raw.substring(first, last + 1);
+};
+
+// â”€â”€ Question mapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const mapQuestions = (parsed, count) => {
+    return parsed.slice(0, count).map(q => {
+        if (!q.questionText || !Array.isArray(q.options) || q.options.length !== 4) {
+            throw new Error('Malformed question object from AI response');
+        }
+        return {
+            questionText:  q.questionText,
+            options:       q.options.map((opt, i) => ({
+                text:      opt.toString(),
+                isCorrect: i === Number(q.correctAnswer)
+            })),
+            correctAnswer: Number(q.correctAnswer),
+            difficulty:    q.difficulty || 'medium',
+            explanation:   q.explanation || ''
+        };
+    });
+};
+
+// â”€â”€ API callers (each returns raw text or throws) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const callGemini = async (prompt) => {
+    const model  = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+};
+
+const callMistral = async (prompt) => {
+    if (!mistral) throw new Error('Mistral not configured');
+    const result = await mistral.chat.complete({
+        model:    'mistral-medium-latest',
+        messages: [{ role: 'user', content: prompt }]
+    });
+    return result.choices[0].message.content;
+};
+
+const callOpenAI = async (prompt) => {
+    if (!openai) throw new Error('OpenAI not configured');
+    const result = await openai.chat.completions.create({
+        model:       'gpt-3.5-turbo',
+        messages:    [{ role: 'user', content: prompt }],
+        temperature: 0.7
+    });
+    return result.choices[0].message.content;
+};
+
+// â”€â”€ Main export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const generateBattleQuiz = async (topic, count = 5) => {
+    const cacheKey = `${topic}::${count}`;
+    const cached   = getCached(cacheKey);
+    if (cached) {
+        console.log(`[BattleAI] Cache hit for "${topic}" (${count}q)`);
+        // Shuffle cached set so same questions appear in different order each battle
+        const shuffled = [...cached].sort(() => Math.random() - 0.5).slice(0, count);
+        return { topic, questions: shuffled };
+    }
+
+    const prompt  = buildPrompt(topic, count);
+    const callers = [
+        { name: 'Gemini',  fn: callGemini  },
+        { name: 'Mistral', fn: callMistral },
+        { name: 'OpenAI',  fn: callOpenAI  }
+    ];
+
+    let lastError = null;
+
+    for (const { name, fn } of callers) {
+        try {
+            console.log(`[BattleAI] Trying ${name} for "${topic}"...`);
+            const raw       = await fn(prompt);
+            const jsonStr   = extractJSON(raw);
+            const parsed    = JSON.parse(jsonStr);
+            const questions = mapQuestions(parsed, count);
+
+            if (questions.length < count) {
+                throw new Error(`${name} returned only ${questions.length}/${count} valid questions`);
+            }
+
+            // Cache a larger pool (2x count) if API returned more, for variety
+            const poolToCache = mapQuestions(parsed, Math.min(parsed.length, count * 2));
+            setCache(cacheKey, poolToCache);
+
+            console.log(`[BattleAI] ${name} succeeded â€” ${questions.length} questions for "${topic}"`);
+            return { topic, questions };
+
+        } catch (err) {
+            console.error(`[BattleAI] ${name} failed:`, err.message);
+            lastError = err;
+        }
+    }
+
+    // All APIs failed â€” do NOT serve fake questions, surface the error clearly
+    throw new Error(
+        `All AI providers failed to generate questions for topic "${topic}". ` +
+        `Last error: ${lastError?.message}. Check API keys and rate limits.`
+    );
+};
+
+module.exports = { generateBattleQuiz };
+
+
+--- [6/6] PREMIUM STYLES: BattleArena.css ---
 .arena-v2 {
   min-height: 100vh;
   background: radial-gradient(circle at top right, #0F172A, #020617);
@@ -777,7 +1850,11 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
 }
 
 .hud-name { font-weight: 700; color: #94A3B8; }
-.hud-score { color: #60A5FA; font-weight: 600; }
+.hud-score { 
+  color: #60A5FA; 
+  font-weight: 600; 
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.4); 
+}
 
 .hp-container {
   height: 12px;
@@ -789,8 +1866,20 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
 
 .hp-bar {
   height: 100%;
-  background: linear-gradient(to right, #EF4444, #F87171);
-  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: linear-gradient(to right, #EF4444, #F87171); /* Fallback */
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.5s ease;
+}
+
+.hp-bar.healthy { background: linear-gradient(to right, #10B981, #34D399); }
+.hp-bar.moderate { background: linear-gradient(to right, #F59E0B, #FCD34D); }
+.hp-bar.critical { 
+  background: linear-gradient(to right, #EF4444, #F87171); 
+  animation: pulse-bar 0.8s infinite; 
+}
+
+@keyframes pulse-bar {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .hp-icon {
@@ -814,9 +1903,12 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
   stroke-width: 8;
   fill: none;
   stroke-linecap: round;
-  transition: stroke-dashoffset 1s linear;
+  transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
   stroke-dasharray: 283;
 }
+
+.timer-progress.warning { stroke: #F59E0B; }
+.timer-progress.danger  { stroke: #EF4444; }
 
 .timer-val {
   position: absolute;
@@ -914,6 +2006,7 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
 
 .trophy-icon { font-size: 6rem; margin-bottom: 2rem; }
 .trophy-icon.winner { color: #FFD700; filter: drop-shadow(0 0 20px #FFD700); }
+.trophy-icon.draw { color: #60A5FA; filter: drop-shadow(0 0 20px #60A5FA); }
 .trophy-icon.loser { color: #94A3B8; }
 
 .score-summary-v2 {
@@ -1151,6 +2244,8 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
   align-items: center;
   gap: 1rem;
   margin-bottom: 2.5rem;
+  padding-left: 2rem;
+  padding-right: 2rem;
 }
 
 .roadmap-header h3 {
@@ -1174,7 +2269,7 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 0 3rem 0;
+  padding: 1rem 2rem 3rem 2rem;
   min-width: 900px;
 }
 
@@ -1193,13 +2288,11 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
   align-items: center;
   gap: 0.5rem;
   transition: all 0.3s;
-  opacity: 0.4;
-  filter: grayscale(1);
+  opacity: 0.6;
 }
 
 .roadmap-node.reached .node-icon-wrapper {
   opacity: 1;
-  filter: none;
   transform: scale(1.1);
 }
 
@@ -1220,7 +2313,22 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
   color: #64748B;
 }
 
-.roadmap-node.reached .node-label { color: #F8FAFC; }
+.roadmap-node.reached .node-label { color: #F8FAFC; text-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
+
+/* Per-Rank Colorful Glows */
+.node-bronze.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 8px rgba(205, 127, 50, 0.6)); }
+.node-silver.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 8px rgba(192, 192, 192, 0.6)); }
+.node-gold.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.8)); }
+.node-platinum.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 12px rgba(80, 200, 120, 0.8)); }
+.node-diamond.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 15px rgba(185, 242, 255, 1)); }
+.node-master.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 15px rgba(255, 77, 77, 1)); }
+.node-gm.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 20px rgba(255, 0, 255, 1)); }
+
+.node-gold.reached .node-label { color: #FFD700; }
+.node-platinum.reached .node-label { color: #50C878; }
+.node-diamond.reached .node-label { color: #B9F2FF; }
+.node-master.reached .node-label { color: #FF4D4D; }
+.node-gm.reached .node-label { color: #FF00FF; }
 
 .roadmap-connector {
   position: absolute;
@@ -1249,6 +2357,45 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
 .roadmap-footer strong { color: #60A5FA; font-weight: 800; }
 .roadmap-footer span { color: #FDE047; font-weight: 800; }
 
+.btn-roadmap-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(71, 85, 105, 0.8);
+  border-radius: 50px;
+  padding: 8px 16px;
+  color: #E2E8F0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.btn-roadmap-toggle .icon {
+  color: #FBBF24;
+  font-size: 1.1rem;
+}
+
+.btn-roadmap-toggle:hover {
+  background: rgba(51, 65, 85, 0.9);
+  border-color: #6366F1;
+  box-shadow: 0 6px 15px rgba(99, 102, 241, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn-roadmap-toggle.active {
+  background: linear-gradient(135deg, #4F46E5, #3B82F6);
+  border-color: #818CF8;
+  color: white;
+  box-shadow: 0 0 15px rgba(79, 70, 229, 0.5);
+}
+
+.btn-roadmap-toggle.active .icon {
+  color: white;
+}
+
 .btn-challenge-v3 {
   width: 100%;
   padding: 0.8rem;
@@ -1271,6 +2418,26 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
   background: #60A5FA;
   color: white;
   box-shadow: 0 0 20px rgba(96, 165, 250, 0.4);
+}
+
+@media (max-width: 640px) {
+    .arena-v2 { padding: 1rem; }
+    .battle-hud-v2 { gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+    .hud-side { padding: 0.8rem; flex: 1; min-width: 140px; }
+    .match-timer-ring { width: 70px; height: 70px; order: -1; margin-bottom: 1rem; }
+    .timer-val { font-size: 1.2rem; }
+    .overall-match-timer { top: unset; bottom: 20px; right: 20px; font-size: 0.8rem; padding: 0.5rem 1rem; }
+    .combat-stage { margin-top: 1rem; }
+    .question-box { padding: 1.2rem; }
+    .question-box h2 { font-size: 1rem !important; }
+    .options-grid-v2 { grid-template-columns: 1fr; gap: 0.8rem; }
+    .opt-v2 { padding: 0.8rem; }
+    .opt-label { font-size: 0.9rem; }
+    
+    .arena-header h1 { font-size: 2rem; }
+    .rank-card-v2 { padding: 1.2rem; flex-direction: column; text-align: center; gap: 1rem; }
+    .rank-info-v2 h2 { font-size: 1.5rem; justify-content: center; }
+    .path-picker { grid-template-columns: 1fr; }
 }
 
 .arena-controls {
@@ -1329,6 +2496,76 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
 .res-block.me { border-color: rgba(96, 165, 250, 0.3); background: rgba(59, 130, 246, 0.05); }
 
 .player-name { font-weight: 800; font-size: 1.1rem; }
+
+/* New Battle Timer Styles */
+.overall-match-timer {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  padding: 0.8rem 2rem;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: -2rem auto 3rem auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  width: fit-content;
+  z-index: 10;
+}
+
+.overall-match-timer .label {
+  color: #94A3B8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.overall-match-timer .time {
+  color: #F87171;
+  font-size: 1.4rem;
+  font-weight: 800;
+  min-width: 80px;
+  text-align: center;
+}
+
+.btn-extension {
+  transition: all 0.3s;
+  background: rgba(251, 146, 60, 0.05);
+}
+
+.btn-extension:hover {
+  background: rgba(251, 146, 60, 0.15) !important;
+  border-color: #FB923C !important;
+  transform: translateY(-2px);
+}
+
+.custom-timer-badge {
+  background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+  color: white;
+  padding: 0.2rem 1rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.custom-timer-badge.total {
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 .res-badge { font-size: 0.7rem; font-weight: 900; padding: 2px 8px; border-radius: 4px; }
 .res-badge.correct { background: #10B981; color: white; }
 .res-badge.wrong { background: #EF4444; color: white; }
@@ -1364,564 +2601,3 @@ DESCRIPTION: CSS styling for the Battle Arena UI, rankings, and animations.
 @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 
-
-=======================================================
-FILE: server/socket/battleHandler.js
-DESCRIPTION: Socket.io event handler for real-time 1v1 battle logic. Handles matchmaking, HP syncing, and win/loss resolution.
-=======================================================
-
-const User = require('../models/User');
-const Battle = require('../models/Battle');
-const { generateBattleQuiz } = require('../services/battleAI.service');
-const { calculatePoints, getTierByPoints } = require('../utils/rankManager');
-const logger = require('../utils/logger');
-
-const waitingPlayers = new Map(); // userId -> player stats
-
-module.exports = (io, socket) => {
-
-    const broadcastLobbyUpdate = () => {
-        const lobby = Array.from(waitingPlayers.values()).map(p => ({
-            userId: p.userId.toString(),
-            name: p.name,
-            avatar: p.avatar,
-            mode: p.mode,
-            topic: p.topic,
-            rank: p.rank
-        }));
-        io.emit('battle:lobby_update', lobby);
-    };
-
-    const getSocketsByUserId = (userId) => {
-        const sockets = [];
-        for (const [id, s] of io.sockets.sockets) {
-            if (s.user && s.user._id.toString() === userId) {
-                sockets.push(s);
-            }
-        }
-        return sockets;
-    };
-
-    const emitToUser = (userId, event, data) => {
-        const sockets = getSocketsByUserId(userId);
-        sockets.forEach(s => s.emit(event, data));
-    };
-
-    const joinUserToRoom = (userId, roomID) => {
-        const sockets = getSocketsByUserId(userId);
-        sockets.forEach(s => s.join(roomID));
-    };
-
-    const createBattle = async (p1, p2, topicStr = null, questionCount = 5, questionTimer = 20) => {
-        const roomID = `room_${Date.now()}_${p1.userId.substring(0, 4)}`;
-        const topic = topicStr || "General";
-
-        try {
-            const quiz = await generateBattleQuiz(topic, questionCount);
-            const battleId = `btl_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-
-            const newBattle = new Battle({
-                battleId: battleId,
-                topic: topic,
-                roomID: roomID,
-                status: 'active',
-                questionTimer: questionTimer,
-                players: [
-                    { userId: p1.userId, name: p1.name },
-                    { userId: p2.userId, name: p2.name }
-                ],
-                quizId: { questions: quiz.questions }
-            });
-
-            await newBattle.save();
-            
-            joinUserToRoom(p1.userId, roomID);
-            joinUserToRoom(p2.userId, roomID);
-
-            waitingPlayers.delete(p1.userId);
-            waitingPlayers.delete(p2.userId);
-            broadcastLobbyUpdate();
-
-            io.to(roomID).emit('battle:started', {
-                battleId: battleId,
-                roomID: roomID,
-                players: newBattle.players,
-                topic: newBattle.topic,
-                questionTimer: newBattle.questionTimer,
-                totalQuestions: quiz.questions.length,
-                quiz: quiz
-            });
-
-            logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
-        } catch (error) {
-            logger.error('Create Battle Error:', error);
-            emitToUser(p1.userId, 'error', { message: 'Battle generation failed.' });
-            emitToUser(p2.userId, 'error', { message: 'Battle generation failed.' });
-        }
-    };
-
-    // --- Lobby ---
-    socket.on('battle:enter_lobby', (data) => {
-        const userId = socket.user._id.toString();
-        const mode = data?.mode || 'random';
-        const topicRaw = data?.topic || 'General';
-        const qCount = parseInt(data?.questionCount) || 5;
-        const qTimer = parseInt(data?.questionTimer) || 20; // Default to 20 seconds
-        const topic = topicRaw.toLowerCase().replace(/\s+/g, ''); // Normalize
-        
-        waitingPlayers.set(userId, {
-            userId: userId,
-            name: socket.user.name,
-            avatar: socket.user.avatar,
-            socketId: socket.id,
-            mode: mode,
-            topic: topic,
-            questionCount: qCount,
-            questionTimer: qTimer,
-            rank: socket.user.rank || { tier: 'Bronze', level: 'I', points: 0 },
-            joinedAt: Date.now()
-        });
-
-        if (mode === 'random') {
-            const opponent = Array.from(waitingPlayers.values()).find(p => 
-                p.userId !== userId && 
-                p.mode === 'random' && 
-                p.topic === topic &&
-                p.questionCount === qCount &&
-                p.questionTimer === qTimer
-            );
-
-            if (opponent) {
-                createBattle(opponent, waitingPlayers.get(userId), topicRaw, qCount, qTimer);
-            } else {
-                socket.emit('battle:searching');
-            }
-        }
-        broadcastLobbyUpdate();
-    });
-
-    socket.on('battle:challenge_player', async (data) => {
-        const { targetUserId, topic, questionCount, questionTimer } = data;
-        const challenger = waitingPlayers.get(socket.user._id.toString());
-        const target = waitingPlayers.get(targetUserId);
-
-        if (!target) return socket.emit('error', { message: 'Target is not in the lobby.' });
-
-        emitToUser(targetUserId, 'battle:incoming_challenge', {
-            challengerName: challenger.name,
-            challengerUserId: challenger.userId,
-            topic: topic || 'General',
-            questionCount: questionCount || 5,
-            questionTimer: questionTimer || 20
-        });
-    });
-
-    socket.on('battle:respond_challenge', async (data) => {
-        const { challengerUserId, accept, topic, questionCount, questionTimer } = data;
-        const target = waitingPlayers.get(socket.user._id.toString());
-        const challenger = waitingPlayers.get(challengerUserId);
-
-        if (!challenger || !target) return socket.emit('error', { message: 'Duel setup expired.' });
-
-        if (accept) {
-            createBattle(challenger, target, topic, questionCount || 5, questionTimer || 20);
-        } else {
-            emitToUser(challengerUserId, 'battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
-        }
-    });
-
-    // --- In-Game (Synchronized Progression) ---
-    socket.on('battle:submit_answer', async (data) => {
-        const { battleId, questionIndex, answer, timeTaken } = data;
-        
-        try {
-            const battle = await Battle.findOne({ battleId }).populate('players.userId');
-            if (!battle || battle.status !== 'active') return;
-
-            const player = battle.players.find(p => p.userId._id.toString() === socket.user._id.toString());
-            const opponent = battle.players.find(p => p.userId._id.toString() !== socket.user._id.toString());
-            
-            if (!player || !opponent) return;
-            
-            // Avoid double submission for same question
-            if (player.answers.some(a => a.questionIndex === questionIndex)) return;
-
-            const question = battle.quizId.questions[questionIndex];
-            const isCorrect = (answer !== null && answer === question.correctAnswer);
-            const perfectTimeBonus = isCorrect && timeTaken < 3000; 
-
-            // Update Player State for THIS Round
-            const roundAnswer = { 
-                questionIndex, 
-                isCorrect, 
-                timeSpent: timeTaken || 15000,
-                perfect: perfectTimeBonus
-            };
-            player.answers.push(roundAnswer);
-
-            // Apply HP Logic (Opponent takes damage if I get it right)
-            if (isCorrect) {
-                const damage = perfectTimeBonus ? 30 : 20;
-                opponent.hp = Math.max(0, opponent.hp - damage);
-                player.score += perfectTimeBonus ? 15 : 10;
-            } else {
-                player.hp = Math.max(0, player.hp - 10); // Mishap damage
-            }
-
-            await battle.save();
-
-            // Check if BOTH have answered THIS question
-            const opponentAnswer = opponent.answers.find(a => a.questionIndex === questionIndex);
-
-            if (opponentAnswer) {
-                // ROUND RESOLVED: Both answered
-                const resolution = {
-                    questionIndex,
-                    correctAnswer: question.correctAnswer,
-                    players: battle.players.map(p => {
-                        const ans = p.answers.find(a => a.questionIndex === questionIndex);
-                        return {
-                            userId: p.userId._id.toString(),
-                            name: p.name,
-                            isCorrect: ans?.isCorrect || false,
-                            timeTaken: ans?.timeSpent || 0,
-                            hp: p.hp,
-                            score: p.score
-                        };
-                    })
-                };
-
-                io.to(battle.roomID).emit('battle:round_resolved', resolution);
-
-                // Wait 3 seconds then signal next question or end
-                setTimeout(async () => {
-                    const refreshedBattle = await Battle.findOne({ battleId });
-                    const lastQuestion = questionIndex === refreshedBattle.quizId.questions.length - 1;
-
-                    if (lastQuestion) {
-                        await concludeBattle(refreshedBattle);
-                    } else {
-                        io.to(battle.roomID).emit('battle:next_question', { nextIndex: questionIndex + 1 });
-                    }
-                }, 4000);
-
-            } else {
-                // Only one has answered: Notify the other or tell the current one to wait
-                socket.emit('battle:waiting_for_opponent', { questionIndex });
-                // We still sync the HP bars live
-                io.to(battle.roomID).emit('battle:sync', {
-                    players: battle.players.map(p => ({
-                        userId: p.userId._id.toString(),
-                        hp: p.hp,
-                        score: p.score
-                    }))
-                });
-            }
-
-        } catch (err) { logger.error('Battle Sync Error:', err); }
-    });
-
-    const concludeBattle = async (battle) => {
-        battle.status = 'completed';
-        battle.endedAt = new Date();
-
-        const p1 = battle.players[0];
-        const p2 = battle.players[1];
-
-        // Determine winner
-        let winner, loser;
-        if (p1.hp > p2.hp) { winner = p1; loser = p2; }
-        else if (p2.hp > p1.hp) { winner = p2; loser = p1; }
-        else if (p1.score > p2.score) { winner = p1; loser = p2; }
-        else { winner = p2; loser = p1; }
-
-        winner.isWinner = true;
-        await battle.save();
-
-        // Points & Streaks Logic
-        const winnerUser = await User.findById(winner.userId);
-        const loserUser = await User.findById(loser.userId);
-
-        // --- Calculate Bonuses for Winner ---
-        let winnerBonus = 0;
-        if (winnerUser.rank.winStreak >= 5) winnerBonus += 20;
-        else if (winnerUser.rank.winStreak >= 3) winnerBonus += 10;
-        
-        if (winner.score >= 50) winnerBonus += 5; // Fast Win
-        if (winner.hp === 100) winnerBonus += 10; // Perfect Win
-
-        let winPoints = calculatePoints(winnerUser.rank.points, loserUser.rank.points, true, winnerBonus);
-        const lossPoints = calculatePoints(loserUser.rank.points, winnerUser.rank.points, false, 0);
-
-        winnerUser.rank.points += winPoints;
-        winnerUser.rank.winStreak += 1;
-        winnerUser.rank.totalWins += 1;
-        
-        loserUser.rank.points = Math.max(0, loserUser.rank.points + lossPoints);
-        loserUser.rank.winStreak = 0;
-        loserUser.rank.totalLosses += 1;
-
-        // Upgrade Tiers
-        const winRank = getTierByPoints(winnerUser.rank.points);
-        const lossRank = getTierByPoints(loserUser.rank.points);
-        winnerUser.rank.tier = winRank.tier;
-        winnerUser.rank.level = winRank.level;
-        loserUser.rank.tier = lossRank.tier;
-        loserUser.rank.level = lossRank.level;
-
-        await winnerUser.save();
-        await loserUser.save();
-
-        io.to(battle.roomID).emit('battle:ended', {
-            winner: winner.name,
-            results: [
-                { userId: winnerUser._id, name: winnerUser.name, rankDelta: winPoints, newPoints: winnerUser.rank.points, tier: winnerUser.rank.tier, lvl: winnerUser.rank.level },
-                { userId: loserUser._id, name: loserUser.name, rankDelta: lossPoints, newPoints: loserUser.rank.points, tier: loserUser.rank.tier, lvl: loserUser.rank.level }
-            ]
-        });
-
-        logger.info(`🏆 [BATTLE END] ${winner.name} won! Delta Win: ${winPoints} | Delta Loss: ${lossPoints}`);
-    };
-
-    socket.on('disconnect', async () => {
-        const userId = socket.user._id.toString();
-        waitingPlayers.delete(userId);
-        broadcastLobbyUpdate();
-
-        // Check for active battles to apply AFK penalty
-        try {
-            const activeBattle = await Battle.findOne({
-                status: 'active',
-                'players.userId': socket.user._id
-            });
-
-            if (activeBattle) {
-                const player = activeBattle.players.find(p => p.userId.toString() === userId);
-                const opponent = activeBattle.players.find(p => p.userId.toString() !== userId);
-                
-                player.afk = true;
-                player.hp = 0; // Immediate forfeit
-
-                const userModel = await User.findById(userId);
-                userModel.rank.points = Math.max(0, userModel.rank.points - 50);
-                userModel.rank.winStreak = 0;
-                userModel.rank.totalLosses += 1;
-                
-                const rankData = getTierByPoints(userModel.rank.points);
-                userModel.rank.tier = rankData.tier;
-                userModel.rank.level = rankData.level;
-                
-                await userModel.save();
-                
-                io.to(activeBattle.roomID).emit('battle:opponent_left', {
-                    message: `${player.name} has abandoned the field (-50 RP penalty applied).`,
-                    winner: opponent.name
-                });
-
-                await concludeBattle(activeBattle);
-            }
-        } catch (err) { logger.error('Disconnect Penalty Error:', err); }
-    });
-};
-
-
-=======================================================
-FILE: server/services/battleAI.service.js
-DESCRIPTION: Service to generate dynamic battle questions using Generative AI (OpenAI / Gemini) APIs.
-=======================================================
-
-require("dotenv").config();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || "dummy");
-
-let openai;
-if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined') {
-    const { OpenAI } = require("openai");
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-}
-
-const formatQuestionsArray = (topic, parsedQuestions, targetCount) => {
-    let questions = mapOptions(parsedQuestions).slice(0, targetCount);
-    // Force pad array to EXACT targetCount if AI failed to generate enough
-    if (questions.length < targetCount) {
-        const remaining = targetCount - questions.length;
-        const fallbacks = createFallback(topic, remaining, questions.length);
-        questions = [...questions, ...fallbacks];
-    }
-    return { topic, questions };
-};
-
-const generateBattleQuiz = async (topic, count = 5) => {
-    const prompt = `Generate exactly ${count} highly competitive multiple choice questions about "${topic}".
-    Rules:
-    1. Mix of medium and hard difficulty.
-    2. Format strictly as a valid JSON array only. No markdown formatting, no backticks, no comments.
-    3. Each object should have exactly: "questionText" (string), "options" (array of exactly 4 strings), "correctAnswer" (integer 0-3), "difficulty" (string "medium" or "hard").
-    Ensure the question is clear and the options distinct.`;
-
-    try {
-        // Primary Attempt: Gemini 1.5 Flash (Generous Free Tier)
-        try {
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const result = await model.generateContent(prompt);
-            let text = result.response.text().replace(/```json/gi, "").replace(/```/g, "").trim();
-            
-            // Fix parsing if AI adds rogue markdown
-            const firstBracket = text.indexOf('[');
-            const lastBracket = text.lastIndexOf(']');
-            if (firstBracket !== -1 && lastBracket !== -1) {
-                text = text.substring(firstBracket, lastBracket + 1);
-            }
-
-            return formatQuestionsArray(topic, JSON.parse(text), count);
-        } catch (geminiError) {
-            console.error('Gemini Failed:', geminiError.message);
-            // Secondary Attempt: OpenAI
-            if (openai) {
-                const completion = await openai.chat.completions.create({
-                    model: "gpt-3.5-turbo",
-                    messages: [{ role: "user", content: prompt }],
-                    temperature: 0.7,
-                });
-                let text = completion.choices[0].message.content.replace(/```json/gi, "").replace(/```/g, "").trim();
-                
-                const firstBracket = text.indexOf('[');
-                const lastBracket = text.lastIndexOf(']');
-                if (firstBracket !== -1 && lastBracket !== -1) {
-                    text = text.substring(firstBracket, lastBracket + 1);
-                }
-
-                return formatQuestionsArray(topic, JSON.parse(text), count);
-            }
-            throw new Error("Both APIs failed or not configured");
-        }
-    } catch (err) {
-        console.error('Battle AI Error/Fallback triggered:', err.message);
-        return { topic, questions: createFallback(topic, count, 0) };
-    }
-};
-
-const mapOptions = (questions) => questions.map(q => ({
-    questionText: q.questionText,
-    options: q.options.map((opt, i) => ({ text: opt.toString(), isCorrect: i === Number(q.correctAnswer) })),
-    correctAnswer: Number(q.correctAnswer),
-    difficulty: q.difficulty || 'medium'
-}));
-
-const createFallback = (topic, count, startIndex = 0) => Array.from({ length: count }, (_, i) => {
-    const opts = [
-        { text: "Correct Data Structure", isCorrect: true }, 
-        { text: "Wrong Interface", isCorrect: false }, 
-        { text: "Memory Leak", isCorrect: false }, 
-        { text: "Syntax Error", isCorrect: false }
-    ].sort(() => Math.random() - 0.5);
-    return {
-        questionText: `Challenge Question ${startIndex + i + 1}: Core concept implementation of ${topic}.`,
-        options: opts,
-        correctAnswer: opts.findIndex(o => o.isCorrect),
-        difficulty: (startIndex + i) % 2 === 0 ? 'medium' : 'hard'
-    };
-});
-
-module.exports = { generateBattleQuiz };
-
-
-=======================================================
-FILE: server/utils/rankManager.js
-DESCRIPTION: Elo ranking logic, streak calculation, and tier thresholds calculator.
-=======================================================
-
-const TIER_THRESHOLDS = [
-    { tier: 'Bronze', levels: ['I', 'II', 'III'], thresholds: [0, 200, 400], max: 599 },
-    { tier: 'Silver', levels: ['I', 'II', 'III'], thresholds: [600, 900, 1200], max: 1499 },
-    { tier: 'Gold',   levels: ['I', 'II', 'III'], thresholds: [1500, 1900, 2300], max: 2699 },
-    { tier: 'Platinum', levels: ['I', 'II', 'III'], thresholds: [2700, 3100, 3500], max: 3899 },
-    { tier: 'Diamond',  levels: ['I', 'II', 'III'], thresholds: [3900, 4200, 4500], max: 4799 },
-    { tier: 'Master',   levels: ['Master'], thresholds: [4800], max: 4999 },
-    { tier: 'Grandmaster', levels: ['Grandmaster'], thresholds: [5000], max: 10000000 }
-];
-
-const getTierByPoints = (points) => {
-    const tierConfig = TIER_THRESHOLDS.find(t => points >= t.thresholds[0] && points <= t.max);
-    if (!tierConfig) return TIER_THRESHOLDS[TIER_THRESHOLDS.length - 1]; // Fallback to GM
-
-    let level = tierConfig.levels[0];
-    for (let i = tierConfig.thresholds.length - 1; i >= 0; i--) {
-        if (points >= tierConfig.thresholds[i]) {
-            level = tierConfig.levels[i];
-            break;
-        }
-    }
-    return { tier: tierConfig.tier, level: level };
-};
-
-const expectedScore = (player, opponent) => {
-    return 1.0 / (1 + Math.pow(10, (opponent - player) / 400.0));
-};
-
-const getKFactor = (points) => {
-    if (points < 1500) return 40;        // Bronze-Silver
-    else if (points < 3900) return 30;   // Gold-Platinum
-    else if (points < 4800) return 25;   // Diamond
-    else return 20;                      // Master+
-};
-
-const calculatePoints = (playerPoints, opponentPoints, isWin, bonus) => {
-    const E = expectedScore(playerPoints, opponentPoints);
-    const K = getKFactor(playerPoints);
-
-    const change = K * ((isWin ? 1 : 0) - E);
-
-    return Math.round(change + bonus);
-};
-
-module.exports = { calculatePoints, getTierByPoints };
-
-
-=======================================================
-FILE: server/models/Battle.js
-DESCRIPTION: Mongoose Schema for storing battle metadata, players, and answered question accuracy.
-=======================================================
-
-const mongoose = require('mongoose');
-
-const battleSchema = new mongoose.Schema({
-    battleId: { type: String, required: true, unique: true },
-    topic: { type: String, required: true },
-    mode: { type: String, enum: ['random', 'challenge'], default: 'random' },
-    status: { type: String, enum: ['waiting', 'active', 'completed', 'canceled'], default: 'active' },
-    
-    players: [{
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        name: String,
-        socketId: String,
-        hp: { type: Number, default: 100 },
-        score: { type: Number, default: 0 },
-        isWinner: { type: Boolean, default: false },
-        answers: [{
-            questionIndex: Number,
-            isCorrect: Boolean,
-            timeSpent: Number, // in ms
-            perfect: Boolean, // if speed was exceptionally fast
-            answeredAt: { type: Date, default: Date.now }
-        }],
-        afk: { type: Boolean, default: false }
-    }],
-    
-    quizId: {
-        topic: String,
-        questions: [{
-            questionText: String,
-            options: [{ text: String, isCorrect: Boolean }],
-            correctAnswer: Number, // Index of correct option
-            difficulty: String
-        }]
-    },
-    
-    roomID: String,
-    startedAt: { type: Date, default: Date.now },
-    endedAt: Date
-}, { timestamps: true });
-
-module.exports = mongoose.model('Battle', battleSchema);
