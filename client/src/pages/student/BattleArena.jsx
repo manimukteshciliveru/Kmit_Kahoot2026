@@ -121,9 +121,9 @@ const BattleArena = () => {
             setRoundStatus('answering');
             setRoundResult(null);
             hasSubmittedRef.current = false;
-            questionStartTimeRef.current = startTime || Date.now();
-            currentMaxTimerRef.current = serverTimer;
-            startQuestionTimer(serverTimer, startTime, serverTime);
+            // setTimer(0); // Question-timer removed as per user request
+            // currentMaxTimerRef.current = serverTimer;
+            // startQuestionTimer(serverTimer, startTime, serverTime);
         });
 
         socket.on('battle:waiting_for_match_end', () => {
@@ -371,16 +371,11 @@ const BattleArena = () => {
                             })()}
                         </div>
 
-                        <div className="match-timer-ring">
-                            <svg viewBox="0 0 100 100" className="w-full h-full">
-                                <circle cx="50" cy="50" r="45" className="timer-bg" />
-                                <circle 
-                                    cx="50" cy="50" r="45" 
-                                    className={`timer-progress ${timer <= 5 ? 'danger' : timer <= 10 ? 'warning' : ''}`} 
-                                    style={{ strokeDashoffset: Math.max(0, 283 - (283 * (timer / currentMaxTimerRef.current))) }}
-                                />
-                            </svg>
-                            <span className="timer-val">{timer}</span>
+                        <div className="battle-vs-logo animate-pulse">
+                            <div className="vs-badge">
+                                <span className="vs-val">1VS1</span>
+                                <div className="vs-glow"></div>
+                            </div>
                         </div>
 
                         <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
@@ -390,8 +385,10 @@ const BattleArena = () => {
                                     const oppData = syncData?.players?.find(p => p.userId !== myId);
                                     return (
                                         <>
-                                            <span className="hud-name text-white font-bold">{oppData?.name || 'Opponent'}</span>
-                                            <span className="hud-score text-white/60 text-xs shadow-glow-sm">({oppData?.score ?? 0} pts)</span>
+                                            <span className="hud-name text-white font-black text-lg tracking-wider" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3)' }}>
+                                                {oppData?.name || 'Opponent'}
+                                            </span>
+                                            <span className="hud-score text-white/50 text-xs shadow-glow-sm">({oppData?.score ?? 0} pts)</span>
                                         </>
                                     );
                                 })()}

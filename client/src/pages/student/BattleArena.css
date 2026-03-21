@@ -191,7 +191,13 @@
   margin-bottom: 0.8rem;
 }
 
-.hud-name { font-weight: 700; color: #94A3B8; }
+.hud-name { 
+  font-weight: 900; 
+  color: #F8FAFC; 
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
 .hud-score { 
   color: #60A5FA; 
   font-weight: 600; 
@@ -233,20 +239,53 @@
   font-size: 0.7rem;
 }
 
-.match-timer-ring {
+.battle-vs-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
   position: relative;
-  width: 100px;
-  height: 100px;
 }
 
-.timer-bg { stroke: #1E293B; stroke-width: 8; fill: none; }
-.timer-progress {
-  stroke: #60A5FA;
-  stroke-width: 8;
-  fill: none;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
-  stroke-dasharray: 283;
+.vs-badge {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+}
+
+.vs-val {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #FDE047;
+  text-shadow: 0 0 15px rgba(253, 224, 71, 0.6);
+  letter-spacing: 1px;
+}
+
+.vs-glow {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 4px solid #FDE047;
+  opacity: 0.15;
+  animation: vs-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes vs-ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
 }
 
 .timer-progress.warning { stroke: #F59E0B; }
