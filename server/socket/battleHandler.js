@@ -40,7 +40,7 @@ module.exports = (io, socket) => {
         sockets.forEach(s => s.join(roomID));
     };
 
-    const createBattle = async (p1, p2, topicStr = null, questionCount = 5, questionTimer = 20) => {
+    const createBattle = async (p1, p2, topicStr = null, questionCount = 5, questionTimer = 20, battleTimer = 0) => {
         const roomID = `room_${Date.now()}_${p1.userId.substring(0, 4)}`;
         const topic = topicStr || "General";
 
@@ -54,6 +54,7 @@ module.exports = (io, socket) => {
                 roomID: roomID,
                 status: 'active',
                 questionTimer: questionTimer,
+                battleTimer: battleTimer,
                 questionCount: questionCount,
                 players: [
                     { userId: p1.userId, name: p1.name },
@@ -78,10 +79,25 @@ module.exports = (io, socket) => {
                 topic: newBattle.topic,
                 questionTimer: newBattle.questionTimer,
                 totalQuestions: quiz.questions.length,
+                battleTimer: newBattle.battleTimer,
                 quiz: quiz
             });
 
             logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
+
+            if (battleTimer > 0) {
+                setTimeout(async () => {
+                    const b = await Battle.findOne({ battleId });
+                    if (b && b.status === 'active') {
+                        logger.info(`⏰ [BATTLE] Time Expired for Room ${roomID}`);
+                        io.to(roomID).emit('battle:sync', { 
+                            message: "Battle time expired! Calculating final results...",
+                            timeExpired: true
+                        });
+                        await concludeBattle(b);
+                    }
+                }, battleTimer * 1000);
+            }
         } catch (error) {
             logger.error('Create Battle Error:', error.message);
             emitToUser(p1.userId, 'error', { 
@@ -100,7 +116,8 @@ module.exports = (io, socket) => {
         const mode = data?.mode || 'random';
         const topicRaw = data?.topic || 'General';
         const qCount = parseInt(data?.questionCount) || 5;
-        const qTimer = parseInt(data?.questionTimer) || 20; // Default to 20 seconds
+        const qTimer = parseInt(data?.questionTimer) || 20; 
+        const bTimer = parseInt(data?.battleTimer) || 0;
         const topic = topicRaw.toLowerCase().replace(/\s+/g, ''); // Normalize
         
         waitingPlayers.set(userId, {
@@ -112,6 +129,7 @@ module.exports = (io, socket) => {
             topic: topic,
             questionCount: qCount,
             questionTimer: qTimer,
+            battleTimer: bTimer,
             rank: socket.user.rank || { tier: 'Bronze', level: 'I', points: 0 },
             joinedAt: Date.now()
         });
@@ -122,11 +140,12 @@ module.exports = (io, socket) => {
                 p.mode === 'random' && 
                 p.topic === topic &&
                 p.questionCount === qCount &&
-                p.questionTimer === qTimer
+                p.questionTimer === qTimer &&
+                p.battleTimer === bTimer
             );
 
             if (opponent) {
-                createBattle(opponent, waitingPlayers.get(userId), topicRaw, qCount, qTimer);
+                createBattle(opponent, waitingPlayers.get(userId), topicRaw, qCount, qTimer, bTimer);
             } else {
                 socket.emit('battle:searching');
             }
@@ -135,7 +154,7 @@ module.exports = (io, socket) => {
     });
 
     socket.on('battle:challenge_player', async (data) => {
-        const { targetUserId, topic, questionCount, questionTimer } = data;
+        const { targetUserId, topic, questionCount, questionTimer, battleTimer } = data;
         const challenger = waitingPlayers.get(socket.user._id.toString());
         const target = waitingPlayers.get(targetUserId);
 
@@ -146,19 +165,20 @@ module.exports = (io, socket) => {
             challengerUserId: challenger.userId,
             topic: topic || 'General',
             questionCount: questionCount || 5,
-            questionTimer: questionTimer || 20
+            questionTimer: questionTimer || 20,
+            battleTimer: battleTimer || 0
         });
     });
 
     socket.on('battle:respond_challenge', async (data) => {
-        const { challengerUserId, accept, topic, questionCount, questionTimer } = data;
+        const { challengerUserId, accept, topic, questionCount, questionTimer, battleTimer } = data;
         const target = waitingPlayers.get(socket.user._id.toString());
         const challenger = waitingPlayers.get(challengerUserId);
 
         if (!challenger || !target) return socket.emit('error', { message: 'Duel setup expired.' });
 
         if (accept) {
-            createBattle(challenger, target, topic, questionCount || 5, questionTimer || 20);
+            createBattle(challenger, target, topic, questionCount || 5, questionTimer || 20, battleTimer || 0);
         } else {
             emitToUser(challengerUserId, 'battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
         }
@@ -197,7 +217,7 @@ module.exports = (io, socket) => {
             const roundAnswer = { 
                 questionIndex, 
                 isCorrect, 
-                timeSpent: timeTaken || 15000,
+                timeSpent: (timeTaken !== null && timeTaken !== undefined) ? timeTaken : (battle.questionTimer * 1000),
                 perfect: perfectTimeBonus
             };
             player.answers.push(roundAnswer);
@@ -262,6 +282,34 @@ module.exports = (io, socket) => {
             }
 
         } catch (err) { logger.error('Battle Sync Error:', err); }
+    });
+
+    socket.on('battle:request_extension', ({ battleId }) => {
+        const userId = socket.user._id.toString();
+        Battle.findOne({ battleId, status: 'active' }).then(battle => {
+            if (!battle) return;
+            const opponent = battle.players.find(p => p.userId.toString() !== userId);
+            if (opponent) {
+                emitToUser(opponent.userId.toString(), 'battle:extension_received', { 
+                    requesterName: socket.user.name 
+                });
+            }
+        });
+    });
+
+    socket.on('battle:extension_respond', ({ battleId, accept }) => {
+        const userId = socket.user._id.toString();
+        Battle.findOne({ battleId, status: 'active' }).then(battle => {
+            if (!battle) return;
+            const challenger = battle.players.find(p => p.userId.toString() !== userId);
+            if (accept) {
+                io.to(battle.roomID).emit('battle:timer_extended');
+            } else {
+                if (challenger) {
+                    emitToUser(challenger.userId.toString(), 'battle:extension_denied');
+                }
+            }
+        });
     });
 
     const concludeBattle = async (battle) => {

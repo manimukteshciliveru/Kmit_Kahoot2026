@@ -6,6 +6,7 @@ const battleSchema = new mongoose.Schema({
     mode: { type: String, enum: ['random', 'challenge'], default: 'random' },
     status: { type: String, enum: ['waiting', 'active', 'completed', 'canceled'], default: 'active' },
     questionTimer: { type: Number, default: 20 },
+    battleTimer: { type: Number, default: 0 }, // Entire-battle, 0 means not used
     questionCount: { type: Number, default: 5 },
     
     players: [{

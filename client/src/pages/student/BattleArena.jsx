@@ -22,6 +22,8 @@ const BattleArena = () => {
     const [battleData, setBattleData] = useState(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [timer, setTimer] = useState(20);
+    const [battleTimer, setBattleTimer] = useState(0); 
+    const [totalRemaining, setTotalRemaining] = useState(0);
     const [searchTime, setSearchTime] = useState(0);
     
     // Synchronized Progression States
@@ -37,6 +39,7 @@ const BattleArena = () => {
 
     const timerRef = useRef(null);
     const searchInterval = useRef(null);
+    const overallTimerRef = useRef(null);
     const syncDataRef = useRef(null);
     const [showLevelMap, setShowLevelMap] = useState(false);
 
@@ -80,7 +83,12 @@ const BattleArena = () => {
             setView('playing');
             setCurrentQuestionIndex(0);
             setRoundStatus('answering');
-            startQuestionTimer();
+            
+            if (data.battleTimer > 0) {
+                setTotalRemaining(data.battleTimer);
+                startOverallTimer();
+            }
+            startQuestionTimer(data.questionTimer);
             toast.success('Duel Started!', { icon: '⚔️' });
         });
 
@@ -140,7 +148,45 @@ const BattleArena = () => {
             toast.error('Disconnected from battle server. Returning to selection.', { duration: 5000 });
             clearInterval(timerRef.current);
             clearInterval(searchInterval.current);
+            clearInterval(overallTimerRef.current);
             setView('selection');
+        });
+
+        socket.on('battle:extension_received', ({ requesterName }) => {
+            toast((t) => (
+                <div className="flex flex-col gap-2">
+                    <span><strong>{requesterName}</strong> wants 15s more for this question!</span>
+                    <div className="flex gap-2">
+                        <button 
+                            className="bg-green-600 px-3 py-1 rounded text-white" 
+                            onClick={() => {
+                                socket.emit('battle:extension_respond', { battleId: battleDataRef.current?.battleId, accept: true });
+                                toast.dismiss(t.id);
+                            }}
+                        >
+                            Allow
+                        </button>
+                        <button 
+                            className="bg-red-600 px-3 py-1 rounded text-white" 
+                            onClick={() => {
+                                socket.emit('battle:extension_respond', { battleId: battleDataRef.current?.battleId, accept: false });
+                                toast.dismiss(t.id);
+                            }}
+                        >
+                            Deny
+                        </button>
+                    </div>
+                </div>
+            ), { duration: 8000, icon: '⏳' });
+        });
+
+        socket.on('battle:timer_extended', () => {
+            setTimer(prev => prev + 15);
+            toast.success('Time Extended by 15s!', { icon: '➕' });
+        });
+
+        socket.on('battle:extension_denied', () => {
+            toast.error('Extension Request Denied');
         });
 
         return () => {
@@ -156,9 +202,31 @@ const BattleArena = () => {
             socket.off('battle:opponent_left');
             clearInterval(timerRef.current);
             clearInterval(searchInterval.current);
+            clearInterval(overallTimerRef.current);
             socket.off('battle:disconnect');
+            socket.off('battle:extension_received');
+            socket.off('battle:timer_extended');
+            socket.off('battle:extension_denied');
         };
     }, [socket, connected, user]);
+
+    const battleDataRef = useRef(null);
+    useEffect(() => {
+        battleDataRef.current = battleData;
+    }, [battleData]);
+
+    const startOverallTimer = () => {
+        clearInterval(overallTimerRef.current);
+        overallTimerRef.current = setInterval(() => {
+            setTotalRemaining(prev => {
+                if (prev <= 0) {
+                    clearInterval(overallTimerRef.current);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
 
     const triggerDamageEffect = (target) => {
         setDamageEffect(target);
@@ -171,8 +239,9 @@ const BattleArena = () => {
         }
     }, [timer, roundStatus]);
 
-    const startQuestionTimer = () => {
-        setTimer(battleData?.questionTimer || 20);
+    const startQuestionTimer = (overrideTimer) => {
+        const initialTime = overrideTimer || battleData?.questionTimer || 20;
+        setTimer(initialTime);
         clearInterval(timerRef.current);
         timerRef.current = setInterval(() => {
             setTimer(prev => {
@@ -185,17 +254,25 @@ const BattleArena = () => {
         }, 1000);
     };
 
+    const requestExtension = () => {
+        if (socket && battleData) {
+            socket.emit('battle:request_extension', { battleId: battleData.battleId });
+            toast.success('Extension Request Sent');
+        }
+    };
+
     const handleAnswer = (answerIndex) => {
         if (roundStatus !== 'answering') return;
         setRoundStatus('waiting');
         
         clearInterval(timerRef.current);
         if (socket && battleData) {
+            const initialTime = battleData?.questionTimer || 20;
             socket.emit('battle:submit_answer', {
                 battleId: battleData.battleId,
                 questionIndex: currentQuestionIndex,
                 answer: answerIndex,
-                timeTaken: (20 - timer) * 1000
+                timeTaken: (initialTime - timer) * 1000
             });
         }
     };
@@ -211,7 +288,8 @@ const BattleArena = () => {
                 mode, 
                 topic: selectedSubTopic ? `${selectedCategory}: ${selectedSubTopic}` : 'General',
                 questionCount,
-                questionTimer
+                questionTimer,
+                battleTimer
             });
         }
     };
@@ -223,7 +301,8 @@ const BattleArena = () => {
                 targetUserId, 
                 topic: `${selectedCategory}: ${selectedSubTopic}`,
                 questionCount,
-                questionTimer
+                questionTimer,
+                battleTimer
             });
             toast.success('Challenge Dispatched!');
         }
@@ -289,6 +368,13 @@ const BattleArena = () => {
                         </div>
                     </div>
 
+                    {battleData.battleTimer > 0 && (
+                        <div className="overall-match-timer glass">
+                            <span className="label">Match Ends In:</span>
+                            <span className="time">{Math.floor(totalRemaining / 60)}:{(totalRemaining % 60).toString().padStart(2, '0')}</span>
+                        </div>
+                    )}
+
                     <div className="combat-stage animate-scale-in">
                         {roundStatus === 'answering' && (
                             <div className="question-box glass">
@@ -304,6 +390,11 @@ const BattleArena = () => {
                                         </button>
                                     ))}
                                 </div>
+                                <div className="q-footer-actions flex justify-end mt-4">
+                                    <button className="btn-extension flex items-center gap-2 text-xs text-orange-400 border border-orange-400/30 px-3 py-2 rounded-lg hover:bg-orange-400/10" onClick={requestExtension}>
+                                        <LuTimer className="animate-pulse" /> Too Tough? Request +15s
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -311,7 +402,7 @@ const BattleArena = () => {
                             <div className="waiting-overlay glass animate-pulse">
                                 <LuTimer className="waiting-icon" />
                                 <h2>Waiting for Opponent...</h2>
-                                <p>You answered in {((20 - timer)).toFixed(1)}s</p>
+                                <p>You answered in {((battleData?.questionTimer || 20) - timer).toFixed(1)}s</p>
                             </div>
                         )}
 
@@ -456,12 +547,39 @@ const BattleArena = () => {
                                         </select>
                                     </div>
                                     <div className="flex-1">
-                                        <label className="form-label">Duration</label>
-                                        <select className="form-select" value={questionTimer} onChange={(e) => setQuestionTimer(Number(e.target.value))}>
-                                            <option value={10}>10s / q</option>
-                                            <option value={20}>20s / q</option>
-                                            <option value={30}>30s / q</option>
-                                            <option value={60}>60s / q</option>
+                                        <label className="form-label">Duration (s/q)</label>
+                                        <div className="flex gap-2">
+                                            <select 
+                                                className="form-select flex-1" 
+                                                value={[10, 20, 30, 60].includes(questionTimer) ? questionTimer : 'custom'} 
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === 'custom') {
+                                                        const custom = prompt("Enter custom time (seconds per question):", "45");
+                                                        if (custom && !isNaN(custom)) setQuestionTimer(Number(custom));
+                                                    } else {
+                                                        setQuestionTimer(Number(val));
+                                                    }
+                                                }}
+                                            >
+                                                <option value={10}>10s / q</option>
+                                                <option value={20}>20s / q</option>
+                                                <option value={30}>30s / q</option>
+                                                <option value={60}>60s / q</option>
+                                                <option value="custom">Custom...</option>
+                                            </select>
+                                            {![10, 20, 30, 60].includes(questionTimer) && (
+                                                <div className="custom-timer-badge">{questionTimer}s</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="form-label">Battle Timer (optional)</label>
+                                        <select className="form-select" value={battleTimer} onChange={(e) => setBattleTimer(Number(e.target.value))}>
+                                            <option value={0}>None</option>
+                                            <option value={120}>2 mins</option>
+                                            <option value={300}>5 mins</option>
+                                            <option value={600}>10 mins</option>
                                         </select>
                                     </div>
                                 </div>
@@ -605,10 +723,10 @@ const BattleArena = () => {
                     <LuSword />
                     <div className="c-text">
                         <strong>{incomingChallenge.challengerName}</strong> wants to duel!
-                        <p>{incomingChallenge.topic} • {incomingChallenge.questionCount} Qs • {incomingChallenge.questionTimer}s Timer</p>
+                        <p>{incomingChallenge.topic} • {incomingChallenge.questionCount} Qs • {incomingChallenge.questionTimer}s Timer {incomingChallenge.battleTimer > 0 ? `• ${incomingChallenge.battleTimer/60}m Match` : ''}</p>
                     </div>
                     <div className="c-btns">
-                        <button className="acc" onClick={() => socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic, questionCount: incomingChallenge.questionCount, questionTimer: incomingChallenge.questionTimer })}>Accept</button>
+                        <button className="acc" onClick={() => socket.emit('battle:respond_challenge', { challengerUserId: incomingChallenge.challengerUserId, accept: true, topic: incomingChallenge.topic, questionCount: incomingChallenge.questionCount, questionTimer: incomingChallenge.questionTimer, battleTimer: incomingChallenge.battleTimer })}>Accept</button>
                         <button className="dec" onClick={() => setIncomingChallenge(null)}>Reject</button>
                     </div>
                 </div>

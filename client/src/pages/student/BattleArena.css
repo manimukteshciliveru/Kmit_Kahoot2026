@@ -798,6 +798,61 @@
 .res-block.me { border-color: rgba(96, 165, 250, 0.3); background: rgba(59, 130, 246, 0.05); }
 
 .player-name { font-weight: 800; font-size: 1.1rem; }
+
+/* New Battle Timer Styles */
+.overall-match-timer {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  padding: 0.8rem 2rem;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: -2rem auto 3rem auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  width: fit-content;
+  z-index: 10;
+}
+
+.overall-match-timer .label {
+  color: #94A3B8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.overall-match-timer .time {
+  color: #F87171;
+  font-size: 1.4rem;
+  font-weight: 800;
+  min-width: 80px;
+  text-align: center;
+}
+
+.btn-extension {
+  transition: all 0.3s;
+  background: rgba(251, 146, 60, 0.05);
+}
+
+.btn-extension:hover {
+  background: rgba(251, 146, 60, 0.15) !important;
+  border-color: #FB923C !important;
+  transform: translateY(-2px);
+}
+
+.custom-timer-badge {
+  background: #2563EB;
+  color: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+}
+
 .res-badge { font-size: 0.7rem; font-weight: 900; padding: 2px 8px; border-radius: 4px; }
 .res-badge.correct { background: #10B981; color: white; }
 .res-badge.wrong { background: #EF4444; color: white; }
