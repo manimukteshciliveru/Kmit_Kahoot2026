@@ -1,17 +1,4 @@
-﻿# ⚔️ 1V1 BATTLE ARENA - FULL SOURCE CODE & DOCUMENTATION
-This file contains the complete system for the 1v1 Battle Arena.
-
-## 🏛️ ARCHITECTURAL BREAKDOWN:
-1. **Frontend (BattleArena.jsx)** - Handles UI/UX, animations, HUD (HP/Scores), and timer synchronization.
-2. **Backend Engine (battleHandler.js)** - Manages real-time rooms, game logic, and server-side safety timers.
-3. **Data Model (Battle.js)** - Defines the persistent storage for battles in MongoDB.
-4. **Ranking System (rankManager.js)** - Calculates ELO points (RP) and handles Tier progression.
-5. **AI Service (battleAI.service.js)** - Generates high-quality questions using Gemini/Mistral/OpenAI failover.
-6. **Styles (BattleArena.css)** - Premium CSS animations and layouts.
-
----
-
---- [1/6] FRONTEND: BattleArena.jsx ---
+﻿--- [1/6] FRONTEND: BattleArena.jsx ---
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
@@ -57,6 +44,10 @@ const BattleArena = () => {
     const syncDataRef = useRef(null);
     const hasSubmittedRef = useRef(false);
     const questionStartTimeRef = useRef(Date.now());
+    const questionEndTimeRef = useRef(0);
+    const currentMaxTimerRef = useRef(20);
+    const [lastTimeTaken, setLastTimeTaken] = useState(0);
+    const [opponentName, setOpponentName] = useState('Opponent');
     const [showLevelMap, setShowLevelMap] = useState(false);
 
     const TOPIC_STRUCTURE = {
@@ -105,6 +96,7 @@ const BattleArena = () => {
                 startOverallTimer();
             }
             questionStartTimeRef.current = Date.now();
+            currentMaxTimerRef.current = data.questionTimer;
             startQuestionTimer(data.questionTimer);
             toast.success('Duel Started!', { icon: 'âš”ï¸' });
         });
@@ -124,9 +116,10 @@ const BattleArena = () => {
             setSyncData(data);
         });
 
-        socket.on('battle:waiting_for_opponent', () => {
+        socket.on('battle:waiting_for_opponent', (data) => {
             setRoundStatus('waiting');
-            clearInterval(timerRef.current);
+            if (data?.opponentName) setOpponentName(data.opponentName);
+            cancelAnimationFrame(timerRef.current);
         });
 
         socket.on('battle:round_resolved', (data) => {
@@ -141,11 +134,12 @@ const BattleArena = () => {
             setRoundResult(null);
             hasSubmittedRef.current = false;
             questionStartTimeRef.current = Date.now();
+            currentMaxTimerRef.current = serverTimer;
             startQuestionTimer(serverTimer);
         });
 
         socket.on('battle:ended', (data) => {
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             setFinalResults(data);
             setView('results');
         });
@@ -163,14 +157,14 @@ const BattleArena = () => {
 
         socket.on('battle:opponent_left', (data) => {
             toast.success(data.message, { icon: 'ðŸ†', duration: 5000 });
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             clearInterval(overallTimerRef.current);
             setView('selection');
         });
 
         socket.on('battle:disconnect', () => {
             toast.error('Disconnected from battle server. Returning to selection.', { duration: 5000 });
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             clearInterval(searchInterval.current);
             clearInterval(overallTimerRef.current);
             setView('selection');
@@ -205,7 +199,8 @@ const BattleArena = () => {
         });
 
         socket.on('battle:timer_extended', () => {
-            setTimer(prev => prev + 15);
+            currentMaxTimerRef.current += 15;
+            questionEndTimeRef.current += 15000;
             toast.success('Time Extended by 15s!', { icon: 'âž•' });
         });
 
@@ -224,7 +219,7 @@ const BattleArena = () => {
             socket.off('battle:ended');
             socket.off('battle:searching');
             socket.off('battle:opponent_left');
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             clearInterval(searchInterval.current);
             clearInterval(overallTimerRef.current);
             socket.off('battle:disconnect');
@@ -263,19 +258,19 @@ const BattleArena = () => {
         }
     }, [timer, roundStatus]);
 
-    const startQuestionTimer = (overrideTimer) => {
-        const initialTime = overrideTimer || battleData?.questionTimer || 20;
-        setTimer(initialTime);
-        clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-            setTimer(prev => {
-                if (prev <= 0) {
-                    clearInterval(timerRef.current);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+    const startQuestionTimer = (duration) => {
+        cancelAnimationFrame(timerRef.current);
+        questionEndTimeRef.current = Date.now() + (duration * 1000);
+        
+        const tick = () => {
+            const now = Date.now();
+            const remaining = Math.max(0, Math.ceil((questionEndTimeRef.current - now) / 1000));
+            setTimer(remaining);
+            if (remaining > 0) {
+                timerRef.current = requestAnimationFrame(tick);
+            }
+        };
+        timerRef.current = requestAnimationFrame(tick);
     };
 
     const requestExtension = () => {
@@ -289,8 +284,9 @@ const BattleArena = () => {
         if (roundStatus !== 'answering' || hasSubmittedRef.current) return;
         hasSubmittedRef.current = true;
         setRoundStatus('waiting');
-        clearInterval(timerRef.current);
+        cancelAnimationFrame(timerRef.current);
         const timeTaken = Date.now() - questionStartTimeRef.current;
+        setLastTimeTaken(timeTaken);
         if (socket && battleData) {
             socket.emit('battle:submit_answer', {
                 battleId: battleData.battleId,
@@ -358,7 +354,7 @@ const BattleArena = () => {
                                 const myData = syncData?.players?.find(p => p.userId === myId);
                                 return (
                                     <div className="hp-container">
-                                        <div className="hp-bar" style={{ width: `${myData?.hp ?? 100}%` }} />
+                                        <div className={`hp-bar ${(myData?.hp ?? 100) > 60 ? 'healthy' : (myData?.hp ?? 100) > 30 ? 'moderate' : 'critical'}`} style={{ width: `${myData?.hp ?? 100}%` }} />
                                     </div>
                                 );
                             })()}
@@ -369,8 +365,8 @@ const BattleArena = () => {
                                 <circle cx="50" cy="50" r="45" className="timer-bg" />
                                 <circle 
                                     cx="50" cy="50" r="45" 
-                                    className="timer-progress" 
-                                    style={{ strokeDashoffset: 283 - (283 * (timer / (battleData?.questionTimer || 20))) }}
+                                    className={`timer-progress ${timer <= 5 ? 'danger' : timer <= 10 ? 'warning' : ''}`} 
+                                    style={{ strokeDashoffset: Math.max(0, 283 - (283 * (timer / currentMaxTimerRef.current))) }}
                                 />
                             </svg>
                             <span className="timer-val">{timer}</span>
@@ -389,7 +385,7 @@ const BattleArena = () => {
                                 const oppData = syncData?.players?.find(p => p.userId !== myId);
                                 return (
                                     <div className="hp-container">
-                                        <div className="hp-bar" style={{ width: `${oppData?.hp ?? 100}%` }} />
+                                        <div className={`hp-bar ${(oppData?.hp ?? 100) > 60 ? 'healthy' : (oppData?.hp ?? 100) > 30 ? 'moderate' : 'critical'}`} style={{ width: `${oppData?.hp ?? 100}%` }} />
                                     </div>
                                 );
                             })()}
@@ -429,8 +425,8 @@ const BattleArena = () => {
                         {roundStatus === 'waiting' && (
                             <div className="waiting-overlay glass animate-pulse">
                                 <LuTimer className="waiting-icon" />
-                                <h2>Waiting for Opponent...</h2>
-                                <p>You answered in {((battleData?.questionTimer || 20) - timer).toFixed(1)}s</p>
+                                <h2>Waiting for <span style={{color: '#60A5FA'}}>{opponentName}</span>...</h2>
+                                <p>You answered in {(lastTimeTaken / 1000).toFixed(1)}s</p>
                             </div>
                         )}
 
@@ -803,6 +799,8 @@ const logger = require('../utils/logger');
 
 const waitingPlayers = new Map(); // userId -> player stats
 const activeRoundTimers = new Map(); // roomID -> timeout
+const pendingQuizCache = new Map(); // topic:count -> Promise
+const roomQuestionIndex = new Map(); // roomID -> currentQuestionIndex
 
 module.exports = (io, socket) => {
     if (!socket.user) return;
@@ -905,7 +903,14 @@ module.exports = (io, socket) => {
         const topic = topicStr || "General";
 
         try {
-            const quiz = await generateBattleQuiz(topic, questionCount);
+            const quizKey = `${topic}::${questionCount}`;
+            let quiz;
+            if (pendingQuizCache.has(quizKey)) {
+                quiz = await pendingQuizCache.get(quizKey);
+                pendingQuizCache.delete(quizKey); // Use once
+            } else {
+                quiz = await generateBattleQuiz(topic, questionCount);
+            }
             const battleId = `btl_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
             const newBattle = new Battle({
@@ -944,6 +949,7 @@ module.exports = (io, socket) => {
             });
 
             // Start Server Safety Timer for Round 1
+            roomQuestionIndex.set(roomID, 0);
             startServerRoundTimer(roomID, battleId, 0, newBattle.questionTimer);
 
             logger.info(`âš”ï¸ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
@@ -1009,6 +1015,10 @@ module.exports = (io, socket) => {
             );
 
             if (opponent) {
+                const quizKey = `${opponent.displayTopic}::${qCount}`;
+                if (!pendingQuizCache.has(quizKey)) {
+                    pendingQuizCache.set(quizKey, generateBattleQuiz(opponent.displayTopic, qCount));
+                }
                 createBattle(opponent, waitingPlayers.get(userId), opponent.displayTopic, qCount, qTimer, bTimer);
             } else {
                 socket.emit('battle:searching');
@@ -1090,6 +1100,9 @@ module.exports = (io, socket) => {
             };
             player.answers.push(roundAnswer);
 
+            const prevHps = battle.players.map(p => p.hp);
+            const prevScores = battle.players.map(p => p.score);
+
             // Apply HP Logic (Opponent takes damage if I get it right)
             if (isCorrect) {
                 const damage = perfectTimeBonus ? 30 : 20;
@@ -1098,6 +1111,9 @@ module.exports = (io, socket) => {
             } else {
                 player.hp = Math.max(0, player.hp - 10); // Mishap damage
             }
+
+            const hpChanged = battle.players.some((p, i) => p.hp !== prevHps[i]);
+            const scoreChanged = battle.players.some((p, i) => p.score !== prevScores[i]);
 
             await battle.save();
 
@@ -1136,6 +1152,7 @@ module.exports = (io, socket) => {
                     if (lastQuestion) {
                         await concludeBattle(refreshedBattle);
                     } else {
+                        roomQuestionIndex.set(battle.roomID, questionIndex + 1);
                         io.to(battle.roomID).emit('battle:next_question', { 
                             nextIndex: questionIndex + 1,
                             timer: battle.questionTimer
@@ -1146,15 +1163,18 @@ module.exports = (io, socket) => {
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait
-                socket.emit('battle:waiting_for_opponent', { questionIndex });
-                // We still sync the HP bars live
-                io.to(battle.roomID).emit('battle:sync', {
-                    players: battle.players.map(p => ({
-                        userId: p.userId.toString(),
-                        hp: p.hp,
-                        score: p.score
-                    }))
-                });
+                socket.emit('battle:waiting_for_opponent', { questionIndex, opponentName: opponent.name });
+                
+                if (hpChanged || scoreChanged) {
+                    io.to(battle.roomID).emit('battle:sync', {
+                        players: battle.players.map(p => ({
+                            userId: p.userId.toString(),
+                            name: p.name,
+                            hp: p.hp,
+                            score: p.score
+                        }))
+                    });
+                }
             }
 
         } catch (err) { logger.error('Battle Sync Error:', err); }
@@ -1173,19 +1193,23 @@ module.exports = (io, socket) => {
         });
     });
 
-    socket.on('battle:extension_respond', ({ battleId, accept }) => {
+    socket.on('battle:extension_respond', async ({ battleId, accept }) => {
         const userId = socket.user._id.toString();
-        Battle.findOne({ battleId, status: 'active' }).then(battle => {
-            if (!battle) return;
-            const challenger = battle.players.find(p => p.userId.toString() !== userId);
-            if (accept) {
-                io.to(battle.roomID).emit('battle:timer_extended');
-            } else {
-                if (challenger) {
-                    emitToUser(challenger.userId.toString(), 'battle:extension_denied');
-                }
+        const battle = await Battle.findOne({ battleId, status: 'active' });
+        if (!battle) return;
+
+        const challenger = battle.players.find(p => p.userId.toString() !== userId);
+        if (accept) {
+            const currentQ = roomQuestionIndex.get(battle.roomID) || 0;
+            // Extend the server safety timer by resetting it with more time
+            // Assuming current remaining time + 15
+            startServerRoundTimer(battle.roomID, battleId, currentQ, battle.questionTimer + 15);
+            io.to(battle.roomID).emit('battle:timer_extended');
+        } else {
+            if (challenger) {
+                emitToUser(challenger.userId.toString(), 'battle:extension_denied');
             }
-        });
+        }
     });
 
     const concludeBattle = async (battleInput) => {
@@ -1196,6 +1220,7 @@ module.exports = (io, socket) => {
             clearTimeout(activeRoundTimers.get(battle.roomID));
             activeRoundTimers.delete(battle.roomID);
         }
+        roomQuestionIndex.delete(battle.roomID);
         battle.status = 'completed';
         battle.endedAt = new Date();
 
@@ -1781,8 +1806,20 @@ module.exports = { generateBattleQuiz };
 
 .hp-bar {
   height: 100%;
-  background: linear-gradient(to right, #EF4444, #F87171);
-  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: linear-gradient(to right, #EF4444, #F87171); /* Fallback */
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.5s ease;
+}
+
+.hp-bar.healthy { background: linear-gradient(to right, #10B981, #34D399); }
+.hp-bar.moderate { background: linear-gradient(to right, #F59E0B, #FCD34D); }
+.hp-bar.critical { 
+  background: linear-gradient(to right, #EF4444, #F87171); 
+  animation: pulse-bar 0.8s infinite; 
+}
+
+@keyframes pulse-bar {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .hp-icon {
@@ -1806,9 +1843,12 @@ module.exports = { generateBattleQuiz };
   stroke-width: 8;
   fill: none;
   stroke-linecap: round;
-  transition: stroke-dashoffset 1s linear;
+  transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
   stroke-dasharray: 283;
 }
+
+.timer-progress.warning { stroke: #F59E0B; }
+.timer-progress.danger  { stroke: #EF4444; }
 
 .timer-val {
   position: absolute;
@@ -2318,6 +2358,26 @@ module.exports = { generateBattleQuiz };
   background: #60A5FA;
   color: white;
   box-shadow: 0 0 20px rgba(96, 165, 250, 0.4);
+}
+
+@media (max-width: 640px) {
+    .arena-v2 { padding: 1rem; }
+    .battle-hud-v2 { gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+    .hud-side { padding: 0.8rem; flex: 1; min-width: 140px; }
+    .match-timer-ring { width: 70px; height: 70px; order: -1; margin-bottom: 1rem; }
+    .timer-val { font-size: 1.2rem; }
+    .overall-match-timer { top: unset; bottom: 20px; right: 20px; font-size: 0.8rem; padding: 0.5rem 1rem; }
+    .combat-stage { margin-top: 1rem; }
+    .question-box { padding: 1.2rem; }
+    .question-box h2 { font-size: 1rem !important; }
+    .options-grid-v2 { grid-template-columns: 1fr; gap: 0.8rem; }
+    .opt-v2 { padding: 0.8rem; }
+    .opt-label { font-size: 0.9rem; }
+    
+    .arena-header h1 { font-size: 2rem; }
+    .rank-card-v2 { padding: 1.2rem; flex-direction: column; text-align: center; gap: 1rem; }
+    .rank-info-v2 h2 { font-size: 1.5rem; justify-content: center; }
+    .path-picker { grid-template-columns: 1fr; }
 }
 
 .arena-controls {
