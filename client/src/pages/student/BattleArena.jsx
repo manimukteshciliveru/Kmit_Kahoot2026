@@ -48,7 +48,8 @@ const BattleArena = () => {
     const timeOffsetRef = useRef(0); // 🕒 Server-Client Clock Offset
     const currentMaxTimerRef = useRef(20);
     const [lastTimeTaken, setLastTimeTaken] = useState(0);
-    const [opponentName, setOpponentName] = useState('Opponent');
+    const [selectedAnswers, setSelectedAnswers] = useState({}); // 🕒 Local Review Mode
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [showLevelMap, setShowLevelMap] = useState(false);
 
     const TOPIC_STRUCTURE = {
@@ -120,10 +121,11 @@ const BattleArena = () => {
             setCurrentQuestionIndex(nextIndex);
             setRoundStatus('answering');
             setRoundResult(null);
-            hasSubmittedRef.current = false;
-            // setTimer(0); // Question-timer removed as per user request
-            // currentMaxTimerRef.current = serverTimer;
-            // startQuestionTimer(serverTimer, startTime, serverTime);
+            // hasSubmittedRef.current = false; // Manual navigation doesn't need this lock
+        });
+
+        socket.on('battle:waiting_for_match_end', () => {
+             setRoundStatus('waiting_match_end');
         });
 
         socket.on('battle:waiting_for_match_end', () => {
@@ -286,20 +288,29 @@ const BattleArena = () => {
         // Feature removed as per user request
     };
 
-    const handleAnswer = (answerIndex) => {
-        if (roundStatus !== 'answering' || hasSubmittedRef.current) return;
-        hasSubmittedRef.current = true;
-        // setRoundStatus('waiting'); // Removed for racing mode
-        cancelAnimationFrame(timerRef.current);
-        const timeTaken = Date.now() - questionStartTimeRef.current;
-        setLastTimeTaken(timeTaken);
+    const handleOptionSelect = (idx) => {
+        setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: idx }));
+    };
+
+    const handleNext = () => {
+        const answer = selectedAnswers[currentQuestionIndex];
+        if (answer === undefined) return toast.error("Please select an answer first!");
+
         if (socket && battleData) {
-            socket.emit('battle:submit_answer', {
+            socket.emit('battle:submit_answer', { 
                 battleId: battleData.battleId,
                 questionIndex: currentQuestionIndex,
-                answer: answerIndex,
-                timeTaken
+                answer: answer,
+                timeTaken: 0 // No per-question timer pressure
             });
+        }
+    };
+
+    const handlePrev = () => {
+        if (currentQuestionIndex > 0) {
+            // Check if we already have an answer in DB? 
+            // In manual mode, maybe just show the previous question locally
+            setCurrentQuestionIndex(prev => prev - 1);
         }
     };
 
@@ -354,11 +365,6 @@ const BattleArena = () => {
                         <div className={`hud-side self ${damageEffect === 'self' ? 'damaged' : ''}`}>
                             <div className="hud-meta">
                                 <span className="hud-name text-blue-400 font-bold">{user.name}</span>
-                                {(() => {
-                                    const myId = (user.id || user._id)?.toString();
-                                    const myData = syncData?.players?.find(p => p.userId === myId);
-                                    return <span className="hud-score text-blue-300/80 text-xs ml-2">({myData?.score ?? 0} pts)</span>;
-                                })()}
                             </div>
                             {(() => {
                                 const myId = (user.id || user._id)?.toString();
@@ -384,12 +390,9 @@ const BattleArena = () => {
                                     const myId = (user.id || user._id)?.toString();
                                     const oppData = syncData?.players?.find(p => p.userId !== myId);
                                     return (
-                                        <>
-                                            <span className="hud-name text-white font-black text-lg tracking-wider" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3)' }}>
-                                                {oppData?.name || 'Opponent'}
-                                            </span>
-                                            <span className="hud-score text-white/50 text-xs shadow-glow-sm">({oppData?.score ?? 0} pts)</span>
-                                        </>
+                                        <span className="hud-name text-white font-black text-lg tracking-wider" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3)' }}>
+                                            {oppData?.name || 'Opponent'}
+                                        </span>
                                     );
                                 })()}
                             </div>
@@ -421,11 +424,30 @@ const BattleArena = () => {
                                 </h2>
                                 <div className="options-grid-v2">
                                     {battleData.quiz.questions[currentQuestionIndex].options.map((opt, idx) => (
-                                        <button key={idx} className="opt-v2" onClick={() => handleAnswer(idx)}>
+                                        <button 
+                                            key={idx} 
+                                            className={`opt-v2 ${selectedAnswers[currentQuestionIndex] === idx ? 'selected' : ''}`} 
+                                            onClick={() => handleOptionSelect(idx)}
+                                        >
                                             <div className="opt-idx">{String.fromCharCode(65 + idx)}</div>
                                             <span className="opt-label">{opt.text}</span>
                                         </button>
                                     ))}
+                                </div>
+                                <div className="q-nav-actions flex justify-between mt-8 pt-4 border-t border-white/10">
+                                    <button 
+                                        className="px-6 py-2 rounded-lg bg-white/5 text-white/50 hover:bg-white/10 disabled:opacity-30"
+                                        onClick={handlePrev}
+                                        disabled={currentQuestionIndex === 0}
+                                    >
+                                        Previous
+                                    </button>
+                                    <button 
+                                        className="px-8 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-500 shadow-lg shadow-blue-500/20"
+                                        onClick={handleNext}
+                                    >
+                                        {currentQuestionIndex === (battleData.quiz.questions.length - 1) ? 'Submit Quiz' : 'Finalize & Next'}
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -542,39 +564,12 @@ const BattleArena = () => {
                             {selectedSubTopic && (
                                 <div className="form-group animate-slideDown flex gap-4">
                                     <div className="flex-1">
-                                        <label className="form-label">Questions</label>
+                                        <label className="form-label">Total Questions</label>
                                         <select className="form-select" value={questionCount} onChange={(e) => setQuestionCount(Number(e.target.value))}>
                                             <option value={5}>5 Questions</option>
                                             <option value={10}>10 Questions</option>
                                             <option value={15}>15 Questions</option>
                                         </select>
-                                    </div>
-                                    <div className="flex-1">
-                                        <label className="form-label">Duration (s/q)</label>
-                                        <div className="flex gap-2">
-                                            <select 
-                                                className="form-select flex-1" 
-                                                value={[10, 20, 30, 60].includes(questionTimer) ? questionTimer : 'custom'} 
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    if (val === 'custom') {
-                                                        const custom = prompt("Enter custom time (seconds per question):", "45");
-                                                        if (custom && !isNaN(custom)) setQuestionTimer(Number(custom));
-                                                    } else {
-                                                        setQuestionTimer(Number(val));
-                                                    }
-                                                }}
-                                            >
-                                                <option value={10}>10s / q</option>
-                                                <option value={20}>20s / q</option>
-                                                <option value={30}>30s / q</option>
-                                                <option value={60}>60s / q</option>
-                                                <option value="custom">Custom...</option>
-                                            </select>
-                                            {![10, 20, 30, 60].includes(questionTimer) && (
-                                                <div className="custom-timer-badge">{questionTimer}s</div>
-                                            )}
-                                        </div>
                                     </div>
                                     <div className="flex-1">
                                         <label className="form-label">Battle Timer (optional)</label>

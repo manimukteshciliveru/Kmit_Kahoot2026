@@ -288,16 +288,19 @@
   }
 }
 
-.timer-progress.warning { stroke: #F59E0B; }
-.timer-progress.danger  { stroke: #EF4444; }
+.opt-v2.selected {
+  background: #2563eb !important;
+  border-color: #ffffff;
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
+}
 
-.timer-val {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 2rem;
-  font-weight: 800;
+.opt-v2.selected .opt-idx {
+  background: #ffffff;
+  color: #2563eb;
+}
+
+.opt-v2.selected .opt-label {
+  color: #ffffff;
 }
 
 /* Question Area */
