@@ -152,7 +152,8 @@ module.exports = (io, socket) => {
                 questionTimer: newBattle.questionTimer,
                 totalQuestions: quiz.questions.length,
                 battleTimer: newBattle.battleTimer,
-                startTime: Date.now(), // ⚡ Authorized Sync Point
+                startTime: Date.now(),
+                serverTime: Date.now(), // 🕒 For Clock Sync
                 quiz: quiz
             });
 
@@ -325,8 +326,13 @@ module.exports = (io, socket) => {
 
             await battle.save();
 
-            // Check if BOTH have answered THIS question
-            const opponentAnswer = opponent.answers.find(a => a.questionIndex === questionIndex);
+            // 🔥 Race Condition Fix: Fetch FRESH state to see if other player answered
+            const freshBattle = await Battle.findOne({ battleId }).populate('players.userId');
+            if (!freshBattle) return;
+
+            const freshMe = freshBattle.players.find(p => p.userId._id.toString() === myId);
+            const freshOpp = freshBattle.players.find(p => p.userId._id.toString() !== myId);
+            const opponentAnswer = freshOpp.answers.find(a => a.questionIndex === questionIndex);
 
             if (opponentAnswer) {
                 if (activeRoundTimers.has(battle.roomID)) {
@@ -364,11 +370,12 @@ module.exports = (io, socket) => {
                         io.to(battle.roomID).emit('battle:next_question', { 
                             nextIndex: questionIndex + 1,
                             timer: battle.questionTimer,
-                            startTime: Date.now() // ⚡ Authorized Sync Point
+                            startTime: Date.now(),
+                            serverTime: Date.now() // 🕒 For Clock Sync
                         });
                         startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, battle.questionTimer);
                     }
-                }, 1500); // 🚀 Lightning fast transition 1.5s instead of 4s
+                }, 1000); // Super fast 1s loading after both submit!
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait

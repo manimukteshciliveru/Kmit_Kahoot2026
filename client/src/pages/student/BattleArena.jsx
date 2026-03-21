@@ -44,6 +44,7 @@ const BattleArena = () => {
     const hasSubmittedRef = useRef(false);
     const questionStartTimeRef = useRef(Date.now());
     const questionEndTimeRef = useRef(0);
+    const timeOffsetRef = useRef(0); // 🕒 Server-Client Clock Offset
     const currentMaxTimerRef = useRef(20);
     const [lastTimeTaken, setLastTimeTaken] = useState(0);
     const [opponentName, setOpponentName] = useState('Opponent');
@@ -94,9 +95,9 @@ const BattleArena = () => {
                 setTotalRemaining(data.battleTimer);
                 startOverallTimer();
             }
-            questionStartTimeRef.current = Date.now();
+            questionStartTimeRef.current = data.startTime || Date.now();
             currentMaxTimerRef.current = data.questionTimer;
-            startQuestionTimer(data.questionTimer, data.startTime);
+            startQuestionTimer(data.questionTimer, data.startTime, data.serverTime);
             toast.success('Duel Started!', { icon: '⚔️' });
         });
 
@@ -134,7 +135,7 @@ const BattleArena = () => {
             hasSubmittedRef.current = false;
             questionStartTimeRef.current = data.startTime || Date.now();
             currentMaxTimerRef.current = serverTimer;
-            startQuestionTimer(serverTimer, data.startTime);
+            startQuestionTimer(serverTimer, data.startTime, data.serverTime);
         });
 
         socket.on('battle:ended', (data) => {
@@ -200,6 +201,7 @@ const BattleArena = () => {
         socket.on('battle:timer_extended', () => {
             currentMaxTimerRef.current += 15;
             questionEndTimeRef.current += 15000;
+            // Recalculate immediate offset logic if needed, but end-time is now absolute
             toast.success('Time Extended by 15s!', { icon: '➕' });
         });
 
@@ -257,14 +259,19 @@ const BattleArena = () => {
         }
     }, [timer, roundStatus]);
 
-    const startQuestionTimer = (duration, serverStartTime) => {
+    const startQuestionTimer = (duration, serverStartTime, serverRecordTime) => {
         cancelAnimationFrame(timerRef.current);
-        const baseTime = serverStartTime || Date.now();
-        questionEndTimeRef.current = baseTime + (duration * 1000);
+        
+        if (serverRecordTime) {
+            timeOffsetRef.current = serverRecordTime - Date.now();
+        }
+
+        const baseTimeAtServer = serverStartTime || (Date.now() + timeOffsetRef.current);
+        questionEndTimeRef.current = baseTimeAtServer + (duration * 1000);
         
         const tick = () => {
-            const now = Date.now();
-            const remaining = Math.max(0, Math.ceil((questionEndTimeRef.current - now) / 1000));
+            const nowAtServer = Date.now() + timeOffsetRef.current;
+            const remaining = Math.max(0, Math.ceil((questionEndTimeRef.current - nowAtServer) / 1000));
             setTimer(remaining);
             if (remaining > 0) {
                 timerRef.current = requestAnimationFrame(tick);
