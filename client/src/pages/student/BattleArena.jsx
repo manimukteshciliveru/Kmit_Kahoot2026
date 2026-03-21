@@ -12,7 +12,7 @@ import './BattleArena.css';
 const BattleArena = () => {
     const { socket, connected } = useSocket();
     const { user } = useAuth();
-    const [view, setView] = useState('selection'); // selection, searching, lobby, playing, results
+    const [view, setView] = useState('selection'); // selection, searching, lobby, playing, results, preparing
     const [lobbyPlayers, setLobbyPlayers] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSubTopic, setSelectedSubTopic] = useState('');
@@ -118,11 +118,11 @@ const BattleArena = () => {
             clearInterval(timerRef.current);
         });
 
-        socket.on('battle:next_question', ({ nextIndex }) => {
+        socket.on('battle:next_question', ({ nextIndex, timer: serverTimer }) => {
             setCurrentQuestionIndex(nextIndex);
             setRoundStatus('answering');
             setRoundResult(null);
-            startQuestionTimer();
+            startQuestionTimer(serverTimer);
         });
 
         socket.on('battle:ended', (data) => {
@@ -136,6 +136,10 @@ const BattleArena = () => {
             setSearchTime(0);
             clearInterval(searchInterval.current);
             searchInterval.current = setInterval(() => setSearchTime(p => p + 1), 1000);
+        });
+
+        socket.on('battle:preparing', () => {
+            setView('preparing');
         });
 
         socket.on('battle:opponent_left', (data) => {
@@ -616,22 +620,34 @@ const BattleArena = () => {
             )}
 
             {view === 'searching' && (
-                <div className="searching-v2 animate-fadeIn">
+                <div className="searching-v2 animate-fade-in flex flex-col items-center justify-center min-h-[60vh]">
                     <div className="radar-v2">
-                        <div className="circle"></div>
-                        <div className="circle"></div>
-                        <div className="circle"></div>
-                        <LuSword className="radar-sword" />
+                        <div className="circle animate-ping"></div>
+                        <LuSword className="radar-sword animate-spin" />
                     </div>
-                    <h2 className="animate-pulse">Finding Opponent...</h2>
-                    <div className="search-meta">
-                        <span className="badge badge-primary">{selectedCategory}</span>
-                        <span className="badge badge-warning">{selectedSubTopic}</span>
+                    <h2 className="text-2xl font-bold mt-8 animate-pulse text-blue-400">Finding Opponent...</h2>
+                    <div className="search-meta flex gap-4 mt-6">
+                        <span className="bg-blue-600/20 text-blue-400 px-4 py-1 rounded-full border border-blue-400/30">{selectedCategory}</span>
+                        <span className="bg-orange-600/20 text-orange-400 px-4 py-1 rounded-full border border-orange-400/30">{selectedSubTopic}</span>
                     </div>
-                    <span className="search-timer">{searchTime}s</span>
-                    <button className="btn btn-danger btn-sm" onClick={() => setView('selection')}>
+                    <span className="text-xl font-mono mt-4 text-slate-300">{searchTime}s</span>
+                    <button className="btn-back-v2 mt-8" onClick={() => setView('selection')}>
                         <LuX /> Stop Searching
                     </button>
+                </div>
+            )}
+
+            {view === 'preparing' && (
+                <div className="preparing-v2 animate-fade-in flex flex-col items-center justify-center min-h-[60vh]">
+                    <div className="radar-v2">
+                        <div className="circle animate-ping"></div>
+                        <LuSword className="radar-sword animate-spin" />
+                    </div>
+                    <h2 className="text-2xl font-bold mt-8 animate-pulse text-blue-400">Battle Preparing...</h2>
+                    <p className="text-slate-400 mt-2">Summoning questions and initializing the arena</p>
+                    <div className="w-64 h-1 bg-slate-800 rounded-full mt-6 overflow-hidden">
+                        <div className="h-full bg-blue-500 animate-loading-bar"></div>
+                    </div>
                 </div>
             )}
 

@@ -178,6 +178,8 @@ module.exports = (io, socket) => {
         if (!challenger || !target) return socket.emit('error', { message: 'Duel setup expired.' });
 
         if (accept) {
+            emitToUser(challengerUserId, 'battle:preparing');
+            socket.emit('battle:preparing');
             createBattle(challenger, target, topic, questionCount || 5, questionTimer || 20, battleTimer || 0);
         } else {
             emitToUser(challengerUserId, 'battle:challenge_rejected', { message: 'Opponent declined the invitation.' });
@@ -264,7 +266,10 @@ module.exports = (io, socket) => {
                     if (lastQuestion) {
                         await concludeBattle(refreshedBattle);
                     } else {
-                        io.to(battle.roomID).emit('battle:next_question', { nextIndex: questionIndex + 1 });
+                        io.to(battle.roomID).emit('battle:next_question', { 
+                            nextIndex: questionIndex + 1,
+                            timer: battle.questionTimer
+                        });
                     }
                 }, 4000);
 
