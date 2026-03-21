@@ -125,17 +125,17 @@ const BattleArena = () => {
         socket.on('battle:round_resolved', (data) => {
             setRoundResult(data);
             setRoundStatus('resolved');
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
         });
 
-        socket.on('battle:next_question', ({ nextIndex, timer: serverTimer }) => {
+        socket.on('battle:next_question', ({ nextIndex, timer: serverTimer, startTime, serverTime }) => {
             setCurrentQuestionIndex(nextIndex);
             setRoundStatus('answering');
             setRoundResult(null);
             hasSubmittedRef.current = false;
-            questionStartTimeRef.current = data.startTime || Date.now();
+            questionStartTimeRef.current = startTime || Date.now();
             currentMaxTimerRef.current = serverTimer;
-            startQuestionTimer(serverTimer, data.startTime, data.serverTime);
+            startQuestionTimer(serverTimer, startTime, serverTime);
         });
 
         socket.on('battle:ended', (data) => {

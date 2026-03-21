@@ -8,6 +8,7 @@ const waitingPlayers = new Map(); // userId -> player stats
 const activeRoundTimers = new Map(); // roomID -> timeout
 const pendingQuizCache = new Map(); // topic:count -> Promise
 const roomQuestionIndex = new Map(); // roomID -> currentQuestionIndex
+const roomRoundStartTime = new Map(); // roomID -> timestamp
 
 module.exports = (io, socket) => {
     if (!socket.user) return;
@@ -159,6 +160,7 @@ module.exports = (io, socket) => {
 
             // Start Server Safety Timer for Round 1
             roomQuestionIndex.set(roomID, 0);
+            roomRoundStartTime.set(roomID, Date.now());
             startServerRoundTimer(roomID, battleId, 0, newBattle.questionTimer);
 
             logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
@@ -327,11 +329,11 @@ module.exports = (io, socket) => {
             await battle.save();
 
             // 🔥 Race Condition Fix: Fetch FRESH state to see if other player answered
-            const freshBattle = await Battle.findOne({ battleId }).populate('players.userId');
+            const freshBattle = await Battle.findOne({ battleId });
             if (!freshBattle) return;
 
-            const freshMe = freshBattle.players.find(p => p.userId._id.toString() === myId);
-            const freshOpp = freshBattle.players.find(p => p.userId._id.toString() !== myId);
+            const freshMe = freshBattle.players.find(p => p.userId.toString() === myId);
+            const freshOpp = freshBattle.players.find(p => p.userId.toString() !== myId);
             const opponentAnswer = freshOpp.answers.find(a => a.questionIndex === questionIndex);
 
             if (opponentAnswer) {
@@ -373,6 +375,7 @@ module.exports = (io, socket) => {
                     if (lastQuestion) {
                         await concludeBattle(refreshedBattle);
                     } else {
+                        roomRoundStartTime.set(battle.roomID, Date.now());
                         io.to(battle.roomID).emit('battle:next_question', { 
                             nextIndex: questionIndex + 1,
                             timer: refreshedBattle.questionTimer,
@@ -381,7 +384,7 @@ module.exports = (io, socket) => {
                         });
                         startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, refreshedBattle.questionTimer);
                     }
-                }, 500); // Super fast 0.5s loading after both submit!
+                }, 3500); // 🕒 Delay 3.5s to allow for Round Result UI animation
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait
@@ -423,9 +426,10 @@ module.exports = (io, socket) => {
         const challenger = battle.players.find(p => p.userId.toString() !== userId);
         if (accept) {
             const currentQ = roomQuestionIndex.get(battle.roomID) || 0;
-            // Extend the server safety timer by resetting it with more time
-            // Assuming current remaining time + 15
-            startServerRoundTimer(battle.roomID, battleId, currentQ, battle.questionTimer + 15);
+            const roundStart = roomRoundStartTime.get(battle.roomID) || Date.now();
+            const elapsed = Math.floor((Date.now() - roundStart) / 1000);
+            const remaining = Math.max(0, battle.questionTimer - elapsed);
+            startServerRoundTimer(battle.roomID, battleId, currentQ, remaining + 15);
             io.to(battle.roomID).emit('battle:timer_extended');
         } else {
             if (challenger) {

@@ -1,17 +1,4 @@
-﻿# ⚔️ 1V1 BATTLE ARENA - FULL SOURCE CODE & DOCUMENTATION
-Complete system for the 1v1 Battle Arena.
-
-## 🛠️ COMPONENT DIRECTORY:
-1. FRONTEND: BattleArena.jsx
-2. BACKEND: battleHandler.js
-3. DATA: Battle.js
-4. MATH: rankManager.js
-5. AI: battleAI.service.js
-6. CSS: BattleArena.css
-
----
-
---- [1/6] FRONTEND UI: BattleArena.jsx ---
+﻿--- [1/6] FRONTEND: BattleArena.jsx ---
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
@@ -139,17 +126,17 @@ const BattleArena = () => {
         socket.on('battle:round_resolved', (data) => {
             setRoundResult(data);
             setRoundStatus('resolved');
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
         });
 
-        socket.on('battle:next_question', ({ nextIndex, timer: serverTimer }) => {
+        socket.on('battle:next_question', ({ nextIndex, timer: serverTimer, startTime, serverTime }) => {
             setCurrentQuestionIndex(nextIndex);
             setRoundStatus('answering');
             setRoundResult(null);
             hasSubmittedRef.current = false;
-            questionStartTimeRef.current = data.startTime || Date.now();
+            questionStartTimeRef.current = startTime || Date.now();
             currentMaxTimerRef.current = serverTimer;
-            startQuestionTimer(serverTimer, data.startTime, data.serverTime);
+            startQuestionTimer(serverTimer, startTime, serverTime);
         });
 
         socket.on('battle:ended', (data) => {
@@ -821,8 +808,6 @@ const BattleArena = () => {
 };
 
 export default BattleArena;
-
-
 --- [2/6] BACKEND ENGINE: battleHandler.js ---
 const User = require('../models/User');
 const Battle = require('../models/Battle');
@@ -834,6 +819,7 @@ const waitingPlayers = new Map(); // userId -> player stats
 const activeRoundTimers = new Map(); // roomID -> timeout
 const pendingQuizCache = new Map(); // topic:count -> Promise
 const roomQuestionIndex = new Map(); // roomID -> currentQuestionIndex
+const roomRoundStartTime = new Map(); // roomID -> timestamp
 
 module.exports = (io, socket) => {
     if (!socket.user) return;
@@ -985,6 +971,7 @@ module.exports = (io, socket) => {
 
             // Start Server Safety Timer for Round 1
             roomQuestionIndex.set(roomID, 0);
+            roomRoundStartTime.set(roomID, Date.now());
             startServerRoundTimer(roomID, battleId, 0, newBattle.questionTimer);
 
             logger.info(`âš”ï¸ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
@@ -1153,11 +1140,11 @@ module.exports = (io, socket) => {
             await battle.save();
 
             // ðŸ”¥ Race Condition Fix: Fetch FRESH state to see if other player answered
-            const freshBattle = await Battle.findOne({ battleId }).populate('players.userId');
+            const freshBattle = await Battle.findOne({ battleId });
             if (!freshBattle) return;
 
-            const freshMe = freshBattle.players.find(p => p.userId._id.toString() === myId);
-            const freshOpp = freshBattle.players.find(p => p.userId._id.toString() !== myId);
+            const freshMe = freshBattle.players.find(p => p.userId.toString() === myId);
+            const freshOpp = freshBattle.players.find(p => p.userId.toString() !== myId);
             const opponentAnswer = freshOpp.answers.find(a => a.questionIndex === questionIndex);
 
             if (opponentAnswer) {
@@ -1199,6 +1186,7 @@ module.exports = (io, socket) => {
                     if (lastQuestion) {
                         await concludeBattle(refreshedBattle);
                     } else {
+                        roomRoundStartTime.set(battle.roomID, Date.now());
                         io.to(battle.roomID).emit('battle:next_question', { 
                             nextIndex: questionIndex + 1,
                             timer: refreshedBattle.questionTimer,
@@ -1207,7 +1195,7 @@ module.exports = (io, socket) => {
                         });
                         startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, refreshedBattle.questionTimer);
                     }
-                }, 500); // Super fast 0.5s loading after both submit!
+                }, 3500); // ðŸ•’ Delay 3.5s to allow for Round Result UI animation
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait
@@ -1249,9 +1237,10 @@ module.exports = (io, socket) => {
         const challenger = battle.players.find(p => p.userId.toString() !== userId);
         if (accept) {
             const currentQ = roomQuestionIndex.get(battle.roomID) || 0;
-            // Extend the server safety timer by resetting it with more time
-            // Assuming current remaining time + 15
-            startServerRoundTimer(battle.roomID, battleId, currentQ, battle.questionTimer + 15);
+            const roundStart = roomRoundStartTime.get(battle.roomID) || Date.now();
+            const elapsed = Math.floor((Date.now() - roundStart) / 1000);
+            const remaining = Math.max(0, battle.questionTimer - elapsed);
+            startServerRoundTimer(battle.roomID, battleId, currentQ, remaining + 15);
             io.to(battle.roomID).emit('battle:timer_extended');
         } else {
             if (challenger) {
@@ -1374,9 +1363,7 @@ module.exports = (io, socket) => {
         } catch (err) { logger.error('Disconnect Penalty Error:', err); }
     });
 };
-
-
---- [3/6] DATA SCHEMA: Battle.js ---
+--- [3/6] DATA MODEL: Battle.js ---
 const mongoose = require('mongoose');
 
 const battleSchema = new mongoose.Schema({
@@ -1421,9 +1408,7 @@ const battleSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 module.exports = mongoose.model('Battle', battleSchema);
-
-
---- [4/6] RP CALCULATION: rankManager.js ---
+--- [4/6] RANKING MATH: rankManager.js ---
 const TIER_THRESHOLDS = [
     { tier: 'Bronze', levels: ['I', 'II', 'III'], thresholds: [0, 200, 400], max: 599 },
     { tier: 'Silver', levels: ['I', 'II', 'III'], thresholds: [600, 900, 1200], max: 1499 },
@@ -1470,9 +1455,7 @@ const calculatePoints = (playerPoints, opponentPoints, isWin, bonus) => {
 };
 
 module.exports = { calculatePoints, getTierByPoints };
-
-
---- [5/6] CONTENT GEN: battleAI.service.js ---
+--- [5/6] AI SERVICE: battleAI.service.js ---
 require("dotenv").config();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
@@ -1653,8 +1636,6 @@ const generateBattleQuiz = async (topic, count = 5) => {
 };
 
 module.exports = { generateBattleQuiz };
-
-
 --- [6/6] PREMIUM STYLES: BattleArena.css ---
 .arena-v2 {
   min-height: 100vh;
@@ -2584,7 +2565,7 @@ module.exports = { generateBattleQuiz };
   height: 100%;
   background: #60A5FA;
   width: 100%;
-  animation: filling 4s linear;
+  animation: filling 3.5s linear;
 }
 
 @keyframes filling { from { width: 0%; } to { width: 100%; } }
@@ -2599,5 +2580,4 @@ module.exports = { generateBattleQuiz };
 
 .animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
 @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
 
