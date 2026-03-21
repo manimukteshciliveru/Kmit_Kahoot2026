@@ -575,12 +575,30 @@ const BattleArena = () => {
                                     </div>
                                     <div className="flex-1">
                                         <label className="form-label">Battle Timer (optional)</label>
-                                        <select className="form-select" value={battleTimer} onChange={(e) => setBattleTimer(Number(e.target.value))}>
-                                            <option value={0}>None</option>
-                                            <option value={120}>2 mins</option>
-                                            <option value={300}>5 mins</option>
-                                            <option value={600}>10 mins</option>
-                                        </select>
+                                        <div className="flex gap-2">
+                                            <select 
+                                                className="form-select flex-1" 
+                                                value={[0, 120, 300, 600].includes(battleTimer) ? battleTimer : 'custom'} 
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === 'custom') {
+                                                        const min = prompt("Enter custom battle time (minutes):", "15");
+                                                        if (min && !isNaN(min)) setBattleTimer(Number(min) * 60);
+                                                    } else {
+                                                        setBattleTimer(Number(val));
+                                                    }
+                                                }}
+                                            >
+                                                <option value={0}>None</option>
+                                                <option value={120}>2 mins</option>
+                                                <option value={300}>5 mins</option>
+                                                <option value={600}>10 mins</option>
+                                                <option value="custom">Custom...</option>
+                                            </select>
+                                            {![0, 120, 300, 600].includes(battleTimer) && (
+                                                <div className="custom-timer-badge total">{Math.floor(battleTimer/60)}m {battleTimer%60}s</div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
