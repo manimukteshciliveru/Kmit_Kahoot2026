@@ -926,7 +926,7 @@
   height: 100%;
   background: #60A5FA;
   width: 100%;
-  animation: filling 3.5s linear;
+  animation: filling 1.5s linear;
 }
 
 @keyframes filling { from { width: 0%; } to { width: 100%; } }

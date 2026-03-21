@@ -384,7 +384,7 @@ module.exports = (io, socket) => {
                         });
                         startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, refreshedBattle.questionTimer);
                     }
-                }, 3500); // 🕒 Delay 3.5s to allow for Round Result UI animation
+                }, 1500); // 🕒 Reduced to 1.5s for Low Latency! Compromise for user feedback.
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait

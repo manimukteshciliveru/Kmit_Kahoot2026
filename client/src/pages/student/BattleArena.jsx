@@ -44,6 +44,7 @@ const BattleArena = () => {
     const hasSubmittedRef = useRef(false);
     const questionStartTimeRef = useRef(Date.now());
     const questionEndTimeRef = useRef(0);
+    const overallEndTimeRef = useRef(0); // 🕒 Authorized Sync End
     const timeOffsetRef = useRef(0); // 🕒 Server-Client Clock Offset
     const currentMaxTimerRef = useRef(20);
     const [lastTimeTaken, setLastTimeTaken] = useState(0);
@@ -92,8 +93,7 @@ const BattleArena = () => {
             setRoundStatus('answering');
             
             if (data.battleTimer > 0) {
-                setTotalRemaining(data.battleTimer);
-                startOverallTimer();
+                startOverallTimer(data.battleTimer, data.startTime, data.serverTime);
             }
             questionStartTimeRef.current = data.startTime || Date.now();
             currentMaxTimerRef.current = data.questionTimer;
@@ -235,17 +235,27 @@ const BattleArena = () => {
         battleDataRef.current = battleData;
     }, [battleData]);
 
-    const startOverallTimer = () => {
-        clearInterval(overallTimerRef.current);
-        overallTimerRef.current = setInterval(() => {
-            setTotalRemaining(prev => {
-                if (prev <= 0) {
-                    clearInterval(overallTimerRef.current);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+    const startOverallTimer = (duration, serverStartTime, serverRecordTime) => {
+        if (overallTimerRef.current) clearInterval(overallTimerRef.current);
+        
+        if (serverRecordTime) {
+            timeOffsetRef.current = serverRecordTime - Date.now();
+        }
+
+        const baseTimeAtServer = serverStartTime || (Date.now() + timeOffsetRef.current);
+        overallEndTimeRef.current = baseTimeAtServer + (duration * 1000);
+
+        const tick = () => {
+            const nowAtServer = Date.now() + timeOffsetRef.current;
+            const remaining = Math.max(0, Math.ceil((overallEndTimeRef.current - nowAtServer) / 1000));
+            setTotalRemaining(remaining);
+            if (remaining <= 0) {
+                clearInterval(overallTimerRef.current);
+            }
+        };
+
+        overallTimerRef.current = setInterval(tick, 1000);
+        tick(); // Immediate update
     };
 
     const triggerDamageEffect = (target) => {
