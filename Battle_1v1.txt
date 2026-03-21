@@ -1,18 +1,17 @@
-# ⚔️ 1v1 Battle Arena - Implementation Documentation
-This file contains the complete code and architectural breakdown for the 1v1 Battle system.
+﻿# ⚔️ 1V1 BATTLE ARENA - FULL SOURCE CODE & DOCUMENTATION
+This file contains the complete system for the 1v1 Battle Arena.
+
+## 🏛️ ARCHITECTURAL BREAKDOWN:
+1. **Frontend (BattleArena.jsx)** - Handles UI/UX, animations, HUD (HP/Scores), and timer synchronization.
+2. **Backend Engine (battleHandler.js)** - Manages real-time rooms, game logic, and server-side safety timers.
+3. **Data Model (Battle.js)** - Defines the persistent storage for battles in MongoDB.
+4. **Ranking System (rankManager.js)** - Calculates ELO points (RP) and handles Tier progression.
+5. **AI Service (battleAI.service.js)** - Generates high-quality questions using Gemini/Mistral/OpenAI failover.
+6. **Styles (BattleArena.css)** - Premium CSS animations and layouts.
 
 ---
 
-## 📂 1. Frontend: BattleArena.jsx
-- Purpose: UI, Real-time HUD, Timer effects, and Question area.
-- Key Functions: handleAnswer (submits choice), startQuestionTimer (customizable countdown), startOverallTimer (match duration).
-
-## 📂 2. Backend: battleHandler.js
-- Purpose: Game logic, Elo calculation, and Round synchronization.
-- Key Functions: submit_answer (atomic HP update), startServerRoundTimer (AFK safety).
-
----
---- CODE START ---
+--- [1/6] FRONTEND: BattleArena.jsx ---
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
@@ -56,6 +55,8 @@ const BattleArena = () => {
     const searchInterval = useRef(null);
     const overallTimerRef = useRef(null);
     const syncDataRef = useRef(null);
+    const hasSubmittedRef = useRef(false);
+    const questionStartTimeRef = useRef(Date.now());
     const [showLevelMap, setShowLevelMap] = useState(false);
 
     const TOPIC_STRUCTURE = {
@@ -103,6 +104,7 @@ const BattleArena = () => {
                 setTotalRemaining(data.battleTimer);
                 startOverallTimer();
             }
+            questionStartTimeRef.current = Date.now();
             startQuestionTimer(data.questionTimer);
             toast.success('Duel Started!', { icon: 'âš”ï¸' });
         });
@@ -137,6 +139,8 @@ const BattleArena = () => {
             setCurrentQuestionIndex(nextIndex);
             setRoundStatus('answering');
             setRoundResult(null);
+            hasSubmittedRef.current = false;
+            questionStartTimeRef.current = Date.now();
             startQuestionTimer(serverTimer);
         });
 
@@ -160,6 +164,7 @@ const BattleArena = () => {
         socket.on('battle:opponent_left', (data) => {
             toast.success(data.message, { icon: 'ðŸ†', duration: 5000 });
             clearInterval(timerRef.current);
+            clearInterval(overallTimerRef.current);
             setView('selection');
         });
 
@@ -281,17 +286,17 @@ const BattleArena = () => {
     };
 
     const handleAnswer = (answerIndex) => {
-        if (roundStatus !== 'answering') return;
+        if (roundStatus !== 'answering' || hasSubmittedRef.current) return;
+        hasSubmittedRef.current = true;
         setRoundStatus('waiting');
-        
         clearInterval(timerRef.current);
+        const timeTaken = Date.now() - questionStartTimeRef.current;
         if (socket && battleData) {
-            const initialTime = battleData?.questionTimer || 20;
             socket.emit('battle:submit_answer', {
                 battleId: battleData.battleId,
                 questionIndex: currentQuestionIndex,
                 answer: answerIndex,
-                timeTaken: (initialTime - timer) * 1000
+                timeTaken
             });
         }
     };
@@ -750,8 +755,8 @@ const BattleArena = () => {
             {view === 'results' && finalResults && (
                 <div className="results-v2 animate-fade-in">
                     <div className="results-card">
-                        <LuTrophy className={`trophy-icon ${finalResults.winner === user.name ? 'winner' : 'loser'}`} />
-                        <h1>{finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT'}</h1>
+                        <LuTrophy className={`trophy-icon ${finalResults.isDraw ? 'draw' : (finalResults.winner === user.name ? 'winner' : 'loser')}`} />
+                        <h1>{finalResults.isDraw ? 'DRAW' : (finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT')}</h1>
                         <div className="score-summary-v2">
                             {finalResults.results.map((r, idx) => {
                                 const myId = user.id || user._id;
@@ -789,7 +794,7 @@ const BattleArena = () => {
 };
 
 export default BattleArena;
---- SERVER HANDLER ---
+--- [2/6] BACKEND ENGINE: battleHandler.js ---
 const User = require('../models/User');
 const Battle = require('../models/Battle');
 const { generateBattleQuiz } = require('../services/battleAI.service');
@@ -800,6 +805,7 @@ const waitingPlayers = new Map(); // userId -> player stats
 const activeRoundTimers = new Map(); // roomID -> timeout
 
 module.exports = (io, socket) => {
+    if (!socket.user) return;
 
     const startServerRoundTimer = (roomID, battleId, questionIndex, duration) => {
         if (activeRoundTimers.has(roomID)) {
@@ -984,6 +990,7 @@ module.exports = (io, socket) => {
             socketId: socket.id,
             mode: mode,
             topic: topic,
+            displayTopic: topicRaw,
             questionCount: qCount,
             questionTimer: qTimer,
             battleTimer: bTimer,
@@ -1002,7 +1009,7 @@ module.exports = (io, socket) => {
             );
 
             if (opponent) {
-                createBattle(opponent, waitingPlayers.get(userId), topicRaw, qCount, qTimer, bTimer);
+                createBattle(opponent, waitingPlayers.get(userId), opponent.displayTopic, qCount, qTimer, bTimer);
             } else {
                 socket.emit('battle:searching');
             }
@@ -1100,6 +1107,7 @@ module.exports = (io, socket) => {
             if (opponentAnswer) {
                 if (activeRoundTimers.has(battle.roomID)) {
                     clearTimeout(activeRoundTimers.get(battle.roomID));
+                    activeRoundTimers.delete(battle.roomID);
                 }
                 // ROUND RESOLVED: Both answered
                 const resolution = {
@@ -1180,7 +1188,10 @@ module.exports = (io, socket) => {
         });
     });
 
-    const concludeBattle = async (battle) => {
+    const concludeBattle = async (battleInput) => {
+        const battle = await Battle.findOne({ battleId: battleInput.battleId });
+        if (!battle || battle.status === 'completed') return;
+
         if (activeRoundTimers.has(battle.roomID)) {
             clearTimeout(activeRoundTimers.get(battle.roomID));
             activeRoundTimers.delete(battle.roomID);
@@ -1239,9 +1250,10 @@ module.exports = (io, socket) => {
 
         io.to(battle.roomID).emit('battle:ended', {
             winner: winner.name,
+            isDraw: isDraw,
             results: [
                 { userId: winnerUser._id, name: winnerUser.name, rankDelta: winPoints, newPoints: winnerUser.rank.points, tier: winnerUser.rank.tier, lvl: winnerUser.rank.level },
-                { userId: loserUser._id, name: loserUser.name, rankDelta: lossPoints, newPoints: loserUser.rank.points, tier: loserUser.rank.tier, lvl: loserUser.rank.level }
+                { userId: loserUser._id, name: loserUser.name, rankDelta: isDraw ? lossPoints : -Math.abs(lossPoints), newPoints: loserUser.rank.points, tier: loserUser.rank.tier, lvl: loserUser.rank.level }
             ]
         });
 
@@ -1260,7 +1272,7 @@ module.exports = (io, socket) => {
                 'players.userId': socket.user._id
             });
 
-            if (activeBattle) {
+            if (activeBattle && activeBattle.status === 'active') {
                 const player = activeBattle.players.find(p => p.userId.toString() === userId);
                 const opponent = activeBattle.players.find(p => p.userId.toString() !== userId);
                 
@@ -1289,7 +1301,7 @@ module.exports = (io, socket) => {
         } catch (err) { logger.error('Disconnect Penalty Error:', err); }
     });
 };
---- BATTLE MODEL ---
+--- [3/6] DATA MODEL: Battle.js ---
 const mongoose = require('mongoose');
 
 const battleSchema = new mongoose.Schema({
@@ -1334,3 +1346,1137 @@ const battleSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 module.exports = mongoose.model('Battle', battleSchema);
+--- [4/6] RANKING MATH: rankManager.js ---
+const TIER_THRESHOLDS = [
+    { tier: 'Bronze', levels: ['I', 'II', 'III'], thresholds: [0, 200, 400], max: 599 },
+    { tier: 'Silver', levels: ['I', 'II', 'III'], thresholds: [600, 900, 1200], max: 1499 },
+    { tier: 'Gold',   levels: ['I', 'II', 'III'], thresholds: [1500, 1900, 2300], max: 2699 },
+    { tier: 'Platinum', levels: ['I', 'II', 'III'], thresholds: [2700, 3100, 3500], max: 3899 },
+    { tier: 'Diamond',  levels: ['I', 'II', 'III'], thresholds: [3900, 4200, 4500], max: 4799 },
+    { tier: 'Master',   levels: ['Master'], thresholds: [4800], max: 4999 },
+    { tier: 'Grandmaster', levels: ['Grandmaster'], thresholds: [5000], max: 10000000 }
+];
+
+const getTierByPoints = (points) => {
+    const tierConfig = TIER_THRESHOLDS.find(t => points >= t.thresholds[0] && points <= t.max);
+    if (!tierConfig) return TIER_THRESHOLDS[TIER_THRESHOLDS.length - 1]; // Fallback to GM
+
+    let level = tierConfig.levels[0];
+    for (let i = tierConfig.thresholds.length - 1; i >= 0; i--) {
+        if (points >= tierConfig.thresholds[i]) {
+            level = tierConfig.levels[i];
+            break;
+        }
+    }
+    return { tier: tierConfig.tier, level: level };
+};
+
+const expectedScore = (player, opponent) => {
+    return 1.0 / (1 + Math.pow(10, (opponent - player) / 400.0));
+};
+
+const getKFactor = (points) => {
+    if (points < 1500) return 40;        // Bronze-Silver
+    else if (points < 3900) return 30;   // Gold-Platinum
+    else if (points < 4800) return 25;   // Diamond
+    else return 20;                      // Master+
+};
+
+const calculatePoints = (playerPoints, opponentPoints, isWin, bonus) => {
+    const E = expectedScore(playerPoints, opponentPoints);
+    const K = getKFactor(playerPoints);
+
+    const change = K * ((isWin ? 1 : 0) - E);
+
+    const cappedBonus = Math.min(bonus, 25);
+    return Math.round(change + cappedBonus);
+};
+
+module.exports = { calculatePoints, getTierByPoints };
+--- [5/6] AI SERVICE: battleAI.service.js ---
+require("dotenv").config();
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// â”€â”€ API Clients â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const genAI = new GoogleGenerativeAI(
+    process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY
+);
+
+let mistral = null;
+if (process.env.MISTRAL_API_KEY) {
+    const { Mistral } = require("@mistralai/mistralai");
+    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+}
+
+let openai = null;
+if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'undefined') {
+    const { OpenAI } = require("openai");
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
+
+// â”€â”€ In-memory question cache (topic:count â†’ questions[]) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const questionCache = new Map();
+const CACHE_TTL_MS  = 24 * 60 * 60 * 1000; // 24 hours
+
+const getCached = (key) => {
+    const entry = questionCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+        questionCache.delete(key);
+        return null;
+    }
+    return entry.questions;
+};
+
+const setCache = (key, questions) => {
+    questionCache.set(key, { questions, timestamp: Date.now() });
+};
+
+// â”€â”€ Master prompt builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const buildPrompt = (topic, count) => `
+You are a senior competitive programming instructor creating exam questions for a 1v1 coding quiz battle.
+
+Generate exactly ${count} multiple choice questions on the topic: "${topic}".
+
+Question style requirements:
+- Questions must be practical and specific â€” no vague theory questions
+- Include code snippets in questions wherever relevant (wrap in backticks)
+- Model your questions after LeetCode, GeeksforGeeks, W3Schools, and CodeChef problem styles
+- Cover: time complexity, output prediction, error spotting, concept application, tricky edge cases
+- Difficulty: 60% medium, 40% hard â€” no easy questions
+- Options must be plausible â€” wrong answers should be common mistakes, not obviously wrong
+- Each question must have exactly one correct answer
+
+Output format: Return ONLY a valid JSON array. No markdown, no backticks, no explanation, no extra text.
+
+Each object must have exactly these keys:
+- "questionText": string (may contain inline code using backticks)
+- "options": array of exactly 4 strings
+- "correctAnswer": integer 0â€“3 (index of correct option in options array)
+- "difficulty": "medium" or "hard"
+- "explanation": string (one sentence explaining why the answer is correct)
+
+Example of ONE good question object:
+{
+  "questionText": "What is the output of this Python code?\\n\`\`\`\\nx = [1, 2, 3]\\nprint(x[-1] * 2)\\n\`\`\`",
+  "options": ["3", "6", "[3, 3]", "Error"],
+  "correctAnswer": 1,
+  "difficulty": "medium",
+  "explanation": "x[-1] accesses the last element (3), and 3 * 2 = 6."
+}
+
+Now generate exactly ${count} questions about "${topic}". Return only the JSON array.
+`.trim();
+
+// â”€â”€ JSON extractor (handles Gemini/Mistral markdown leakage) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const extractJSON = (raw) => {
+    const first = raw.indexOf('[');
+    const last  = raw.lastIndexOf(']');
+    if (first === -1 || last === -1) throw new Error('No JSON array found in response');
+    return raw.substring(first, last + 1);
+};
+
+// â”€â”€ Question mapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const mapQuestions = (parsed, count) => {
+    return parsed.slice(0, count).map(q => {
+        if (!q.questionText || !Array.isArray(q.options) || q.options.length !== 4) {
+            throw new Error('Malformed question object from AI response');
+        }
+        return {
+            questionText:  q.questionText,
+            options:       q.options.map((opt, i) => ({
+                text:      opt.toString(),
+                isCorrect: i === Number(q.correctAnswer)
+            })),
+            correctAnswer: Number(q.correctAnswer),
+            difficulty:    q.difficulty || 'medium',
+            explanation:   q.explanation || ''
+        };
+    });
+};
+
+// â”€â”€ API callers (each returns raw text or throws) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const callGemini = async (prompt) => {
+    const model  = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+};
+
+const callMistral = async (prompt) => {
+    if (!mistral) throw new Error('Mistral not configured');
+    const result = await mistral.chat.complete({
+        model:    'mistral-medium-latest',
+        messages: [{ role: 'user', content: prompt }]
+    });
+    return result.choices[0].message.content;
+};
+
+const callOpenAI = async (prompt) => {
+    if (!openai) throw new Error('OpenAI not configured');
+    const result = await openai.chat.completions.create({
+        model:       'gpt-3.5-turbo',
+        messages:    [{ role: 'user', content: prompt }],
+        temperature: 0.7
+    });
+    return result.choices[0].message.content;
+};
+
+// â”€â”€ Main export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const generateBattleQuiz = async (topic, count = 5) => {
+    const cacheKey = `${topic}::${count}`;
+    const cached   = getCached(cacheKey);
+    if (cached) {
+        console.log(`[BattleAI] Cache hit for "${topic}" (${count}q)`);
+        // Shuffle cached set so same questions appear in different order each battle
+        const shuffled = [...cached].sort(() => Math.random() - 0.5).slice(0, count);
+        return { topic, questions: shuffled };
+    }
+
+    const prompt  = buildPrompt(topic, count);
+    const callers = [
+        { name: 'Gemini',  fn: callGemini  },
+        { name: 'Mistral', fn: callMistral },
+        { name: 'OpenAI',  fn: callOpenAI  }
+    ];
+
+    let lastError = null;
+
+    for (const { name, fn } of callers) {
+        try {
+            console.log(`[BattleAI] Trying ${name} for "${topic}"...`);
+            const raw       = await fn(prompt);
+            const jsonStr   = extractJSON(raw);
+            const parsed    = JSON.parse(jsonStr);
+            const questions = mapQuestions(parsed, count);
+
+            if (questions.length < count) {
+                throw new Error(`${name} returned only ${questions.length}/${count} valid questions`);
+            }
+
+            // Cache a larger pool (2x count) if API returned more, for variety
+            const poolToCache = mapQuestions(parsed, Math.min(parsed.length, count * 2));
+            setCache(cacheKey, poolToCache);
+
+            console.log(`[BattleAI] ${name} succeeded â€” ${questions.length} questions for "${topic}"`);
+            return { topic, questions };
+
+        } catch (err) {
+            console.error(`[BattleAI] ${name} failed:`, err.message);
+            lastError = err;
+        }
+    }
+
+    // All APIs failed â€” do NOT serve fake questions, surface the error clearly
+    throw new Error(
+        `All AI providers failed to generate questions for topic "${topic}". ` +
+        `Last error: ${lastError?.message}. Check API keys and rate limits.`
+    );
+};
+
+module.exports = { generateBattleQuiz };
+--- [6/6] PREMIUM STYLES: BattleArena.css ---
+.arena-v2 {
+  min-height: 100vh;
+  background: radial-gradient(circle at top right, #0F172A, #020617);
+  color: #F8FAFC;
+  padding: 2rem;
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+/* Home Screen */
+.arena-home {
+  max-width: 1000px;
+  margin: 0 auto;
+  animation: fadeIn 0.8s ease-out;
+}
+
+.arena-header h1 {
+  font-size: 3rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.05em;
+  background: linear-gradient(to right, #60A5FA, #A78BFA, #F472B6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+}
+
+.arena-header p {
+  color: #94A3B8;
+  font-size: 1.1rem;
+}
+
+.user-rank-status {
+  margin: 2.5rem 0;
+}
+
+.rank-card-v2 {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.rank-card-v2::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.1) 0%, transparent 70%);
+  z-index: 0;
+}
+
+.rank-i {
+  font-size: 4rem;
+  filter: drop-shadow(0 0 15px currentColor);
+  z-index: 1;
+}
+
+.rank-i.bronze { color: #CD7F32; }
+.rank-i.silver { color: #C0C0C0; }
+.rank-i.gold { color: #FFD700; }
+.rank-i.platinum { color: #50C878; }
+.rank-i.diamond { color: #B9F2FF; }
+.rank-i.master { color: #FF4D4D; }
+.rank-i.gm { color: #FF00FF; }
+
+.rank-details { z-index: 1; flex: 1; }
+.rank-details h3 { font-size: 2rem; margin: 0; }
+.rank-details p { color: #94A3B8; margin: 0.2rem 0 0; }
+
+.streak-badge {
+  background: linear-gradient(135deg, #F97316, #EF4444);
+  padding: 0.8rem 1.5rem;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.4);
+}
+
+/* Controls */
+.path-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.path-picker select {
+  background: #1E293B;
+  border: 1px solid #334155;
+  color: #F8FAFC;
+  padding: 1.2rem;
+  border-radius: 16px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.path-picker select option,
+.form-select option {
+  background: #1E293B;
+  color: #F8FAFC;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.btn-match {
+  flex: 1;
+  padding: 1.5rem;
+  border-radius: 20px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  cursor: pointer;
+  border: none;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-match.random {
+  background: #2563EB;
+  color: white;
+  box-shadow: 0 15px 30px -5px rgba(37, 99, 235, 0.5);
+}
+
+.btn-match.random:hover:not(:disabled) {
+  transform: translateY(-5px) scale(1.02);
+  background: #3B82F6;
+}
+
+.btn-match.browse {
+  background: transparent;
+  border: 2px solid #334155;
+  color: #94A3B8;
+}
+
+.btn-match:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* Combat HUD */
+.battle-playing-screen {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.battle-hud-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 4rem;
+}
+
+.hud-side {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.6);
+  padding: 1.5rem;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s;
+}
+
+.hud-side.damaged {
+  border-color: #EF4444;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+.hud-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+}
+
+.hud-name { font-weight: 700; color: #94A3B8; }
+.hud-score { color: #60A5FA; font-weight: 600; }
+
+.hp-container {
+  height: 12px;
+  background: #0F172A;
+  border-radius: 99px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hp-bar {
+  height: 100%;
+  background: linear-gradient(to right, #EF4444, #F87171);
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hp-icon {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  font-size: 0.7rem;
+}
+
+.match-timer-ring {
+  position: relative;
+  width: 100px;
+  height: 100px;
+}
+
+.timer-bg { stroke: #1E293B; stroke-width: 8; fill: none; }
+.timer-progress {
+  stroke: #60A5FA;
+  stroke-width: 8;
+  fill: none;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+  stroke-dasharray: 283;
+}
+
+.timer-val {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+/* Question Area */
+.question-box {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 3rem;
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+.q-indicator {
+  background: #334155;
+  color: #94A3B8;
+  padding: 0.4rem 1.2rem;
+  border-radius: 99px;
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.question-box h2 {
+  font-size: 2.2rem;
+  margin-bottom: 3rem;
+  line-height: 1.3;
+}
+
+.options-grid-v2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.opt-v2 {
+  background: #1E293B;
+  border: 1px solid #334155;
+  padding: 1.5rem;
+  border-radius: 20px;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.opt-idx {
+  background: #334155;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-weight: 700;
+  color: #60A5FA;
+}
+
+.opt-v2:hover {
+  background: #334155;
+  border-color: #60A5FA;
+  transform: scale(1.02);
+}
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.shake-self .hud-side.self { animation: shake 0.5s; }
+.shake-opponent .hud-side.opponent { animation: shake 0.5s; }
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  50% { transform: translateX(10px); }
+  75% { transform: translateX(-5px); }
+  100% { transform: translateX(0); }
+}
+
+/* Results */
+.results-card {
+  text-align: center;
+  padding: 4rem;
+}
+
+.trophy-icon { font-size: 6rem; margin-bottom: 2rem; }
+.trophy-icon.winner { color: #FFD700; filter: drop-shadow(0 0 20px #FFD700); }
+.trophy-icon.draw { color: #60A5FA; filter: drop-shadow(0 0 20px #60A5FA); }
+.trophy-icon.loser { color: #94A3B8; }
+
+.score-summary-v2 {
+  margin: 3rem 0;
+  background: rgba(30, 41, 59, 0.4);
+  border-radius: 24px;
+  padding: 2rem;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 1.2rem;
+}
+
+.summary-row.highlight { color: #60A5FA; font-weight: 700; }
+
+.delta.pos { color: #10B981; }
+.delta.neg { color: #EF4444; }
+
+/* Challenge UI */
+.challenge-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: #1E293B;
+  border: 2px solid #60A5FA;
+  padding: 1.5rem;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  animation: slideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1000;
+}
+
+.c-btns { display: flex; gap: 0.5rem; }
+.c-btns button { padding: 0.8rem 1.2rem; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; }
+.acc { background: #60A5FA; color: white; }
+.dec { background: #334155; color: #94A3B8; }
+
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+/* Enhanced Lobby Grid */
+.lobby-v2 {
+  max-width: 1000px;
+  margin: 0 auto;
+  border-radius: 36px;
+  overflow: hidden;
+  box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.8), 0 0 40px rgba(96, 165, 250, 0.1);
+}
+
+.lobby-head {
+  padding: 2.5rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  background: #10B981;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  box-shadow: 0 0 10px #10B981;
+  animation: pulse 2s infinite;
+}
+
+.lobby-grid {
+  background: rgba(15, 23, 42, 0.5);
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.player-card-v2 {
+  padding: 1.5rem;
+  border-radius: 24px;
+  text-align: center;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.player-card-v2:hover {
+  transform: translateY(-10px);
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.player-card-v2.me {
+  border-color: #3B82F6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.p-card-header {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 1.2rem;
+}
+
+.p-avatar-lg {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  object-fit: cover;
+  border: 3px solid #334155;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+.p-status-mini {
+  position: absolute;
+  bottom: -10px;
+  right: -10px;
+  background: #1E293B;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #0F172A;
+  font-size: 1.2rem;
+}
+
+.p-card-body h4 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.p-rank-label {
+  color: #94A3B8;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.p-topic-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(148, 163, 184, 0.1);
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  color: #60A5FA;
+  margin-top: 1rem;
+}
+
+.p-card-footer {
+  margin-top: 1.5rem;
+}
+
+.lobby-controls-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 0 0.5rem;
+}
+
+.btn-back-v2 {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 0.7rem 1.4rem;
+  border-radius: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.9rem;
+}
+
+.btn-back-v2:hover {
+  background: #EF4444;
+  color: white;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+.lobby-stats-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+  padding: 0.6rem 1.2rem;
+  border-radius: 99px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.avatar-fallback {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  background: #1E293B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  color: #64748B;
+  border: 3px solid #334155;
+}
+
+.rank-roadmap-container {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 24px;
+}
+
+.roadmap-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+.roadmap-header h3 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin: 0;
+  color: #F8FAFC;
+}
+
+.current-pts {
+  margin-left: auto;
+  background: rgba(59, 130, 246, 0.1);
+  color: #60A5FA;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-weight: 800;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.roadmap-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem 3rem 2rem;
+  min-width: 900px;
+}
+
+.roadmap-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.node-icon-wrapper {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s;
+  opacity: 0.6;
+}
+
+.roadmap-node.reached .node-icon-wrapper {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.node-icon-wrapper svg {
+  font-size: 2rem;
+}
+
+.node-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #94A3B8;
+}
+
+.node-threshold {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.roadmap-node.reached .node-label { color: #F8FAFC; text-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
+
+/* Per-Rank Colorful Glows */
+.node-bronze.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 8px rgba(205, 127, 50, 0.6)); }
+.node-silver.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 8px rgba(192, 192, 192, 0.6)); }
+.node-gold.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.8)); }
+.node-platinum.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 12px rgba(80, 200, 120, 0.8)); }
+.node-diamond.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 15px rgba(185, 242, 255, 1)); }
+.node-master.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 15px rgba(255, 77, 77, 1)); }
+.node-gm.reached .node-icon-wrapper svg { filter: drop-shadow(0 0 20px rgba(255, 0, 255, 1)); }
+
+.node-gold.reached .node-label { color: #FFD700; }
+.node-platinum.reached .node-label { color: #50C878; }
+.node-diamond.reached .node-label { color: #B9F2FF; }
+.node-master.reached .node-label { color: #FF4D4D; }
+.node-gm.reached .node-label { color: #FF00FF; }
+
+.roadmap-connector {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  right: -50%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  z-index: 1;
+}
+
+.connector-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3B82F6, #60A5FA);
+  transition: width 1s ease-out;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.roadmap-footer {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #CBD5E1;
+}
+
+.roadmap-footer strong { color: #60A5FA; font-weight: 800; }
+.roadmap-footer span { color: #FDE047; font-weight: 800; }
+
+.btn-roadmap-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(71, 85, 105, 0.8);
+  border-radius: 50px;
+  padding: 8px 16px;
+  color: #E2E8F0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.btn-roadmap-toggle .icon {
+  color: #FBBF24;
+  font-size: 1.1rem;
+}
+
+.btn-roadmap-toggle:hover {
+  background: rgba(51, 65, 85, 0.9);
+  border-color: #6366F1;
+  box-shadow: 0 6px 15px rgba(99, 102, 241, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn-roadmap-toggle.active {
+  background: linear-gradient(135deg, #4F46E5, #3B82F6);
+  border-color: #818CF8;
+  color: white;
+  box-shadow: 0 0 15px rgba(79, 70, 229, 0.5);
+}
+
+.btn-roadmap-toggle.active .icon {
+  color: white;
+}
+
+.btn-challenge-v3 {
+  width: 100%;
+  padding: 0.8rem;
+  background: white;
+  color: #0F172A;
+  border: none;
+  border-radius: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.btn-challenge-v3:hover {
+  background: #60A5FA;
+  color: white;
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.4);
+}
+
+.arena-controls {
+  padding: 3rem;
+  margin-top: 3rem;
+  border-radius: 32px;
+}
+
+/* Animations Hub Additions */
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.searching-v2 .search-meta {
+  display: flex;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.combat-stage { position: relative; min-height: 400px; display: flex; align-items: center; justify-content: center; width: 100%; }
+
+.waiting-overlay {
+  text-align: center;
+  padding: 4rem;
+  border-radius: 32px;
+  width: 100%;
+}
+
+.waiting-icon { font-size: 4rem; color: #60A5FA; margin-bottom: 2rem; }
+
+.round-resolution {
+  width: 100%;
+  max-width: 600px;
+  padding: 2.5rem;
+  border-radius: 32px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.res-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; color: #60A5FA; }
+.res-header h2 { margin: 0; font-size: 1.5rem; }
+
+.res-grid { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2.5rem; }
+
+.res-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 1.8rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  border: 1px solid transparent;
+}
+
+.res-block.me { border-color: rgba(96, 165, 250, 0.3); background: rgba(59, 130, 246, 0.05); }
+
+.player-name { font-weight: 800; font-size: 1.1rem; }
+
+/* New Battle Timer Styles */
+.overall-match-timer {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  padding: 0.8rem 2rem;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: -2rem auto 3rem auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  width: fit-content;
+  z-index: 10;
+}
+
+.overall-match-timer .label {
+  color: #94A3B8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.overall-match-timer .time {
+  color: #F87171;
+  font-size: 1.4rem;
+  font-weight: 800;
+  min-width: 80px;
+  text-align: center;
+}
+
+.btn-extension {
+  transition: all 0.3s;
+  background: rgba(251, 146, 60, 0.05);
+}
+
+.btn-extension:hover {
+  background: rgba(251, 146, 60, 0.15) !important;
+  border-color: #FB923C !important;
+  transform: translateY(-2px);
+}
+
+.custom-timer-badge {
+  background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+  color: white;
+  padding: 0.2rem 1rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.custom-timer-badge.total {
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.res-badge { font-size: 0.7rem; font-weight: 900; padding: 2px 8px; border-radius: 4px; }
+.res-badge.correct { background: #10B981; color: white; }
+.res-badge.wrong { background: #EF4444; color: white; }
+
+.xp-gain { color: #FDE047; }
+
+.next-round-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.next-round-bar .progress {
+  height: 100%;
+  background: #60A5FA;
+  width: 100%;
+  animation: filling 4s linear;
+}
+
+@keyframes filling { from { width: 0%; } to { width: 100%; } }
+
+.status-footer { text-align: center; color: #94A3B8; font-size: 0.9rem; font-weight: 600; font-style: italic; }
+
+/* Existing Animations Helpers */
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+.animate-fade-in { animation: fadeIn 0.6s ease-out; }
+
+.animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+

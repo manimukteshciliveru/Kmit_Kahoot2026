@@ -6,6 +6,8 @@ const logger = require('../utils/logger');
 
 const waitingPlayers = new Map(); // userId -> player stats
 const activeRoundTimers = new Map(); // roomID -> timeout
+const pendingQuizCache = new Map(); // topic:count -> Promise
+const roomQuestionIndex = new Map(); // roomID -> currentQuestionIndex
 
 module.exports = (io, socket) => {
     if (!socket.user) return;
@@ -108,7 +110,14 @@ module.exports = (io, socket) => {
         const topic = topicStr || "General";
 
         try {
-            const quiz = await generateBattleQuiz(topic, questionCount);
+            const quizKey = `${topic}::${questionCount}`;
+            let quiz;
+            if (pendingQuizCache.has(quizKey)) {
+                quiz = await pendingQuizCache.get(quizKey);
+                pendingQuizCache.delete(quizKey); // Use once
+            } else {
+                quiz = await generateBattleQuiz(topic, questionCount);
+            }
             const battleId = `btl_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
             const newBattle = new Battle({
@@ -147,6 +156,7 @@ module.exports = (io, socket) => {
             });
 
             // Start Server Safety Timer for Round 1
+            roomQuestionIndex.set(roomID, 0);
             startServerRoundTimer(roomID, battleId, 0, newBattle.questionTimer);
 
             logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
@@ -212,6 +222,10 @@ module.exports = (io, socket) => {
             );
 
             if (opponent) {
+                const quizKey = `${opponent.displayTopic}::${qCount}`;
+                if (!pendingQuizCache.has(quizKey)) {
+                    pendingQuizCache.set(quizKey, generateBattleQuiz(opponent.displayTopic, qCount));
+                }
                 createBattle(opponent, waitingPlayers.get(userId), opponent.displayTopic, qCount, qTimer, bTimer);
             } else {
                 socket.emit('battle:searching');
@@ -293,6 +307,9 @@ module.exports = (io, socket) => {
             };
             player.answers.push(roundAnswer);
 
+            const prevHps = battle.players.map(p => p.hp);
+            const prevScores = battle.players.map(p => p.score);
+
             // Apply HP Logic (Opponent takes damage if I get it right)
             if (isCorrect) {
                 const damage = perfectTimeBonus ? 30 : 20;
@@ -301,6 +318,9 @@ module.exports = (io, socket) => {
             } else {
                 player.hp = Math.max(0, player.hp - 10); // Mishap damage
             }
+
+            const hpChanged = battle.players.some((p, i) => p.hp !== prevHps[i]);
+            const scoreChanged = battle.players.some((p, i) => p.score !== prevScores[i]);
 
             await battle.save();
 
@@ -339,6 +359,7 @@ module.exports = (io, socket) => {
                     if (lastQuestion) {
                         await concludeBattle(refreshedBattle);
                     } else {
+                        roomQuestionIndex.set(battle.roomID, questionIndex + 1);
                         io.to(battle.roomID).emit('battle:next_question', { 
                             nextIndex: questionIndex + 1,
                             timer: battle.questionTimer
@@ -349,15 +370,18 @@ module.exports = (io, socket) => {
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait
-                socket.emit('battle:waiting_for_opponent', { questionIndex });
-                // We still sync the HP bars live
-                io.to(battle.roomID).emit('battle:sync', {
-                    players: battle.players.map(p => ({
-                        userId: p.userId.toString(),
-                        hp: p.hp,
-                        score: p.score
-                    }))
-                });
+                socket.emit('battle:waiting_for_opponent', { questionIndex, opponentName: opponent.name });
+                
+                if (hpChanged || scoreChanged) {
+                    io.to(battle.roomID).emit('battle:sync', {
+                        players: battle.players.map(p => ({
+                            userId: p.userId.toString(),
+                            name: p.name,
+                            hp: p.hp,
+                            score: p.score
+                        }))
+                    });
+                }
             }
 
         } catch (err) { logger.error('Battle Sync Error:', err); }
@@ -376,19 +400,23 @@ module.exports = (io, socket) => {
         });
     });
 
-    socket.on('battle:extension_respond', ({ battleId, accept }) => {
+    socket.on('battle:extension_respond', async ({ battleId, accept }) => {
         const userId = socket.user._id.toString();
-        Battle.findOne({ battleId, status: 'active' }).then(battle => {
-            if (!battle) return;
-            const challenger = battle.players.find(p => p.userId.toString() !== userId);
-            if (accept) {
-                io.to(battle.roomID).emit('battle:timer_extended');
-            } else {
-                if (challenger) {
-                    emitToUser(challenger.userId.toString(), 'battle:extension_denied');
-                }
+        const battle = await Battle.findOne({ battleId, status: 'active' });
+        if (!battle) return;
+
+        const challenger = battle.players.find(p => p.userId.toString() !== userId);
+        if (accept) {
+            const currentQ = roomQuestionIndex.get(battle.roomID) || 0;
+            // Extend the server safety timer by resetting it with more time
+            // Assuming current remaining time + 15
+            startServerRoundTimer(battle.roomID, battleId, currentQ, battle.questionTimer + 15);
+            io.to(battle.roomID).emit('battle:timer_extended');
+        } else {
+            if (challenger) {
+                emitToUser(challenger.userId.toString(), 'battle:extension_denied');
             }
-        });
+        }
     });
 
     const concludeBattle = async (battleInput) => {
@@ -399,6 +427,7 @@ module.exports = (io, socket) => {
             clearTimeout(activeRoundTimers.get(battle.roomID));
             activeRoundTimers.delete(battle.roomID);
         }
+        roomQuestionIndex.delete(battle.roomID);
         battle.status = 'completed';
         battle.endedAt = new Date();
 
@@ -453,6 +482,7 @@ module.exports = (io, socket) => {
 
         io.to(battle.roomID).emit('battle:ended', {
             winner: winner.name,
+            isDraw: isDraw,
             results: [
                 { userId: winnerUser._id, name: winnerUser.name, rankDelta: winPoints, newPoints: winnerUser.rank.points, tier: winnerUser.rank.tier, lvl: winnerUser.rank.level },
                 { userId: loserUser._id, name: loserUser.name, rankDelta: isDraw ? lossPoints : -Math.abs(lossPoints), newPoints: loserUser.rank.points, tier: loserUser.rank.tier, lvl: loserUser.rank.level }

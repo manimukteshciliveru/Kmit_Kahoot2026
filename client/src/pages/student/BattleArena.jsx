@@ -43,6 +43,10 @@ const BattleArena = () => {
     const syncDataRef = useRef(null);
     const hasSubmittedRef = useRef(false);
     const questionStartTimeRef = useRef(Date.now());
+    const questionEndTimeRef = useRef(0);
+    const currentMaxTimerRef = useRef(20);
+    const [lastTimeTaken, setLastTimeTaken] = useState(0);
+    const [opponentName, setOpponentName] = useState('Opponent');
     const [showLevelMap, setShowLevelMap] = useState(false);
 
     const TOPIC_STRUCTURE = {
@@ -91,6 +95,7 @@ const BattleArena = () => {
                 startOverallTimer();
             }
             questionStartTimeRef.current = Date.now();
+            currentMaxTimerRef.current = data.questionTimer;
             startQuestionTimer(data.questionTimer);
             toast.success('Duel Started!', { icon: '⚔️' });
         });
@@ -110,9 +115,10 @@ const BattleArena = () => {
             setSyncData(data);
         });
 
-        socket.on('battle:waiting_for_opponent', () => {
+        socket.on('battle:waiting_for_opponent', (data) => {
             setRoundStatus('waiting');
-            clearInterval(timerRef.current);
+            if (data?.opponentName) setOpponentName(data.opponentName);
+            cancelAnimationFrame(timerRef.current);
         });
 
         socket.on('battle:round_resolved', (data) => {
@@ -127,11 +133,12 @@ const BattleArena = () => {
             setRoundResult(null);
             hasSubmittedRef.current = false;
             questionStartTimeRef.current = Date.now();
+            currentMaxTimerRef.current = serverTimer;
             startQuestionTimer(serverTimer);
         });
 
         socket.on('battle:ended', (data) => {
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             setFinalResults(data);
             setView('results');
         });
@@ -149,14 +156,14 @@ const BattleArena = () => {
 
         socket.on('battle:opponent_left', (data) => {
             toast.success(data.message, { icon: '🏆', duration: 5000 });
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             clearInterval(overallTimerRef.current);
             setView('selection');
         });
 
         socket.on('battle:disconnect', () => {
             toast.error('Disconnected from battle server. Returning to selection.', { duration: 5000 });
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             clearInterval(searchInterval.current);
             clearInterval(overallTimerRef.current);
             setView('selection');
@@ -191,7 +198,8 @@ const BattleArena = () => {
         });
 
         socket.on('battle:timer_extended', () => {
-            setTimer(prev => prev + 15);
+            currentMaxTimerRef.current += 15;
+            questionEndTimeRef.current += 15000;
             toast.success('Time Extended by 15s!', { icon: '➕' });
         });
 
@@ -210,7 +218,7 @@ const BattleArena = () => {
             socket.off('battle:ended');
             socket.off('battle:searching');
             socket.off('battle:opponent_left');
-            clearInterval(timerRef.current);
+            cancelAnimationFrame(timerRef.current);
             clearInterval(searchInterval.current);
             clearInterval(overallTimerRef.current);
             socket.off('battle:disconnect');
@@ -249,19 +257,19 @@ const BattleArena = () => {
         }
     }, [timer, roundStatus]);
 
-    const startQuestionTimer = (overrideTimer) => {
-        const initialTime = overrideTimer || battleData?.questionTimer || 20;
-        setTimer(initialTime);
-        clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-            setTimer(prev => {
-                if (prev <= 0) {
-                    clearInterval(timerRef.current);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+    const startQuestionTimer = (duration) => {
+        cancelAnimationFrame(timerRef.current);
+        questionEndTimeRef.current = Date.now() + (duration * 1000);
+        
+        const tick = () => {
+            const now = Date.now();
+            const remaining = Math.max(0, Math.ceil((questionEndTimeRef.current - now) / 1000));
+            setTimer(remaining);
+            if (remaining > 0) {
+                timerRef.current = requestAnimationFrame(tick);
+            }
+        };
+        timerRef.current = requestAnimationFrame(tick);
     };
 
     const requestExtension = () => {
@@ -275,8 +283,9 @@ const BattleArena = () => {
         if (roundStatus !== 'answering' || hasSubmittedRef.current) return;
         hasSubmittedRef.current = true;
         setRoundStatus('waiting');
-        clearInterval(timerRef.current);
+        cancelAnimationFrame(timerRef.current);
         const timeTaken = Date.now() - questionStartTimeRef.current;
+        setLastTimeTaken(timeTaken);
         if (socket && battleData) {
             socket.emit('battle:submit_answer', {
                 battleId: battleData.battleId,
@@ -344,7 +353,7 @@ const BattleArena = () => {
                                 const myData = syncData?.players?.find(p => p.userId === myId);
                                 return (
                                     <div className="hp-container">
-                                        <div className="hp-bar" style={{ width: `${myData?.hp ?? 100}%` }} />
+                                        <div className={`hp-bar ${(myData?.hp ?? 100) > 60 ? 'healthy' : (myData?.hp ?? 100) > 30 ? 'moderate' : 'critical'}`} style={{ width: `${myData?.hp ?? 100}%` }} />
                                     </div>
                                 );
                             })()}
@@ -355,8 +364,8 @@ const BattleArena = () => {
                                 <circle cx="50" cy="50" r="45" className="timer-bg" />
                                 <circle 
                                     cx="50" cy="50" r="45" 
-                                    className="timer-progress" 
-                                    style={{ strokeDashoffset: 283 - (283 * (timer / (battleData?.questionTimer || 20))) }}
+                                    className={`timer-progress ${timer <= 5 ? 'danger' : timer <= 10 ? 'warning' : ''}`} 
+                                    style={{ strokeDashoffset: Math.max(0, 283 - (283 * (timer / currentMaxTimerRef.current))) }}
                                 />
                             </svg>
                             <span className="timer-val">{timer}</span>
@@ -375,7 +384,7 @@ const BattleArena = () => {
                                 const oppData = syncData?.players?.find(p => p.userId !== myId);
                                 return (
                                     <div className="hp-container">
-                                        <div className="hp-bar" style={{ width: `${oppData?.hp ?? 100}%` }} />
+                                        <div className={`hp-bar ${(oppData?.hp ?? 100) > 60 ? 'healthy' : (oppData?.hp ?? 100) > 30 ? 'moderate' : 'critical'}`} style={{ width: `${oppData?.hp ?? 100}%` }} />
                                     </div>
                                 );
                             })()}
@@ -415,8 +424,8 @@ const BattleArena = () => {
                         {roundStatus === 'waiting' && (
                             <div className="waiting-overlay glass animate-pulse">
                                 <LuTimer className="waiting-icon" />
-                                <h2>Waiting for Opponent...</h2>
-                                <p>You answered in {((battleData?.questionTimer || 20) - timer).toFixed(1)}s</p>
+                                <h2>Waiting for <span style={{color: '#60A5FA'}}>{opponentName}</span>...</h2>
+                                <p>You answered in {(lastTimeTaken / 1000).toFixed(1)}s</p>
                             </div>
                         )}
 
@@ -741,8 +750,8 @@ const BattleArena = () => {
             {view === 'results' && finalResults && (
                 <div className="results-v2 animate-fade-in">
                     <div className="results-card">
-                        <LuTrophy className={`trophy-icon ${finalResults.winner === user.name ? 'winner' : 'loser'}`} />
-                        <h1>{finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT'}</h1>
+                        <LuTrophy className={`trophy-icon ${finalResults.isDraw ? 'draw' : (finalResults.winner === user.name ? 'winner' : 'loser')}`} />
+                        <h1>{finalResults.isDraw ? 'DRAW' : (finalResults.winner === user.name ? 'VICTORY' : 'DEFEAT')}</h1>
                         <div className="score-summary-v2">
                             {finalResults.results.map((r, idx) => {
                                 const myId = user.id || user._id;
