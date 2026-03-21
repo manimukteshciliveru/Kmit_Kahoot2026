@@ -152,6 +152,7 @@ module.exports = (io, socket) => {
                 questionTimer: newBattle.questionTimer,
                 totalQuestions: quiz.questions.length,
                 battleTimer: newBattle.battleTimer,
+                startTime: Date.now(), // ⚡ Authorized Sync Point
                 quiz: quiz
             });
 
@@ -362,11 +363,12 @@ module.exports = (io, socket) => {
                         roomQuestionIndex.set(battle.roomID, questionIndex + 1);
                         io.to(battle.roomID).emit('battle:next_question', { 
                             nextIndex: questionIndex + 1,
-                            timer: battle.questionTimer
+                            timer: battle.questionTimer,
+                            startTime: Date.now() // ⚡ Authorized Sync Point
                         });
                         startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, battle.questionTimer);
                     }
-                }, 4000);
+                }, 1500); // 🚀 Lightning fast transition 1.5s instead of 4s
 
             } else {
                 // Only one has answered: Notify the other or tell the current one to wait

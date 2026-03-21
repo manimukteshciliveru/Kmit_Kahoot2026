@@ -96,7 +96,7 @@ const BattleArena = () => {
             }
             questionStartTimeRef.current = Date.now();
             currentMaxTimerRef.current = data.questionTimer;
-            startQuestionTimer(data.questionTimer);
+            startQuestionTimer(data.questionTimer, data.startTime);
             toast.success('Duel Started!', { icon: '⚔️' });
         });
 
@@ -132,9 +132,9 @@ const BattleArena = () => {
             setRoundStatus('answering');
             setRoundResult(null);
             hasSubmittedRef.current = false;
-            questionStartTimeRef.current = Date.now();
+            questionStartTimeRef.current = data.startTime || Date.now();
             currentMaxTimerRef.current = serverTimer;
-            startQuestionTimer(serverTimer);
+            startQuestionTimer(serverTimer, data.startTime);
         });
 
         socket.on('battle:ended', (data) => {
@@ -257,9 +257,10 @@ const BattleArena = () => {
         }
     }, [timer, roundStatus]);
 
-    const startQuestionTimer = (duration) => {
+    const startQuestionTimer = (duration, serverStartTime) => {
         cancelAnimationFrame(timerRef.current);
-        questionEndTimeRef.current = Date.now() + (duration * 1000);
+        const baseTime = serverStartTime || Date.now();
+        questionEndTimeRef.current = baseTime + (duration * 1000);
         
         const tick = () => {
             const now = Date.now();
