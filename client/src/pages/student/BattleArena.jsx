@@ -116,18 +116,6 @@ const BattleArena = () => {
             setSyncData(data);
         });
 
-        socket.on('battle:waiting_for_opponent', (data) => {
-            setRoundStatus('waiting');
-            if (data?.opponentName) setOpponentName(data.opponentName);
-            cancelAnimationFrame(timerRef.current);
-        });
-
-        socket.on('battle:round_resolved', (data) => {
-            setRoundResult(data);
-            setRoundStatus('resolved');
-            cancelAnimationFrame(timerRef.current);
-        });
-
         socket.on('battle:next_question', ({ nextIndex, timer: serverTimer, startTime, serverTime }) => {
             setCurrentQuestionIndex(nextIndex);
             setRoundStatus('answering');
@@ -136,6 +124,10 @@ const BattleArena = () => {
             questionStartTimeRef.current = startTime || Date.now();
             currentMaxTimerRef.current = serverTimer;
             startQuestionTimer(serverTimer, startTime, serverTime);
+        });
+
+        socket.on('battle:waiting_for_match_end', () => {
+             setRoundStatus('waiting_match_end');
         });
 
         socket.on('battle:ended', (data) => {
@@ -291,16 +283,13 @@ const BattleArena = () => {
     };
 
     const requestExtension = () => {
-        if (socket && battleData) {
-            socket.emit('battle:request_extension', { battleId: battleData.battleId });
-            toast.success('Extension Request Sent');
-        }
+        // Feature removed as per user request
     };
 
     const handleAnswer = (answerIndex) => {
         if (roundStatus !== 'answering' || hasSubmittedRef.current) return;
         hasSubmittedRef.current = true;
-        setRoundStatus('waiting');
+        // setRoundStatus('waiting'); // Removed for racing mode
         cancelAnimationFrame(timerRef.current);
         const timeTaken = Date.now() - questionStartTimeRef.current;
         setLastTimeTaken(timeTaken);
@@ -441,48 +430,14 @@ const BattleArena = () => {
                                         </button>
                                     ))}
                                 </div>
-                                <div className="q-footer-actions flex justify-end mt-4">
-                                    <button className="btn-extension flex items-center gap-2 text-xs text-orange-400 border border-orange-400/30 px-3 py-2 rounded-lg hover:bg-orange-400/10" onClick={requestExtension}>
-                                        <LuTimer className="animate-pulse" /> Too Tough? Request +15s
-                                    </button>
-                                </div>
                             </div>
                         )}
 
-                        {roundStatus === 'waiting' && (
-                            <div className="waiting-overlay glass animate-pulse">
-                                <LuTimer className="waiting-icon" />
-                                <h2>Waiting for <span style={{color: '#60A5FA'}}>{opponentName}</span>...</h2>
-                                <p>You answered in {(lastTimeTaken / 1000).toFixed(1)}s</p>
-                            </div>
-                        )}
-
-                        {roundStatus === 'resolved' && roundResult && (
-                            <div className="round-resolution glass animate-scale-in">
-                                <div className="res-header">
-                                    <LuTarget />
-                                    <h2>Round {currentQuestionIndex + 1} Results</h2>
-                                </div>
-                                <div className="res-grid">
-                                    {roundResult.players.map(p => (
-                                        <div key={p.userId} className={`res-block ${p.userId === (user.id || user._id).toString() ? 'me' : ''}`}>
-                                            <div className="res-info">
-                                                <span className="player-name">{p.name}</span>
-                                                <span className={`res-badge ${p.isCorrect ? 'correct' : 'wrong'}`}>
-                                                    {p.isCorrect ? 'CORRECT' : 'WRONG'}
-                                                </span>
-                                            </div>
-                                            <div className="res-meta">
-                                                <span>Speed: {(p.timeTaken / 1000).toFixed(1)}s</span>
-                                                <span className="xp-gain">+{p.isCorrect ? (p.timeTaken < 3000 ? 15 : 10) : 0} XP</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="next-round-bar">
-                                    <div className="progress"></div>
-                                </div>
-                                <p className="status-footer">Next question incoming...</p>
+                        {roundStatus === 'waiting_match_end' && (
+                            <div className="waiting-overlay glass animate-float">
+                                <LuLoader2 className="spinner-icon mx-auto text-4xl mb-4 text-blue-400" />
+                                <h3>Finishing up!</h3>
+                                <p>Waiting for the battle to conclude...</p>
                             </div>
                         )}
                     </div>

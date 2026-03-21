@@ -5,73 +5,12 @@ const { calculatePoints, getTierByPoints } = require('../utils/rankManager');
 const logger = require('../utils/logger');
 
 const waitingPlayers = new Map(); // userId -> player stats
-const activeRoundTimers = new Map(); // roomID -> timeout
 const pendingQuizCache = new Map(); // topic:count -> Promise
-const roomQuestionIndex = new Map(); // roomID -> currentQuestionIndex
-const roomRoundStartTime = new Map(); // roomID -> timestamp
 
 module.exports = (io, socket) => {
     if (!socket.user) return;
 
-    const startServerRoundTimer = (roomID, battleId, questionIndex, duration) => {
-        if (activeRoundTimers.has(roomID)) {
-            clearTimeout(activeRoundTimers.get(roomID));
-        }
-
-        const timeout = setTimeout(async () => {
-            try {
-                const battle = await Battle.findOne({ battleId, status: 'active' });
-                if (!battle) return;
-
-                const allAnswered = battle.players.every(p => p.answers.some(a => a.questionIndex === questionIndex));
-                if (!allAnswered) {
-                    logger.info(`⏰ [BATTLE] Round Timeout in Room ${roomID}. Advancing...`);
-                    
-                    // Force answers for any player who didn't submit
-                    for (const player of battle.players) {
-                        const hasAns = player.answers.some(a => a.questionIndex === questionIndex);
-                        if (!hasAns) {
-                            player.answers.push({
-                                questionIndex,
-                                isCorrect: false,
-                                timeSpent: duration * 1000,
-                                perfect: false
-                            });
-                            player.hp = Math.max(0, player.hp - 10);
-                        }
-                    }
-                    await battle.save();
-
-                    const resolution = {
-                        questionIndex,
-                        correctAnswer: battle.quiz.questions[questionIndex].correctAnswer,
-                        players: battle.players.map(p => ({
-                            userId: p.userId.toString(),
-                            name: p.name,
-                            isCorrect: p.answers.find(a => a.questionIndex === questionIndex)?.isCorrect || false,
-                            timeTaken: duration * 1000,
-                            hp: p.hp,
-                            score: p.score
-                        }))
-                    };
-                    io.to(roomID).emit('battle:round_resolved', resolution);
-
-                    setTimeout(async () => {
-                        const b = await Battle.findOne({ battleId });
-                        if (!b) return;
-                        const lastQuestion = questionIndex === b.quiz.questions.length - 1;
-                        if (lastQuestion) await concludeBattle(b);
-                        else {
-                            io.to(roomID).emit('battle:next_question', { nextIndex: questionIndex + 1, timer: b.questionTimer });
-                            startServerRoundTimer(roomID, battleId, questionIndex + 1, b.questionTimer);
-                        }
-                    }, 4000);
-                }
-            } catch (err) { logger.error('Round Timeout Error:', err); }
-        }, (duration + 5) * 1000);
-
-        activeRoundTimers.set(roomID, timeout);
-    };
+    // startServerRoundTimer and room-maps removed for 'Racing Mode' async flow
 
 
     const broadcastLobbyUpdate = () => {
@@ -154,14 +93,9 @@ module.exports = (io, socket) => {
                 totalQuestions: quiz.questions.length,
                 battleTimer: newBattle.battleTimer,
                 startTime: Date.now(),
-                serverTime: Date.now(), // 🕒 For Clock Sync
+                serverTime: Date.now(),
                 quiz: quiz
             });
-
-            // Start Server Safety Timer for Round 1
-            roomQuestionIndex.set(roomID, 0);
-            roomRoundStartTime.set(roomID, Date.now());
-            startServerRoundTimer(roomID, battleId, 0, newBattle.questionTimer);
 
             logger.info(`⚔️ [BATTLE] Combat Initiated: ${p1.name} vs ${p2.name} in Room ${roomID}`);
 
@@ -328,125 +262,45 @@ module.exports = (io, socket) => {
 
             await battle.save();
 
-            // 🔥 Race Condition Fix: Fetch FRESH state to see if other player answered
-            const freshBattle = await Battle.findOne({ battleId });
-            if (!freshBattle) return;
-
-            const freshMe = freshBattle.players.find(p => p.userId.toString() === myId);
-            const freshOpp = freshBattle.players.find(p => p.userId.toString() !== myId);
-            const opponentAnswer = freshOpp.answers.find(a => a.questionIndex === questionIndex);
-
-            if (opponentAnswer) {
-                if (activeRoundTimers.has(battle.roomID)) {
-                    clearTimeout(activeRoundTimers.get(battle.roomID));
-                    activeRoundTimers.delete(battle.roomID);
-                }
-                // ROUND RESOLVED: Both answered
-                const resolution = {
-                    questionIndex,
-                    correctAnswer: question.correctAnswer,
-                    players: freshBattle.players.map(p => {
-                        const ans = p.answers.find(a => a.questionIndex === questionIndex);
-                        return {
-                            userId: p.userId.toString(),
-                            name: p.name,
-                            isCorrect: ans?.isCorrect || false,
-                            timeTaken: ans?.timeSpent || 0,
-                            hp: p.hp,
-                            score: p.score
-                        };
-                    })
-                };
-                
-                io.to(battle.roomID).emit('battle:round_resolved', resolution);
-
-                // 🔥 Gate check: Only one submitter triggers the next round
-                const currentStoredIdx = roomQuestionIndex.get(battle.roomID);
-                if (currentStoredIdx !== undefined && currentStoredIdx > questionIndex) return;
-                
-                // Mark round as transitioning
-                roomQuestionIndex.set(battle.roomID, questionIndex + 1);
-
-                setTimeout(async () => {
-                    const refreshedBattle = await Battle.findOne({ battleId });
-                    if (!refreshedBattle) return;
-                    const lastQuestion = questionIndex === refreshedBattle.quiz.questions.length - 1;
-
-                    if (lastQuestion) {
-                        await concludeBattle(refreshedBattle);
-                    } else {
-                        roomRoundStartTime.set(battle.roomID, Date.now());
-                        io.to(battle.roomID).emit('battle:next_question', { 
-                            nextIndex: questionIndex + 1,
-                            timer: refreshedBattle.questionTimer,
-                            startTime: Date.now(),
-                            serverTime: Date.now()
-                        });
-                        startServerRoundTimer(battle.roomID, battleId, questionIndex + 1, refreshedBattle.questionTimer);
-                    }
-                }, 1500); // 🕒 Reduced to 1.5s for Low Latency! Compromise for user feedback.
-
-            } else {
-                // Only one has answered: Notify the other or tell the current one to wait
-                socket.emit('battle:waiting_for_opponent', { questionIndex, opponentName: opponent.name });
-                
-                if (hpChanged || scoreChanged) {
-                    io.to(battle.roomID).emit('battle:sync', {
-                        players: freshBattle.players.map(p => ({ // Send from FRESH state
-                            userId: p.userId.toString(),
-                            name: p.name,
-                            hp: p.hp,
-                            score: p.score
-                        }))
-                    });
-                }
-            }
-
-        } catch (err) { logger.error('Battle Sync Error:', err); }
-    });
-
-    socket.on('battle:request_extension', ({ battleId }) => {
-        const userId = socket.user._id.toString();
-        Battle.findOne({ battleId, status: 'active' }).then(battle => {
-            if (!battle) return;
-            const opponent = battle.players.find(p => p.userId.toString() !== userId);
-            if (opponent) {
-                emitToUser(opponent.userId.toString(), 'battle:extension_received', { 
-                    requesterName: socket.user.name 
+            // 🔥 RACE MODE: Immediately send next question to ONLY this player
+            const nextIdx = questionIndex + 1;
+            if (nextIdx < battle.quiz.questions.length) {
+                socket.emit('battle:next_question', {
+                    nextIndex: nextIdx,
+                    timer: battle.questionTimer,
+                    startTime: Date.now(),
+                    serverTime: Date.now()
                 });
+            } else {
+                socket.emit('battle:waiting_for_match_end');
             }
-        });
+
+            // Sync HP/Scores for real-time visibility
+            io.to(battle.roomID).emit('battle:sync', {
+                players: battle.players.map(p => ({
+                    userId: p.userId.toString(),
+                    name: p.name,
+                    hp: p.hp,
+                    score: p.score
+                }))
+            });
+
+            // Check if BOTH are finished
+            const freshBattle = await Battle.findOne({ battleId });
+            const bothFinished = freshBattle.players.every(p => p.answers.length >= freshBattle.quiz.questions.length);
+            if (bothFinished) {
+                await concludeBattle(freshBattle);
+            }
+
+        } catch (err) { logger.error('Battle Submit Error:', err); }
     });
 
-    socket.on('battle:extension_respond', async ({ battleId, accept }) => {
-        const userId = socket.user._id.toString();
-        const battle = await Battle.findOne({ battleId, status: 'active' });
-        if (!battle) return;
-
-        const challenger = battle.players.find(p => p.userId.toString() !== userId);
-        if (accept) {
-            const currentQ = roomQuestionIndex.get(battle.roomID) || 0;
-            const roundStart = roomRoundStartTime.get(battle.roomID) || Date.now();
-            const elapsed = Math.floor((Date.now() - roundStart) / 1000);
-            const remaining = Math.max(0, battle.questionTimer - elapsed);
-            startServerRoundTimer(battle.roomID, battleId, currentQ, remaining + 15);
-            io.to(battle.roomID).emit('battle:timer_extended');
-        } else {
-            if (challenger) {
-                emitToUser(challenger.userId.toString(), 'battle:extension_denied');
-            }
-        }
-    });
+    // Extensions removed for async racing mode
 
     const concludeBattle = async (battleInput) => {
         const battle = await Battle.findOne({ battleId: battleInput.battleId });
         if (!battle || battle.status === 'completed') return;
 
-        if (activeRoundTimers.has(battle.roomID)) {
-            clearTimeout(activeRoundTimers.get(battle.roomID));
-            activeRoundTimers.delete(battle.roomID);
-        }
-        roomQuestionIndex.delete(battle.roomID);
         battle.status = 'completed';
         battle.endedAt = new Date();
 
