@@ -358,7 +358,11 @@ const BattleArena = () => {
 
                         <div className={`hud-side opponent ${damageEffect === 'opponent' ? 'damaged' : ''}`}>
                             <div className="hud-meta">
-                                <span className="hud-name text-white font-bold">Opponent</span>
+                                {(() => {
+                                    const myId = (user.id || user._id)?.toString();
+                                    const oppData = syncData?.players?.find(p => p.userId !== myId);
+                                    return <span className="hud-name text-white font-bold">{oppData?.name || 'Opponent'}</span>;
+                                })()}
                             </div>
                             {(() => {
                                 const myId = (user.id || user._id)?.toString();
