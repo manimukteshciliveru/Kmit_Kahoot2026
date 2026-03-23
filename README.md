@@ -1,6 +1,8 @@
-# Kahoot! Clone - QuizMaster Pro
+# QuizMaster Pro - Kahoot! Clone
 
-A real-time quiz platform built with the MERN stack (MongoDB, Express, React, Node.js).
+A real-time quiz platform and 1v1 battle arena built with the MERN stack.
+
+[📖 Read the Detailed Documentation](DOCUMENTATION.md)
 
 ## Prerequisites
 
