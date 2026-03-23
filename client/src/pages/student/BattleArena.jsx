@@ -121,11 +121,9 @@ const BattleArena = () => {
             setCurrentQuestionIndex(nextIndex);
             setRoundStatus('answering');
             setRoundResult(null);
-            // hasSubmittedRef.current = false; // Manual navigation doesn't need this lock
-        });
-
-        socket.on('battle:waiting_for_match_end', () => {
-             setRoundStatus('waiting_match_end');
+            setIsSubmitting(false); // Reset submission lock
+            questionStartTimeRef.current = Date.now();
+            startQuestionTimer(serverTimer, startTime, serverTime);
         });
 
         socket.on('battle:waiting_for_match_end', () => {
@@ -292,18 +290,26 @@ const BattleArena = () => {
         setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: idx }));
     };
 
+    const handleAnswer = (answerIndex) => {
+        if (isSubmitting || !socket || !battleData) return;
+        
+        setIsSubmitting(true);
+        const timeTaken = Date.now() - questionStartTimeRef.current;
+
+        socket.emit('battle:submit_answer', { 
+            battleId: battleData.battleId,
+            questionIndex: currentQuestionIndex,
+            answer: answerIndex,
+            timeTaken: timeTaken
+        });
+        
+        // Timer will be stopped/reset when 'battle:next_question' arrives
+    };
+
     const handleNext = () => {
         const answer = selectedAnswers[currentQuestionIndex];
         if (answer === undefined) return toast.error("Please select an answer first!");
-
-        if (socket && battleData) {
-            socket.emit('battle:submit_answer', { 
-                battleId: battleData.battleId,
-                questionIndex: currentQuestionIndex,
-                answer: answer,
-                timeTaken: 0 // No per-question timer pressure
-            });
-        }
+        handleAnswer(answer);
     };
 
     const handlePrev = () => {
