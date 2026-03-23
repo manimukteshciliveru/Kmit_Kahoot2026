@@ -2,7 +2,8 @@
 
 A real-time quiz platform and 1v1 battle arena built with the MERN stack.
 
-[📖 Read the Detailed Documentation](DOCUMENTATION.md)
+[📖 Read the General Documentation](DOCUMENTATION.md)  
+[🛠️ Read the Technical Folder Reference](TECHNICAL_REFERENCE.md)
 
 ## Prerequisites
 
