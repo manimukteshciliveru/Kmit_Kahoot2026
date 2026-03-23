@@ -421,39 +421,54 @@ const BattleArena = () => {
                         </div>
                     )}
 
-                    <div className="combat-stage animate-scale-in">
+                        <div className="battle-arena-main-stage animate-scale-in">
                         {roundStatus === 'answering' && (
-                            <div className="question-box glass">
-                                <div className="q-indicator">Question {currentQuestionIndex + 1} / {battleData.quiz.questions.length}</div>
-                                <h2 style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', textAlign: 'left', lineHeight: '1.6', fontSize: '1.2rem', margin: '1rem 0 2rem 0' }}>
-                                    {battleData.quiz.questions[currentQuestionIndex].questionText}
-                                </h2>
-                                <div className="options-grid-v2">
-                                    {battleData.quiz.questions[currentQuestionIndex].options.map((opt, idx) => (
-                                        <button 
-                                            key={idx} 
-                                            className={`opt-v2 ${selectedAnswers[currentQuestionIndex] === idx ? 'selected' : ''}`} 
-                                            onClick={() => handleOptionSelect(idx)}
+                            <div className="battle-question-container">
+                                {/* Horizontal Question Status Nav */}
+                                <div className="battle-q-nav-top">
+                                    {battleData.quiz.questions.map((_, i) => (
+                                        <div 
+                                            key={i}
+                                            className={`battle-q-dot ${i === currentQuestionIndex ? 'active' : selectedAnswers[i] !== undefined ? 'answered' : ''}`}
+                                            onClick={() => setCurrentQuestionIndex(i)}
                                         >
-                                            <div className="opt-idx">{String.fromCharCode(65 + idx)}</div>
-                                            <span className="opt-label">{opt.text}</span>
-                                        </button>
+                                            {i + 1}
+                                        </div>
                                     ))}
                                 </div>
-                                <div className="q-nav-actions flex justify-between mt-8 pt-4 border-t border-white/10">
-                                    <button 
-                                        className="px-6 py-2 rounded-lg bg-white/5 text-white/50 hover:bg-white/10 disabled:opacity-30"
-                                        onClick={handlePrev}
-                                        disabled={currentQuestionIndex === 0}
-                                    >
-                                        Previous
-                                    </button>
-                                    <button 
-                                        className="px-8 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-500 shadow-lg shadow-blue-500/20"
-                                        onClick={handleNext}
-                                    >
-                                        {currentQuestionIndex === (battleData.quiz.questions.length - 1) ? 'Submit Quiz' : 'Finalize & Next'}
-                                    </button>
+
+                                <div className="question-box glass">
+                                    <div className="q-indicator">Question {currentQuestionIndex + 1} / {battleData.quiz.questions.length}</div>
+                                    <h2 className="q-text-premium">
+                                        {battleData.quiz.questions[currentQuestionIndex].questionText}
+                                    </h2>
+                                    <div className="options-grid-v2">
+                                        {battleData.quiz.questions[currentQuestionIndex].options.map((opt, idx) => (
+                                            <button 
+                                                key={idx} 
+                                                className={`opt-v2 ${selectedAnswers[currentQuestionIndex] === idx ? 'selected' : ''}`} 
+                                                onClick={() => handleOptionSelect(idx)}
+                                            >
+                                                <div className="opt-idx">{String.fromCharCode(65 + idx)}</div>
+                                                <span className="opt-label">{opt.text}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="q-nav-actions">
+                                        <button 
+                                            className="btn-prev"
+                                            onClick={handlePrev}
+                                            disabled={currentQuestionIndex === 0}
+                                        >
+                                            <LuChevronRight style={{ transform: 'rotate(180deg)' }} /> Previous
+                                        </button>
+                                        <button 
+                                            className="btn-next"
+                                            onClick={handleNext}
+                                        >
+                                            {currentQuestionIndex === (battleData.quiz.questions.length - 1) ? 'Submit Quiz' : 'Finalize & Next'} <LuChevronRight />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
