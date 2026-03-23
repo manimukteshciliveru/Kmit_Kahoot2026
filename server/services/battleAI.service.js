@@ -99,11 +99,32 @@ const mapQuestions = (parsed, count) => {
     });
 };
 
+// Gemini models to try in order
+const GEMINI_MODELS = [
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-pro'
+];
+
 // ── API callers (each returns raw text or throws) ─────────────────────────────
 const callGemini = async (prompt) => {
-    const model  = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    let lastError = null;
+
+    for (const modelName of GEMINI_MODELS) {
+        try {
+            console.log(`[BattleAI] Attempting Gemini model: ${modelName}`);
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            return result.response.text();
+        } catch (err) {
+            console.warn(`[BattleAI] Gemini model ${modelName} failed: ${err.message}`);
+            lastError = err;
+            // Continue to next model
+        }
+    }
+
+    throw lastError || new Error('All Gemini models failed');
 };
 
 const callMistral = async (prompt) => {
