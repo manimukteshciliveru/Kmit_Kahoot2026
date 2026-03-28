@@ -4,9 +4,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { toast } from 'react-hot-toast';
 import { 
-    FiZap, FiUsers, FiAward, FiClock, FiAlertCircle, 
+    FiZap, FiUsers, FiAward, FiAlertCircle, 
     FiShield, FiTrendingUp, FiCheckCircle, FiXCircle,
-    FiSearch, FiSettings, FiTrophy, FiHeart
+    FiSearch, FiTrophy
 } from 'react-icons/fi';
 import './SurvivalArena.css';
 
@@ -32,6 +32,52 @@ const SurvivalArena = () => {
 
     // Refs for timer
     const timerRef = useRef(null);
+
+    // ── Actions ────────────────────────────────────────────────
+    const handleSubmitAnswer = useCallback((answer) => {
+        if (isSubmitting || isEliminated) return;
+        setMyAnswer(answer);
+        setIsSubmitting(true);
+        if (roomState?.roomId && currentQuestion?.questionIndex !== undefined) {
+            socket.emit('survival:submit_answer', {
+                roomId: roomState.roomId,
+                answer,
+                questionIndex: currentQuestion.questionIndex
+            });
+        }
+    }, [isSubmitting, isEliminated, roomState, currentQuestion, socket]);
+
+    const handleCreateRoom = (topic = 'General', difficulty = 'medium') => {
+        socket.emit('survival:create', { topic, difficulty });
+    };
+
+    const handleJoinRoom = (roomId) => {
+        socket.emit('survival:join', { roomId });
+        setView('preparing');
+    };
+
+    const handleStartGame = () => {
+        if (roomState?.roomId) {
+            socket.emit('survival:start', { roomId: roomState.roomId });
+        }
+    };
+
+    // ── Timer Logic ────────────────────────────────────────────
+    const startTimer = useCallback((duration) => {
+        clearInterval(timerRef.current);
+        let time = duration;
+        timerRef.current = setInterval(() => {
+            time -= 1;
+            setTimeLeft(time);
+            if (time <= 0) {
+                clearInterval(timerRef.current);
+                if (!myAnswer && !isEliminated) {
+                   // Time ran out, submit null
+                   handleSubmitAnswer(null);
+                }
+            }
+        }, 1000);
+    }, [isEliminated, myAnswer, handleSubmitAnswer]);
 
     // ── Socket Connections ─────────────────────────────────────
     useEffect(() => {
@@ -119,51 +165,7 @@ const SurvivalArena = () => {
             clearInterval(fetchInterval);
             clearInterval(timerRef.current);
         };
-    }, [socket, connected]);
-
-    // ── Timer Logic ────────────────────────────────────────────
-    const startTimer = (duration) => {
-        clearInterval(timerRef.current);
-        let time = duration;
-        timerRef.current = setInterval(() => {
-            time -= 1;
-            setTimeLeft(time);
-            if (time <= 0) {
-                clearInterval(timerRef.current);
-                if (!myAnswer && !isEliminated) {
-                   // Time ran out, submit null
-                   handleSubmitAnswer(null);
-                }
-            }
-        }, 1000);
-    };
-
-    // ── Actions ────────────────────────────────────────────────
-    const handleCreateRoom = (topic = 'General', difficulty = 'medium') => {
-        socket.emit('survival:create', { topic, difficulty });
-    };
-
-    const handleJoinRoom = (roomId) => {
-        socket.emit('survival:join', { roomId });
-        setView('preparing');
-    };
-
-    const handleStartGame = () => {
-        if (roomState?.roomId) {
-            socket.emit('survival:start', { roomId: roomState.roomId });
-        }
-    };
-
-    const handleSubmitAnswer = (answer) => {
-        if (isSubmitting || isEliminated) return;
-        setMyAnswer(answer);
-        setIsSubmitting(true);
-        socket.emit('survival:submit_answer', {
-            roomId: roomState.roomId,
-            answer,
-            questionIndex: currentQuestion.questionIndex
-        });
-    };
+    }, [socket, connected, isEliminated, startTimer]);
 
     // ── Helpers ────────────────────────────────────────────────
     const timerPercent = timerDuration > 0 ? (timeLeft / timerDuration) * 100 : 0;
