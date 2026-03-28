@@ -51,6 +51,7 @@ const PlayQuiz = () => {
     // Stats & UI
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(0);
+    const [timerDuration, setTimerDuration] = useState(30); // Total timer for current question (dynamic from server)
     const [quizTimeLeft, setQuizTimeLeft] = useState(0); // Overall quiz timer
     const [leaderboard, setLeaderboard] = useState([]);
     const [participantCount, setParticipantCount] = useState(0);
@@ -59,6 +60,12 @@ const PlayQuiz = () => {
     const autoSubmittedRef = useRef(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [scheduledCountdown, setScheduledCountdown] = useState('');
+
+    // Computed: percentage of timer remaining (0–100) for progress bar
+    const timerPercent = timerDuration > 0 ? Math.max(0, Math.min(100, (timeLeft / timerDuration) * 100)) : 0;
+    // Color: green → yellow → red based on urgency
+    const timerColor = timeLeft <= 5 ? '#EF4444' : timeLeft <= 10 ? '#F59E0B' : '#10B981';
+
 
     // --- Core Synchronization ---
     const requestSync = useCallback(() => {
@@ -193,7 +200,13 @@ const PlayQuiz = () => {
                 const diff = (new Date(data.expiresAt).getTime() - getServerTime()) / 1000;
                 const secs = Math.max(0, Math.floor(diff));
                 setTimeLeft(secs);
+                setTimerDuration(secs); // Dynamic timer from server
                 setQuizTimeLeft(secs);
+            }
+            // Handle dynamic timer attached to question (survival / AI mode)
+            if (data.timer !== undefined && data.timer > 0) {
+                setTimeLeft(data.timer);
+                setTimerDuration(data.timer);
             }
             if (data.leaderboard) setLeaderboard(data.leaderboard);
         };
@@ -727,6 +740,30 @@ const PlayQuiz = () => {
                                 <span className="q-index-tag">Question {currentIndex + 1} of {questions.length}</span>
                                 <h2 className="q-text-display">{q?.text}</h2>
                             </div>
+
+                            {/* ── Dynamic Timer Bar ── */}
+                            {status === 'question_active' && timeLeft > 0 && (
+                                <div className="dynamic-timer-bar-wrap">
+                                    <div className="dynamic-timer-meta">
+                                        <span style={{ color: timerColor, fontWeight: 700 }}>
+                                            {timeLeft <= 5 ? '⚠️ ' : '⏱️ '}{timeLeft}s
+                                        </span>
+                                        <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>
+                                            {q?.difficulty ? q.difficulty.toUpperCase() : ''}
+                                        </span>
+                                    </div>
+                                    <div className="dynamic-timer-track">
+                                        <div
+                                            className="dynamic-timer-fill"
+                                            style={{
+                                                width: `${timerPercent}%`,
+                                                background: timerColor,
+                                                transition: 'width 1s linear, background 0.3s ease'
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="options-grid-container">
                                 {(['mcq', 'msq'].includes(q?.type?.toLowerCase()) || (q?.options && q?.options.length > 0)) ? (

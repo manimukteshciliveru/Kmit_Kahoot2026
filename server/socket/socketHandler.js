@@ -7,6 +7,7 @@ const QuizResult = require('../models/QuizResult');
 const { calculateScore } = require('../utils/calculateScore');
 const logger = require('../utils/logger');
 const battleHandler = require('./battleHandler');
+const survivalHandler = require('./survivalHandler');
 
 
 // 🏁 Global Quiz State Machine Definitions
@@ -148,6 +149,9 @@ module.exports = (io) => {
 
         // --- Battle Handler (1v1 Games) ---
         battleHandler(io, socket);
+
+        // --- Survival Mode Handler ---
+        survivalHandler(io, socket);
 
 
 

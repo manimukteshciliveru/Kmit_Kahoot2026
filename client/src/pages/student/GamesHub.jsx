@@ -33,9 +33,8 @@ const GamesHub = () => {
             description: 'How long can you last? One wrong answer and you are out. Build your record streak!',
             icon: <FiTrendingUp />,
             color: '#FDE047',
-            path: '#',
-            tag: 'COMING SOON',
-            disabled: true
+            path: '/survival',
+            tag: 'NEW'
         }
     ];
 

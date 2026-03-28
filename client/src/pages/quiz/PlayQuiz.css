@@ -834,3 +834,61 @@
   .glory-stats-grid { grid-template-columns: 1fr 1fr; }
   .stat-val { font-size: 1.6rem; }
 }
+
+/* ============================================================
+   Dynamic Timer Bar — AI-driven per-question countdown
+   ============================================================ */
+
+/* Wrapper sits between .q-header and .options-grid-container */
+.dynamic-timer-bar-wrap {
+  padding: 0 2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Row: seconds left + difficulty badge */
+.dynamic-timer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: 'Montserrat', sans-serif;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.5px;
+}
+
+/* Track (the grey background rail) */
+.dynamic-timer-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Fill (shrinks left-to-right as time passes) */
+.dynamic-timer-fill {
+  height: 100%;
+  border-radius: 999px;
+  box-shadow: 0 0 8px currentColor;
+  /* transition applied inline so JS can control color live */
+}
+
+/* Urgency pulse animation when ≤5 seconds */
+@keyframes timer-critical-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(239, 68, 68, 0.6); }
+  50%       { opacity: 0.7; box-shadow: 0 0 18px rgba(239, 68, 68, 1); }
+}
+
+.dynamic-timer-fill[style*="#EF4444"] {
+  animation: timer-critical-pulse 0.6s ease-in-out infinite;
+}
+
+/* Responsive: compact on small screens */
+@media (max-width: 768px) {
+  .dynamic-timer-bar-wrap { padding: 0 1.1rem 1rem; }
+  .dynamic-timer-track    { height: 5px; }
+}
