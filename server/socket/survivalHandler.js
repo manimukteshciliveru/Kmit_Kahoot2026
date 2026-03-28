@@ -458,7 +458,6 @@ const processRoundEnd = async (io, room) => {
 
         if (!lastAnswer || !lastAnswer.isCorrect) {
             // Eliminate player
-            player.isAlive       = true; // Keep in map but mark
             player.isAlive       = false;
             player.eliminatedAt  = q.index;
             eliminated.push({ userId: player.userId, name: player.name });

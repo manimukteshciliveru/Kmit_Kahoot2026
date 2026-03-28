@@ -6,7 +6,6 @@ import { quizAPI, responseAPI } from '../../services/api';
 import { FiClock, FiUsers, FiZap, FiCheckCircle, FiInfo } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
-import './PlayQuiz.css';
 import localforage from 'localforage';
 import './PlayQuiz.css';
 

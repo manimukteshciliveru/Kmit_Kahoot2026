@@ -1,0 +1,63 @@
+# 🚀 Project Study Roadmap: Kahoot AI Quiz Platform
+
+This roadmap is designed to help you study the codebase systematically for your project review. Follow this order to understand how data flows from the database to the user's screen.
+
+## 📁 Phase 1: The Core Foundation (Backend Basics)
+Start here to understand how the database is structured and how security works.
+
+1.  [**db.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/config/db.js) — *The Connection*: How the app talks to MongoDB Atlas.
+2.  [**User.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/models/User.js) — *The User Model*: Look at the `username`, `email` (roll number), `password` (hashed), and `role` fields.
+3.  [**Quiz.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/models/Quiz.js) — *The Quiz Model*: Understand how `questions`, `joinCode`, and `finalLeaderboard` are stored.
+4.  [**authMiddleware.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/middleware/authMiddleware.js) — *The Security Guard*: How the server verifies if a user is logged in using JWT tokens.
+
+---
+
+## 📁 Phase 2: API & Logic (The "Brain" of the App)
+See how the server handles requests (Login, Create Quiz, AI, Leaderboard).
+
+5.  [**routes/auth.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/routes/auth.js) — *Login Logic*: How roll numbers/usernames are checked and tokens are issued.
+6.  [**routes/quiz.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/routes/quiz.js) — *The URL Map*: List of all URLs like `/create`, `/join`, and `/stats`.
+7.  [**quizController.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/controllers/quizController.js) — **CRITICAL**: The most important backend file.
+    *   Find the [generateQuestions](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/controllers/quizController.js#33-152) function: This is the **AI integration** using Gemini.
+    *   Find `pdfParse`: This extracts text from uploaded PDFs.
+    *   Find [getLeaderboard](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/controllers/quizController.js#508-607): How ranks are calculated (Score -> Time Taken).
+
+---
+
+## 📁 Phase 3: Real-Time Engine (The Live Quiz Loop)
+This is the most "exciting" part of the code—how Kahoot-style live interactions happen.
+
+8.  [**index.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/index.js) — **THE ENGINE**:
+    *   Look at `io.on('connection')`: The start of the WebSocket loop.
+    *   `join_room`: How students enter the teacher's waiting room.
+    *   `submit_question_answer`: How the server updates scores in RAM instantly.
+    *   `roomState`: The in-memory storage for active quizzes.
+
+---
+
+## 📁 Phase 4: Frontend Architecture (React Entry)
+Switch to the `client/` folder to see how the user interface is built.
+
+9.  [**main.jsx**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/main.jsx) — *The Entry Point*: Mounts the React app.
+10. [**AuthContext.jsx**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/context/AuthContext.jsx) — *Global State*: Keeps the user logged in even when they refresh the page.
+11. [**App.jsx**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/App.jsx) — *The Map*: Shows which URL leads to which page (Login, Dashboard, etc.).
+12. [**api.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/utils/api.js) — *HTTP Helper*: Automatically adds the JWT token to every request.
+13. [**socket.js**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/utils/socket.js) — *WebSocket Helper*: Establishes the real-time link.
+
+---
+
+## 📁 Phase 5: The User Interface (Pages)
+How the components actually look and behave.
+
+14. [**Login.jsx**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/pages/Login.jsx) — The front door.
+15. [**TeacherDashboard.jsx**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/pages/TeacherDashboard.jsx) — Navigation and summary stats for teachers.
+16. [**LiveRoomTeacher.jsx**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/pages/LiveRoomTeacher.jsx) — The "Start Quiz" and "Next Question" controls.
+17. [**LiveRoomStudent.jsx**](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/pages/LiveRoomStudent.jsx) — The buzzer/button interface students use.
+
+---
+
+## 💡 Pro Tips for your Review (Viva):
+- **AI Integration**: Be ready to explain that the server sends a "prompt" to Gemini and gets a JSON response back.
+- **JWT**: Explain that tokens are like IDs that the client keeps in `localStorage`.
+- **WebSocket (Socket.io)**: Explain it as a "two-way street" compared to normal HTTP which is a "one-way street".
+- **Database**: We use **MongoDB Atlas** because it's NoSQL—it stores data as documents (JSON objects), not just tables.

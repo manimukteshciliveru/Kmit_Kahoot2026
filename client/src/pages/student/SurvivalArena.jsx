@@ -30,12 +30,18 @@ const SurvivalArena = () => {
     const [availableRooms, setAvailableRooms] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Refs for timer
     const timerRef = useRef(null);
+    // Refs for real-time state access in intervals
+    const myAnswerRef = useRef(null);
+    const isEliminatedRef = useRef(isEliminated);
+
+    // Sync refs
+    useEffect(() => { myAnswerRef.current = myAnswer; }, [myAnswer]);
+    useEffect(() => { isEliminatedRef.current = isEliminated; }, [isEliminated]);
 
     // ── Actions ────────────────────────────────────────────────
     const handleSubmitAnswer = useCallback((answer) => {
-        if (isSubmitting || isEliminated) return;
+        if (isSubmitting || isEliminatedRef.current) return;
         setMyAnswer(answer);
         setIsSubmitting(true);
         if (roomState?.roomId && currentQuestion?.questionIndex !== undefined) {
@@ -45,7 +51,7 @@ const SurvivalArena = () => {
                 questionIndex: currentQuestion.questionIndex
             });
         }
-    }, [isSubmitting, isEliminated, roomState, currentQuestion, socket]);
+    }, [isSubmitting, roomState, currentQuestion, socket]);
 
     const handleCreateRoom = (topic = 'General', difficulty = 'medium') => {
         socket.emit('survival:create', { topic, difficulty });
@@ -62,22 +68,23 @@ const SurvivalArena = () => {
         }
     };
 
-    // ── Timer Logic ────────────────────────────────────────────
     const startTimer = useCallback((duration) => {
         clearInterval(timerRef.current);
         let time = duration;
+        setTimeLeft(time);
+        
         timerRef.current = setInterval(() => {
             time -= 1;
             setTimeLeft(time);
             if (time <= 0) {
                 clearInterval(timerRef.current);
-                if (!myAnswer && !isEliminated) {
-                   // Time ran out, submit null
+                // Check if user hasn't answered using ref to avoid stale state
+                if (!myAnswerRef.current && !isEliminatedRef.current) {
                    handleSubmitAnswer(null);
                 }
             }
         }, 1000);
-    }, [isEliminated, myAnswer, handleSubmitAnswer]);
+    }, [handleSubmitAnswer]);
 
     // ── Socket Connections ─────────────────────────────────────
     useEffect(() => {
@@ -247,7 +254,7 @@ const SurvivalArena = () => {
                     </div>
                 </div>
 
-                {roomState?.host === (user.id || user._id).toString() ? (
+                {roomState?.host === (user?.id || user?._id)?.toString() ? (
                     <button className="btn-start-now" onClick={handleStartGame}>
                         IGNITE GAME
                     </button>
@@ -315,7 +322,7 @@ const SurvivalArena = () => {
                     <h3>Live Leaderboard</h3>
                     <div className="scores-list">
                         {scores.map(s => (
-                            <div key={s.userId} className={`score-row ${!s.isAlive ? 'eliminated' : ''} ${s.userId === (user.id || user._id).toString() ? 'me' : ''}`}>
+                            <div key={s.userId} className={`score-row ${!s.isAlive ? 'eliminated' : ''} ${s.userId === (user?.id || user?._id)?.toString() ? 'me' : ''}`}>
                                 <span className="rank">#{s.rank}</span>
                                 <span className="name">{s.name}</span>
                                 <span className="pts">{s.score}</span>
@@ -350,7 +357,7 @@ const SurvivalArena = () => {
 
     const renderResults = () => {
         const winner = finalResults?.winner;
-        const isMe = winner?.userId === (user.id || user._id).toString();
+        const isMe = winner?.userId === (user?.id || user?._id)?.toString();
 
         return (
             <div className="survival-results animate-fadeIn">
@@ -362,7 +369,7 @@ const SurvivalArena = () => {
                     <div className="final-lb">
                         <h3>Battle Records</h3>
                         {finalResults?.leaderboard?.slice(0, 10).map(s => (
-                            <div key={s.userId} className={`lb-row ${s.userId === (user.id || user._id).toString() ? 'me' : ''}`}>
+                            <div key={s.userId} className={`lb-row ${s.userId === (user?.id || user?._id)?.toString() ? 'me' : ''}`}>
                                 <span className="rank">#{s.rank}</span>
                                 <span className="name">{s.name}</span>
                                 <span className="rounds">{s.survivalRounds} Rounds</span>

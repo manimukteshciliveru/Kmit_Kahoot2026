@@ -1,0 +1,723 @@
+# 🎓 Project Review Guide — Kahoot-Style Quiz App
+
+> [!IMPORTANT]
+> This guide is your complete reference for tomorrow's review. Read it top-to-bottom once, then use it as a reference sheet during your presentation.
+
+---
+
+## 🧠 PART 1 — What is This Project? (The Big Picture)
+
+This is a **real-time, Kahoot-style quiz platform** built for a classroom setting. It has three types of users:
+
+| Role | What they can do |
+|---|---|
+| **Teacher** | Create quizzes (manually/AI/PDF), host live quiz rooms, monitor student progress in real-time, see leaderboards |
+| **Student** | Join quizzes with a code, answer questions, see scores, view history |
+| **Admin** | Manage the platform (admin dashboard) |
+
+> [!NOTE]
+> Self-registration is **disabled**. Only an admin can create accounts. This was done intentionally to prevent random students from signing up.
+
+---
+
+## 🏗️ PART 2 — Tech Stack (What Tools Were Used)
+
+```
+PROJECT
+├── CLIENT (Frontend — what the user sees)
+│   ├── React + Vite  → Modern JavaScript UI framework
+│   ├── React Router  → Navigation between pages
+│   └── Socket.IO (client) → Real-time communication with server
+│
+└── SERVER (Backend — the brain)
+    ├── Node.js + Express → Web server
+    ├── Socket.IO (server) → Real-time events (live quizzes)
+    ├── MongoDB + Mongoose → Database to store users, quizzes, results
+    ├── JWT (jsonwebtoken) → Login/authentication tokens
+    ├── bcryptjs → Password hashing (security)
+    ├── Gemini AI API → AI-generated quiz questions
+    ├── pdf-parse → Extract text from uploaded PDFs
+    └── multer → Handle file uploads
+```
+
+---
+
+## 🗺️ PART 3 — Architecture (How the Parts Connect)
+
+```
+BROWSER (React App)
+    │
+    │  HTTP REST calls (/api/auth, /api/quiz)
+    │  ──────────────────────────────────────►
+    │                                        EXPRESS SERVER (port 5000)
+    │                                           │
+    │  WebSocket (Socket.IO, real-time)         ├── Routes → Controllers → MongoDB
+    │  ◄──────────────────────────────────────►│
+    │                                           └── Socket.IO Events
+    │
+    └── LocalStorage (saves JWT token)
+```
+
+**Key Concept:** There are TWO communication channels:
+1. **HTTP REST** — For loading data (login, create quiz, fetch quiz details)
+2. **WebSocket (Socket.IO)** — For real-time events during a live quiz (answer submitted, leaderboard updated, timer synced)
+
+---
+
+## 📁 PART 4 — Folder Structure Explained
+
+```
+Demo_project/
+├── server/                   ← Backend (Node.js)
+│   ├── index.js              ← MAIN FILE: Server startup + all Socket.IO logic
+│   ├── config/db.js          ← MongoDB connection
+│   ├── models/
+│   │   ├── User.js           ← User database schema
+│   │   ├── Quiz.js           ← Quiz database schema
+│   │   └── Result.js         ← Quiz result schema
+│   ├── routes/
+│   │   ├── auth.js           ← Login/Register/Role API routes
+│   │   └── quiz.js           ← Quiz CRUD API routes
+│   ├── controllers/
+│   │   └── quizController.js ← All quiz business logic
+│   └── middleware/
+│       └── authMiddleware.js ← JWT token verification
+│
+└── client/                   ← Frontend (React)
+    └── src/
+        ├── App.jsx            ← Router — maps URLs to pages
+        ├── context/
+        │   └── AuthContext.jsx ← Global login state manager
+        ├── pages/             ← Each screen/page of the app
+        │   ├── Login.jsx
+        │   ├── TeacherDashboard.jsx
+        │   ├── StudentDashboard.jsx
+        │   ├── CreateQuizText.jsx
+        │   ├── CreateQuizPDF.jsx
+        │   ├── CreateQuizTopic.jsx
+        │   ├── LiveRoomTeacher.jsx  ← Teacher's live quiz host view
+        │   ├── LiveRoomStudent.jsx  ← Student's live quiz answering view
+        │   ├── AttemptQuiz.jsx      ← Self-paced quiz attempt
+        │   ├── Leaderboard.jsx
+        │   ├── Assessments.jsx
+        │   ├── MyQuizzes.jsx
+        │   └── Performance.jsx
+        └── components/
+            ├── ProtectedRoute.jsx  ← Guards pages so only right roles see them
+            └── DashboardLayout.jsx
+```
+
+---
+
+## ⚙️ PART 5 — Features Explained Simply
+
+### Feature 1: Login System
+- User sends email + password → server checks DB → if correct, sends a **JWT token**
+- Token is stored in **localStorage** in the browser
+- Every future request sends this token in the header `x-auth-token`
+- Token expires in **1 hour**
+
+### Feature 2: Quiz Creation (3 modes)
+| Mode | How it works |
+|---|---|
+| **Manual Text** | Teacher types questions themselves |
+| **PDF Upload** | PDF is sent to server → text extracted with `pdf-parse` → sent to Gemini AI → AI returns questions |
+| **Topic** | Teacher types a topic (e.g. "Python loops") → sent to Gemini AI → AI returns questions |
+
+> [!TIP]
+> If the Gemini API key is missing or fails, the app **automatically falls back to mock/fake questions** so it never crashes.
+
+### Feature 3: Live Room (The Kahoot Part!)
+1. Teacher creates a **Live Quiz** → gets a 6-digit **Join Code**
+2. Teacher goes to `/live-room-teacher/:joinCode`
+3. Students enter the same code → join via `/live-room-student/:joinCode`
+4. **Socket.IO connects all of them** into the same "room"
+5. Teacher clicks "Start" → all students' screens update simultaneously
+6. Teacher navigates questions → students see the same question
+7. Student submits answer → score calculated on server → **leaderboard updates in real-time** for everyone
+8. Teacher clicks "End Quiz" → results are saved to DB → all students redirected to leaderboard
+
+### Feature 4: Scoring & Leaderboard
+- Each correct answer = **10 points** (configurable per question)
+- Tie-breaking: **Higher score wins** → if tied, **faster total time wins** → if still tied, **who answered first wins**
+- Final leaderboard is saved to the Quiz document in MongoDB
+
+### Feature 5: Reconnect / Sync
+- If a student's browser refreshes during a live quiz, they reconnect via `reconnectUser` socket event
+- The server **rebuilds their state** from the database (current question, leaderboard, progress)
+
+---
+
+## 🔎 PART 6 — LINE-BY-LINE CODE EXPLANATION
+
+---
+
+### 📄 [server/config/db.js](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/config/db.js) — Database Connection
+
+```javascript
+// Line 1: Import mongoose (the library that connects Node.js to MongoDB)
+const mongoose = require('mongoose');
+
+// Line 3: Define an async function called connectDB
+const connectDB = async () => {
+    try {
+        // Line 5: Connect to MongoDB using the URL from .env file
+        // process.env.MONGO_URI is the secret MongoDB link (e.g. MongoDB Atlas cloud)
+        const conn = await mongoose.connect(process.env.MONGO_URI);
+
+        // Line 6: If successful, print which server we connected to
+        console.log(`MongoDB Connected: ${conn.connection.host}`);
+    } catch (error) {
+        // Line 8: If connection fails, print the error
+        console.error(`Error: ${error.message}`);
+        // Line 9: Stop the entire server — no point running without a database
+        process.exit(1);
+    }
+};
+
+// Line 13: Export so server/index.js can use it
+module.exports = connectDB;
+```
+
+---
+
+### 📄 [server/models/User.js](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/models/User.js) — User Blueprint
+
+```javascript
+const mongoose = require('mongoose');
+
+// Define what a "User" looks like in the database
+const UserSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  // ^ Must have a username, and no two users can have the same one
+
+  email: { type: String, required: true, unique: true },
+  // ^ Same for email — must be unique
+
+  password: { type: String, required: true },
+  // ^ Stored as a hashed value (never plain text)
+
+  role: {
+    type: String,
+    enum: ['teacher', 'student', 'admin', 'none'],
+    // ^ Only these 4 values are allowed
+    default: 'none'
+    // ^ New accounts start with no role until they choose one
+  },
+
+  createdAt: { type: Date, default: Date.now }
+  // ^ Automatically records when the user was created
+});
+
+// Create and export the model (this becomes the "Users" collection in MongoDB)
+module.exports = mongoose.model('User', UserSchema);
+```
+
+---
+
+### 📄 [server/models/Quiz.js](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/models/Quiz.js) — Quiz Blueprint
+
+```javascript
+const QuizSchema = new mongoose.Schema({
+    title: { type: String, required: true },         // Quiz name
+    description: { type: String },                   // Auto-filled with difficulty level
+
+    questions: [{                                    // Array of question objects
+        questionText: { type: String, required: true },
+        options: [{ type: String }],                 // 4 answer choices
+        correctAnswer: { type: String, required: true },
+        points: { type: Number, default: 10 },       // Points for getting it right
+        type: { type: String, enum: ['multiple-choice', 'true-false', 'input'] }
+    }],
+
+    createdBy: { type: ObjectId, ref: 'User' },      // Links to the teacher who made it
+
+    isActive: { type: Boolean, default: true },      // Can students join?
+    joinCode: { type: String, unique: true },        // The 6-digit code students use
+
+    difficulty: { enum: ['Easy', 'Medium', 'Thinkable', 'Hard'] },
+    timerPerQuestion: { type: Number, default: 30 }, // Seconds per question
+    duration: { type: Number, default: 0 },          // Total quiz time (0 = no limit)
+    topic: { type: String },                         // Topic used for AI generation
+
+    isLive: { type: Boolean, default: false },       // Is this a live/realtime quiz?
+    isAssessment: { type: Boolean, default: false }, // Is this a formal assessment?
+
+    status: { enum: ['waiting', 'started', 'finished'], default: 'waiting' },
+    // waiting = teacher hasn't started yet
+    // started = quiz is running
+    // finished = quiz is over
+
+    finalLeaderboard: [...],  // Saved rankings when quiz ends
+    finalInsights: { topStudent, hardestQuestion, easiestQuestion }
+});
+```
+
+---
+
+### 📄 [server/models/Result.js](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/models/Result.js) — Quiz Attempt Blueprint
+
+```javascript
+const ResultSchema = new mongoose.Schema({
+    quiz: { type: ObjectId, ref: 'Quiz' },     // Which quiz this result belongs to
+    student: { type: ObjectId, ref: 'User' },  // Which student attempted it
+
+    score: { type: Number, default: 0 },       // Total score earned
+    totalQuestions: { type: Number },          // How many questions in the quiz
+    totalTimeTaken: { type: Number, default: 0 }, // Total time taken (seconds)
+
+    answers: [{                                // Each question's answer record
+        questionText: String,
+        selectedOption: String,    // What the student chose
+        correctOption: String,     // What the right answer was
+        isCorrect: Boolean,        // True/False
+        timeTaken: Number          // Seconds taken for this question
+    }],
+
+    status: { enum: ['in-progress', 'completed'] },
+    // in-progress = student is still answering
+    // completed = they're done
+
+    startedAt: Date,       // When they started
+    completedAt: Date,     // When they finished
+    lastAnsweredAt: Date   // Timestamp of their last answer (used for tiebreaking)
+});
+```
+
+---
+
+### 📄 [server/middleware/authMiddleware.js](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/middleware/authMiddleware.js) — JWT Guard
+
+```javascript
+const jwt = require('jsonwebtoken');
+
+// This is a MIDDLEWARE — a checkpoint every protected route passes through
+module.exports = function (req, res, next) {
+    // Step 1: Get the token from the request header called 'x-auth-token'
+    const token = req.header('x-auth-token');
+
+    // Step 2: If no token is present, reject the request
+    if (!token) {
+        return res.status(401).json({ msg: 'No token, authorization denied' });
+    }
+
+    // Step 3: Verify the token using the secret key from .env
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // decoded.user contains { id, role } — the user's identity
+
+        req.user = decoded.user;
+        // ^ Attach the user's identity to the request so the next handler knows who they are
+
+        next(); // → Pass on to the actual route handler
+    } catch (err) {
+        // If the token is fake, expired, or tampered with:
+        res.status(401).json({ msg: 'Token is not valid' });
+    }
+};
+```
+
+---
+
+### 📄 [server/routes/auth.js](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/routes/auth.js) — Login & Registration API
+
+```javascript
+// POST /api/auth/register  → DISABLED (returns 403 Forbidden)
+// Why? Admin controls who can access the system. Students cannot self-register.
+
+// POST /api/auth/login
+router.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    // Search database by email OR username (flexible login)
+    let user = await User.findOne({ $or: [{ email }, { username: email }] });
+
+    if (!user) return res.status(400).json({ msg: 'Invalid Credentials' });
+
+    // bcrypt.compare checks if the plain text password matches the stored hash
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ msg: 'Invalid Credentials' });
+
+    // Create a JWT payload containing user ID and role
+    const payload = { user: { id: user.id, role: user.role } };
+
+    // Sign the token — it expires in 1 hour
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' }, (err, token) => {
+        res.json({ token, role: user.role }); // Send token to browser
+    });
+});
+
+// GET /api/auth/me  (requires auth token)
+// Returns the logged-in user's full profile (without password)
+
+// POST /api/auth/set-role  (requires auth token)
+// Allows a user with role='none' to pick 'teacher', 'student', or 'admin'
+// Can only be done ONCE — role cannot be changed after it's set
+```
+
+---
+
+### 📄 [server/controllers/quizController.js](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/controllers/quizController.js) — Quiz Business Logic
+
+#### AI Question Generation ([generateQuestions](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/controllers/quizController.js#21-105))
+
+```javascript
+const generateQuestions = async (type, content, count, difficulty) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    // If no API key, use fake/mock questions
+    if (!apiKey || apiKey === 'AIzaSyPlaceholder') {
+        return generateMockQuestions(count);
+    }
+
+    // Build a detailed prompt telling Gemini exactly what to do
+    // The prompt says: return ONLY JSON, correctAnswer must match options exactly
+
+    // Try 3 different Gemini models in order (newest first)
+    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+
+    for (const model of models) {
+        // Make HTTPS request directly to Gemini REST API
+        // If rate limited (429 error), wait 3 seconds and retry once
+        // Parse the JSON response and return the questions array
+        // If this model fails, try the next one
+    }
+
+    // If ALL models fail, fall back to mock questions (never crashes!)
+};
+```
+
+#### [createQuiz](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/controllers/quizController.js#111-202)
+```javascript
+// Handles 3 types of quiz creation:
+// 1. Manual: teacher provided questions directly
+// 2. PDF: extract text → send to Gemini → get questions
+// 3. Topic/Content: send topic to Gemini → get questions
+
+// After getting questions:
+// - Deactivate any previous active live quizzes by this teacher
+// - Generate a unique 6-digit join code (keeps regenerating until unique)
+// - Save the new Quiz to MongoDB
+// - Return the quiz data to the frontend
+```
+
+#### [submitQuiz](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/controllers/quizController.js#307-383) / [submitAttempt](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/controllers/quizController.js#555-559)
+```javascript
+// Called when a student finishes a NON-live quiz
+// Loops through each question, compares selected vs correct answer
+// Handles edge case: correctAnswer might be "A", "B" (labels) or "0", "1" (indices)
+// This is the label fallback logic:
+const labelIdx = labels.indexOf(correctAnswer); // find if it's 'a','b','c'...
+if (labelIdx !== -1 && options[labelIdx]) {     // if so, compare using that option
+    isCorrect = studentAnswer === options[labelIdx];
+}
+```
+
+#### [getLeaderboard](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/controllers/quizController.js#384-489)
+```javascript
+// Fetch all Result records for a quiz
+// Sort by: score DESC, then total time ASC (fastest wins ties)
+// Build ranked list (ties get the same rank number)
+// Privacy: Teacher sees ALL students' results + answers
+//          Student only sees THEIR OWN result
+```
+
+---
+
+### 📄 [server/index.js](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/index.js) — The Heart of Real-Time (Socket.IO)
+
+#### Setup (Lines 1-36)
+
+```javascript
+require('dotenv').config(); // Load .env file (API keys, DB URL, secrets)
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+
+const app = express();
+const server = http.createServer(app); // Wrap express in http.Server
+
+connectDB();   // Connect to MongoDB
+app.use(cors()); // Allow cross-origin requests (frontend on different port)
+app.use(express.json()); // Parse JSON request bodies
+
+// Register API routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/quiz', require('./routes/quiz'));
+
+// Create Socket.IO server on top of http server
+const io = new Server(server, { cors: { origin: "*" } });
+
+// In-memory storage (lives in RAM, not database)
+const roomParticipants = new Map(); // quizId → [list of participants]
+const roomState = new Map();        // quizId → { currentQuestion, endTime, leaderboard, ... }
+const socketToUser = new Map();     // socketId → { quizId, username }
+```
+
+#### `join_room` event (Line 40)
+
+```javascript
+socket.on('join_room', ({ quizId, user }) => {
+    socket.join(quizId);
+    // ^ Socket.IO "room" concept: all sockets in the same room get broadcast messages
+
+    socketToUser.set(socket.id, { quizId, username: user.username });
+    // ^ Track which user this socket belongs to (needed for disconnect cleanup)
+
+    // Add/update participant in the room list
+    // If already existed (reconnect), update their entry; otherwise push new
+
+    io.to(quizId).emit('participants_update', participants);
+    // ^ Broadcast updated participant list to EVERYONE in the room
+
+    // SYNC STATE: If the quiz already started, catch this user up:
+    if (state.status === 'started') socket.emit('quiz_started');
+    if (state.currentQuestion) socket.emit('change_question', { questionIndex });
+    if (state.endTime) socket.emit('sync_timer', { timeLeft: ... });
+    // ^ These are sent only to THIS socket (not broadcast) to catch them up
+});
+```
+
+#### `start_quiz` event (Line 194)
+
+```javascript
+socket.on('start_quiz', async (quizId) => {
+    // Load quiz from DB to get duration/timerPerQuestion
+    // Calculate endTime = now + duration in milliseconds
+    // Save state in roomState Map
+    // Update quiz status to 'started' in MongoDB
+
+    io.to(quizId).emit('quiz_started');       // Tell ALL students to begin
+    io.to(quizId).emit('sync_timer', { timeLeft }); // Start timer on all screens
+
+    // If quiz has a global time limit, auto-terminate after time expires
+    setTimeout(async () => {
+        io.to(quizId).emit('quiz_ended'); // Auto-end when timer runs out
+    }, durationMs + 3000);
+});
+```
+
+#### `submit_question_answer` event (Line 378) — The Most Important Event
+
+```javascript
+socket.on('submit_question_answer', async ({ quizId, studentId, questionIndex, answer, timeRemaining }) => {
+    // 1. OPTIMISTICALLY update in-memory progress (instant UI feedback)
+
+    // 2. Load the quiz from DB to get the correct answer
+
+    // 3. Compare student's answer to correct answer (with label/index fallback)
+    //    "a" → options[0], "1" → options[1], etc.
+
+    // 4. Calculate points earned
+
+    // 5. Find or create Result record in DB for this student
+    //    If already answered this question, REPLACE (not add again) the old answer
+
+    // 6. Save updated Result to MongoDB
+
+    // 7. Broadcast to everyone in the room:
+    io.to(quizId).emit('student_progress_update', {
+        studentId, questionIndex, answered: true, isCorrect
+        // Teacher's view uses this to show colored dots (green/red) per student
+    });
+
+    // 8. Recalculate full leaderboard from DB (all results for this quiz)
+    //    Sort by: score DESC → time ASC → timestamp ASC
+
+    // 9. Broadcast updated leaderboard to everyone
+    io.to(quizId).emit('question_leaderboard', { questionIndex, leaderboard });
+});
+```
+
+#### `end_quiz` event (Line 238)
+
+```javascript
+socket.on('end_quiz', async (quizId) => {
+    roomState.delete(quizId); // Clear in-memory state
+
+    // 1. Mark all 'in-progress' results as 'completed'
+    await Result.updateMany({ quiz: quizId, status: 'in-progress' }, { $set: { status: 'completed' } });
+
+    // 2. Compute final rankings from database
+    // 3. Save final leaderboard + insights to the Quiz document
+    // 4. THEN emit 'quiz_ended' so students navigate to leaderboard
+    //    (important: save FIRST, emit AFTER)
+    io.to(quizId).emit('quiz_ended');
+});
+```
+
+#### `disconnect` event (Line 588)
+
+```javascript
+socket.on('disconnect', () => {
+    const info = socketToUser.get(socket.id); // Who was this?
+    // Mark them as 'isOnline: false' (don't delete — they might reconnect)
+    participants[existingIdx].isOnline = false;
+    io.to(quizId).emit('participants_update', participants);
+    // ^ Teacher sees them go gray/offline instead of disappearing
+});
+```
+
+---
+
+### 📄 [client/src/context/AuthContext.jsx](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/context/AuthContext.jsx) — Global Login State
+
+```javascript
+// React Context = a way to share data across ALL components without passing props
+const AuthContext = createContext(null);
+
+export const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(null); // null = not logged in
+    const [loading, setLoading] = useState(true); // checking login status
+
+    useEffect(() => {
+        // On app load: check if there's a token in localStorage
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Verify token by calling /api/auth/me
+            // If valid → set user state
+            // If invalid/expired → remove token from storage
+        }
+        setLoading(false);
+    }, []); // [] means run only once on mount
+
+    const login = async (email, password) => {
+        const res = await api.post('/auth/login', { email, password });
+        localStorage.setItem('token', res.data.token); // Save token
+        const userRes = await api.get('/auth/me');      // Get user profile
+        setUser(userRes.data);                          // Store in state
+        return userRes.data;
+    };
+
+    const logout = () => {
+        localStorage.removeItem('token'); // Delete token
+        setUser(null);                    // Clear state → all routes redirect to login
+    };
+
+    // Provide these values to ALL child components
+    return (
+        <AuthContext.Provider value={{ user, loading, login, register, logout, setRole }}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
+```
+
+---
+
+### 📄 [client/src/App.jsx](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/client/src/App.jsx) — URL Routing
+
+```javascript
+function App() {
+  return (
+    <AuthProvider>   {/* Wrap everything so all pages can access login state */}
+      <Router>       {/* Enable URL-based navigation */}
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          {/* Public route — no protection needed */}
+
+          <Route path="/teacher-dashboard" element={
+            <ProtectedRoute roles={['teacher']}>  {/* Only teachers can access */}
+              <TeacherDashboard />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/live-room-teacher/:joinCode" element={
+            <ProtectedRoute roles={['teacher']}>
+              <LiveRoomTeacher />  {/* :joinCode is a URL parameter, e.g. /live-room-teacher/482910 */}
+            </ProtectedRoute>
+          } />
+
+          <Route path="/live-room-student/:joinCode" element={
+            <ProtectedRoute roles={['student']}>
+              <LiveRoomStudent />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/" element={<Home />} />
+          {/* Home component auto-redirects based on role */}
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
+}
+
+// Home component logic:
+// If not logged in → go to /login
+// if role='none' → go to /select-role
+// if role='teacher' → go to /teacher-dashboard
+// if role='student' → go to /student-dashboard
+// if role='admin' → go to /admin-dashboard
+```
+
+---
+
+## 🔄 PART 7 — Complete Data Flow: A Student Answers a Question
+
+Here's a step-by-step of what happens when a student clicks an answer in a live quiz:
+
+```
+1. Student clicks option "Paris" in LiveRoomStudent.jsx
+
+2. Client emits socket event:
+   socket.emit('submit_question_answer', {
+     quizId, studentId, questionIndex: 2, answer: "Paris", timeRemaining: 15
+   })
+
+3. Server receives the event in index.js (line 378)
+
+4. Server loads quiz from MongoDB → gets question[2].correctAnswer = "Paris"
+
+5. Comparison: "paris" === "paris" → isCorrect = true, points = 10
+
+6. Server finds student's Result record in DB (or creates a new one)
+
+7. Updates result: score += 10, answers array updated, lastAnsweredAt = now
+
+8. Result saved to MongoDB
+
+9. Server recalculates full leaderboard from ALL results
+
+10. Server broadcasts to entire room:
+    → 'student_progress_update' (teacher sees green dot for student on Q2)
+    → 'question_leaderboard' (everyone's leaderboard updates)
+
+11. LiveRoomTeacher.jsx receives 'student_progress_update'
+    → Updates the student progress grid on teacher's screen
+
+12. Both teacher and student screens update with new leaderboard ranking
+```
+
+---
+
+## 💡 PART 8 — Key Technical Concepts to Know
+
+| Concept | What it means in this project |
+|---|---|
+| **JWT (JSON Web Token)** | A signed digital ID card. Created at login, sent with every request in the `x-auth-token` header. Expires in 1 hour. |
+| **bcrypt** | A one-way password hashing function. The plain password is NEVER stored. Only the hash is saved. `bcrypt.compare()` verifies login. |
+| **Socket.IO Room** | A named group sockets can join. `socket.join(quizId)` — any message emitted `io.to(quizId)` goes to ALL sockets in that group. |
+| **Map (JavaScript)** | Used for in-memory storage: `roomParticipants`, `roomState`, `socketToUser`. These are fast lookups but reset when server restarts. |
+| **Mongoose populate()** | When you store a reference (like `student: ObjectId`), `.populate('student', 'username')` replaces the ID with actual user data from the Users collection. |
+| **Middleware** | Code that runs BETWEEN receiving a request and handling it. [authMiddleware.js](file:///c:/Users/manim/OneDrive/Desktop/kahoot_team2026/Demo_project/server/middleware/authMiddleware.js) is a middleware that checks the JWT token. |
+| **CORS** | Cross-Origin Resource Sharing — allows the React app (on port 5173) to talk to the Express server (on port 5000). |
+| **Optimistic Update** | In `submit_question_answer`, progress is marked as answered IMMEDIATELY in memory, then the DB is updated. This makes the UI feel instant. |
+
+---
+
+## ❓ PART 9 — Questions You Might Be Asked & How to Answer
+
+**Q: Why use Socket.IO instead of just REST API?**
+> REST API is request-response — you have to ask for data. Socket.IO is persistent — the server can PUSH data to everyone at any time. For a live quiz where 30 students need to see the same leaderboard update simultaneously, REST would require constant polling. Socket.IO is the right tool.
+
+**Q: Why is registration disabled?**
+> The app is designed for a closed classroom environment. The admin pre-creates all student accounts (bulk imported from student data). This prevents unauthorized access.
+
+**Q: What happens if the server restarts during a live quiz?**
+> `roomState` (in-memory Map) is lost. However, on reconnect, the server has a `reconnectUser` handler that **rebuilds state from the database** (fetching all Results and rebuilding the leaderboard and progress). The quiz can continue.
+
+**Q: How does the AI quiz generation work?**
+> A carefully crafted text prompt is sent directly to Google's Gemini API over HTTPS. The prompt instructs Gemini to return ONLY valid JSON in a specific format. The server parses the response and validates the questions before saving them.
+
+**Q: How is the leaderboard tie-breaking done?**
+> 3 levels: 1) Highest score wins. 2) If same score, lower total time wins (faster is better). 3) If same score AND same time, whoever submitted their last answer first wins (using `lastAnsweredAt` timestamp).
