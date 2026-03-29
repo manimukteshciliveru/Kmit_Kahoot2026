@@ -1,317 +1,100 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { SocketProvider } from './context/SocketContext';
-import { ThemeProvider } from './context/ThemeContext';
+import React from 'react';
+import { useAuth } from './context/AuthContext';
 
-// Layout
+// Layouts
 import Layout from './components/common/Layout';
 
 // Auth Pages
 import Login from './pages/auth/Login';
-
-// Dashboard Pages
-import StudentDashboard from './pages/student/StudentDashboard';
-import FacultyDashboard from './pages/faculty/FacultyDashboard';
-import AdminDashboard from './pages/admin/AdminDashboard';
+import Register from './pages/auth/Register';
+import Unauthorized from './pages/auth/Unauthorized';
 
 // Admin Pages
+import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
-import AddUser from './pages/admin/AddUser';
-import BulkUpload from './pages/admin/BulkUpload';
 import Analytics from './pages/admin/Analytics';
-import QuizAnalytics from './pages/admin/QuizAnalytics';
 import Settings from './pages/admin/Settings';
 
-// Student Pages
-import JoinQuiz from './pages/student/JoinQuiz';
-
-// Common Pages
-import Profile from './pages/common/Profile';
-import History from './pages/student/History';
-import QuizReport from './pages/student/QuizReport';
-
 // Faculty Pages
-import CreateQuiz from './pages/faculty/CreateQuiz';
-import HostQuiz from './pages/faculty/HostQuiz';
-import QuizResults from './pages/faculty/QuizResults';
+import FacultyDashboard from './pages/faculty/FacultyDashboard';
 import MyQuizzes from './pages/faculty/MyQuizzes';
+import CreateQuiz from './pages/faculty/CreateQuiz';
 import FacultyAnalytics from './pages/faculty/FacultyAnalytics';
 
-// Quiz Pages
-import PlayQuiz from './pages/quiz/PlayQuiz';
+// Student Pages
+import StudentDashboard from './pages/student/StudentDashboard';
+import JoinQuiz from './pages/student/JoinQuiz';
+import History from './pages/student/History';
 import Flashcards from './pages/student/Flashcards';
 import BattleArena from './pages/student/BattleArena';
 import GamesHub from './pages/student/GamesHub';
 import SurvivalArena from './pages/student/SurvivalArena';
+import Profile from './pages/common/Profile';
+
+// Quiz Pages
+import PlayQuiz from './pages/quiz/PlayQuiz';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user, loading } = useAuth();
+    const { user, loading } = useAuth();
+    if (loading) return null;
+    if (!user) return <Navigate to="/login" />;
+    if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/unauthorized" />;
+    return children;
+};
 
-  if (loading) {
+const App = () => {
     return (
-      <div className="loading-screen">
-        <div className="spinner"></div>
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return children;
-};
-
-// Dashboard Route - redirects based on user role
-const DashboardRoute = () => {
-  const { user } = useAuth();
-
-  switch (user?.role) {
-    case 'admin':
-      return <AdminDashboard />;
-    case 'faculty':
-      return <FacultyDashboard />;
-    case 'student':
-    default:
-      return <StudentDashboard />;
-  }
-};
-
-// Main App Component
-function App() {
-  return (
-    <Router>
-      <AuthProvider>
-        <ThemeProvider>
-          <SocketProvider>
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 3000,
-                style: {
-                  background: '#1A1A2E',
-                  color: '#F8FAFC',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '10px',
-                },
-                success: {
-                  iconTheme: {
-                    primary: '#10B981',
-                    secondary: '#1A1A2E',
-                  },
-                },
-                error: {
-                  iconTheme: {
-                    primary: '#EF4444',
-                    secondary: '#1A1A2E',
-                  },
-                },
-              }}
-            />
-
+        <Router>
             <Routes>
-              {/* Public Routes */}
-              <Route path="/login" element={<Login />} />
+                {/* Public Routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/unauthorized" element={<Unauthorized />} />
 
-              {/* Student Only Routes */}
-              <Route path="/join" element={<ProtectedRoute allowedRoles={['student']}><JoinQuiz /></ProtectedRoute>} />
-              <Route path="/history" element={<ProtectedRoute allowedRoles={['student']}><History /></ProtectedRoute>} />
-              <Route path="/flashcards" element={<ProtectedRoute allowedRoles={['student']}><Flashcards /></ProtectedRoute>} />
-              <Route path="/quiz/report/:id" element={<ProtectedRoute allowedRoles={['student']}><QuizReport /></ProtectedRoute>} />
-
-              {/* Protected Routes with Layout */}
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Layout />
-                  </ProtectedRoute>
-                }
-              >
-                {/* Dashboard */}
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="dashboard" element={<DashboardRoute />} />
-
-                {/* Student Routes */}
-                <Route
-                  path="join-quiz"
-                  element={
-                    <ProtectedRoute allowedRoles={['student']}>
-                      <JoinQuiz />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="flashcards"
-                  element={
-                    <ProtectedRoute allowedRoles={['student']}>
-                      <Flashcards />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="battle"
-                  element={
-                    <ProtectedRoute allowedRoles={['student']}>
-                      <BattleArena />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="games"
-                  element={
-                    <ProtectedRoute allowedRoles={['student']}>
-                      <GamesHub />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="survival"
-                  element={
-                    <ProtectedRoute allowedRoles={['student']}>
-                      <SurvivalArena />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="history"
-                  element={
-                    <ProtectedRoute allowedRoles={['student', 'admin']}>
-                      <History />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="history/report/:responseId"
-                  element={
-                    <ProtectedRoute allowedRoles={['student', 'admin']}>
-                      <QuizReport />
-                    </ProtectedRoute>
-                  }
-                />
-
-                {/* Faculty Routes */}
-                <Route
-                  path="create-quiz"
-                  element={
-                    <ProtectedRoute allowedRoles={['faculty', 'admin']}>
-                      <CreateQuiz />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="quiz/:quizId/edit"
-                  element={
-                    <ProtectedRoute allowedRoles={['faculty', 'admin']}>
-                      <CreateQuiz />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="my-quizzes"
-                  element={
-                    <ProtectedRoute allowedRoles={['faculty', 'admin']}>
-                      <MyQuizzes />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="quiz/:quizId/host"
-                  element={
-                    <ProtectedRoute allowedRoles={['faculty', 'admin']}>
-                      <HostQuiz />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="quiz/:quizId/results"
-                  element={
-                    <ProtectedRoute allowedRoles={['faculty', 'admin']}>
-                      <QuizResults />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="my-analytics"
-                  element={
-                    <ProtectedRoute allowedRoles={['faculty', 'admin']}>
-                      <FacultyAnalytics />
-                    </ProtectedRoute>
-                  }
-                />
-
-                {/* Quiz Routes */}
-                <Route path="quiz/:quizId/play" element={<PlayQuiz />} />
+                {/* Root Redirect */}
+                <Route path="/" element={<Navigate to="/login" />} />
 
                 {/* Admin Routes */}
-                <Route
-                  path="users"
-                  element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <UserManagement />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="users/new"
-                  element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AddUser />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="users/bulk"
-                  element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <BulkUpload />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="analytics"
-                  element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <Analytics />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="quiz-analytics"
-                  element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <QuizAnalytics />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="settings"
-                  element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <Settings />
-                    </ProtectedRoute>
-                  }
-                />
+                <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><Layout /></ProtectedRoute>}>
+                    <Route index element={<Navigate to="dashboard" />} />
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="users" element={<UserManagement />} />
+                    <Route path="analytics" element={<Analytics />} />
+                    <Route path="settings" element={<Settings />} />
+                </Route>
 
-                {/* Profile */}
-                <Route path="profile" element={<Profile />} />
-              </Route>
+                {/* Faculty Routes */}
+                <Route path="/faculty" element={<ProtectedRoute allowedRoles={['faculty']}><Layout /></ProtectedRoute>}>
+                    <Route index element={<Navigate to="dashboard" />} />
+                    <Route path="dashboard" element={<FacultyDashboard />} />
+                    <Route path="quizzes" element={<MyQuizzes />} />
+                    <Route path="create" element={<CreateQuiz />} />
+                    <Route path="analytics" element={<FacultyAnalytics />} />
+                </Route>
 
-              {/* Catch all */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                {/* Student Routes */}
+                <Route path="/student" element={<ProtectedRoute allowedRoles={['student']}><Layout /></ProtectedRoute>}>
+                    <Route index element={<Navigate to="dashboard" />} />
+                    <Route path="dashboard" element={<StudentDashboard />} />
+                    <Route path="join" element={<JoinQuiz />} />
+                    <Route path="history" element={<History />} />
+                    <Route path="profile" element={<Profile />} />
+                    <Route path="flashcards" element={<Flashcards />} />
+                    <Route path="battle" element={<BattleArena />} />
+                    <Route path="survival" element={<SurvivalArena />} />
+                    <Route path="games" element={<GamesHub />} />
+                </Route>
+
+                {/* Shared Quiz Play Route */}
+                <Route path="/play/:quizId" element={<ProtectedRoute><PlayQuiz /></ProtectedRoute>} />
+
+                {/* Catch All */}
+                <Route path="*" element={<Navigate to="/" />} />
             </Routes>
-          </SocketProvider>
-        </ThemeProvider>
-      </AuthProvider>
-    </Router>
-  );
-}
+        </Router>
+    );
+};
 
 export default App;
