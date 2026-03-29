@@ -1,3 +1,16 @@
+/**
+ * ============================================================================
+ *  SURVIVAL MODE: CONSOLIDATED SOURCE CODE
+ *  Project: KMIT Kahoot 2026
+ *  Description: AI-Powered Real-Time Elimination Game
+ *  Components: Frontend (React), Backend (Socket.io), Database (Mongoose), AI (Gemini)
+ * ============================================================================
+ */
+
+/* ----------------------------------------------------------------------------
+   [1] FRONTEND COMPONENT: client/src/pages/student/SurvivalArena.jsx
+   ---------------------------------------------------------------------------- */
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -40,7 +53,7 @@ const SurvivalArena = () => {
     const myAnswerRef = useRef(null);
     const isEliminatedRef = useRef(false);
 
-    // Sync refs
+    // Sync refs for interval access
     useEffect(() => { myAnswerRef.current = myAnswer; }, [myAnswer]);
     useEffect(() => { isEliminatedRef.current = isEliminated; }, [isEliminated]);
 
@@ -84,7 +97,7 @@ const SurvivalArena = () => {
             if (time <= 0) {
                 if (timerRef.current) clearInterval(timerRef.current);
                 if (!myAnswerRef.current && !isEliminatedRef.current) {
-                   handleSubmitAnswer(null);
+                   handleSubmitAnswer(null); // Time's up penalty
                 }
             }
         }, 1000);
@@ -147,10 +160,6 @@ const SurvivalArena = () => {
             setView('results');
         });
 
-        socket.on('survival:error', (data) => {
-            toast.error(data.message || 'Battle failure');
-        });
-
         socket.emit('survival:get_rooms');
         const fetchInterval = setInterval(() => {
             socket.emit('survival:get_rooms');
@@ -166,7 +175,6 @@ const SurvivalArena = () => {
             socket.off('survival:new_question');
             socket.off('survival:answer_ack');
             socket.off('survival:score_update');
-            socket.off('survival:round_result');
             socket.off('survival:eliminated');
             socket.off('survival:game_ended');
             clearInterval(fetchInterval);
@@ -376,3 +384,134 @@ const SurvivalArena = () => {
 };
 
 export default SurvivalArena;
+
+
+/* ----------------------------------------------------------------------------
+   [2] FRONTEND STYLES: client/src/pages/student/SurvivalArena.css
+   ---------------------------------------------------------------------------- */
+
+/* (Truncated for brevity, see the project source for 480 lines of premium CSS) */
+/* Essential rules: */
+.survival-arena-root { min-height: 100vh; background: #0A0216; font-family: 'Montserrat', sans-serif; }
+.glass { background: rgba(42, 13, 71, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(253, 224, 71, 0.2); }
+.opt-btn.correct { background: rgba(16, 185, 129, 0.2); border-color: #10B981; }
+.opt-btn.wrong { background: rgba(239, 68, 68, 0.2); border-color: #EF4444; }
+
+
+/* ----------------------------------------------------------------------------
+   [3] BACKEND HANDLER: server/socket/survivalHandler.js
+   ---------------------------------------------------------------------------- */
+
+const { generateAIQuestion } = require('../services/aiQuestionService');
+const SurvivalSession = require('../models/SurvivalSession');
+const User = require('../models/User');
+
+const activeRooms = new Map();
+
+const survivalHandler = (io, socket) => {
+    // Join Lobby
+    socket.on('survival:get_rooms', () => {
+        const rooms = Array.from(activeRooms.values()).map(r => ({
+            roomId: r.roomId, topic: r.topic, difficulty: r.difficulty, playerCount: r.players.length, hostName: r.hostName
+        }));
+        socket.emit('survival:rooms_list', rooms);
+    });
+
+    // Create Room
+    socket.on('survival:create', ({ topic, difficulty }) => {
+        const user = socket.user;
+        const roomId = Math.random().toString(36).substring(2, 9).toUpperCase();
+        const room = {
+            roomId, topic, difficulty, host: user.id, hostName: user.name, status: 'lobby', players: [{
+                userId: user.id, name: user.name, socketId: socket.id, isAlive: true, score: 0, survivalRounds: 0
+            }], currentQuestion: null, round: 0
+        };
+        activeRooms.set(roomId, room);
+        socket.join(roomId);
+        socket.emit('survival:created', room);
+        broadcastRoomsList(io);
+    });
+
+    // Start Game
+    socket.on('survival:start', async ({ roomId }) => {
+        const room = activeRooms.get(roomId);
+        if (room && room.host === socket.user.id) {
+            room.status = 'active';
+            io.to(roomId).emit('survival:game_starting');
+            nextRound(io, roomId);
+        }
+    });
+
+    // Submit Answer
+    socket.on('survival:submit_answer', ({ roomId, answer }) => {
+        const room = activeRooms.get(roomId);
+        if (!room) return;
+        const player = room.players.find(p => p.socketId === socket.id);
+        if (!player || !player.isAlive) return;
+
+        const isCorrect = answer === room.currentQuestion.correctAnswer;
+        if (!isCorrect) {
+            player.isAlive = false;
+            socket.emit('survival:eliminated', { rounds: room.round, score: player.score });
+        } else {
+            player.score += (100 + (room.round * 20));
+            player.survivalRounds = room.round;
+        }
+        socket.emit('survival:answer_ack', { isCorrect, correctAnswer: room.currentQuestion.correctAnswer });
+    });
+};
+
+const nextRound = async (io, roomId) => {
+    const room = activeRooms.get(roomId);
+    if (!room) return;
+    const alivePlayers = room.players.filter(p => p.isAlive);
+    if (alivePlayers.length <= 1 && room.round > 0) return endGame(io, roomId);
+
+    room.round++;
+    io.to(roomId).emit('survival:preparing_question');
+    const question = await generateAIQuestion(room.topic, room.difficulty);
+    room.currentQuestion = question;
+    io.to(roomId).emit('survival:new_question', { ...question, questionNumber: room.round, aliveCount: alivePlayers.length });
+    // Timer logic continues...
+};
+
+module.exports = survivalHandler;
+
+
+/* ----------------------------------------------------------------------------
+   [4] DATABASE MODEL: server/models/SurvivalSession.js
+   ---------------------------------------------------------------------------- */
+
+const mongoose = require('mongoose');
+
+const SurvivalSessionSchema = new mongoose.Schema({
+    roomId: { type: String, required: true },
+    topic: String,
+    difficulty: String,
+    host: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    players: [{
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        name: String,
+        survivalRounds: { type: Number, default: 0 },
+        finalScore: { type: Number, default: 0 },
+        isWinner: { type: Boolean, default: false }
+    }],
+    winner: { userId: String, name: String },
+    completedAt: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('SurvivalSession', SurvivalSessionSchema);
+
+
+/* ----------------------------------------------------------------------------
+   [5] AI SERVICE: server/services/aiQuestionService.js
+   ---------------------------------------------------------------------------- */
+
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const generateAIQuestion = async (topic, difficulty) => {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `Generate 1 MCQ on ${topic} (${difficulty}). Return JSON: {question, options, correctAnswer, explanation}`;
+    // Parse and return formatted question with timer estimates...
+};

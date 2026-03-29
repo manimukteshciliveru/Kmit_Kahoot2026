@@ -142,6 +142,7 @@ module.exports = (io, socket) => {
         });
 
         socket.emit('survival:created', { roomId, topic, difficulty, maxQuestions });
+        broadcastRoomsList(io); // Add this helper broadcast
         logger.info(`[SURVIVAL] Room created: ${roomId} by ${userName}`);
     });
 
@@ -164,11 +165,16 @@ module.exports = (io, socket) => {
                 rollNumber:   socket.user.rollNumber || '',
                 department:   socket.user.department || '',
                 section:      socket.user.section    || '',
+                socketId:     socket.id, // -- Store initial socketId --
                 score:        0,
                 answers:      [],
                 isAlive:      true,
                 eliminatedAt: null
             });
+        } else {
+            // Update socketId for reconnections
+            const p = room.alivePlayers.get(userId);
+            p.socketId = socket.id;
         }
 
         const playersArr = Array.from(room.alivePlayers.values()).map(p => ({
@@ -272,10 +278,15 @@ module.exports = (io, socket) => {
             totalScore:     player.score
         });
 
-        // Broadcast live scoreboard update
-        roomcast(io, roomId, 'survival:score_update', {
-            scores: getScoreboard(room)
-        });
+        // Update pending answers
+        if (room.pendingAnswers) {
+            room.pendingAnswers.delete(userId);
+            // If all alive players have answered, advance immediately
+            if (room.pendingAnswers.size === 0) {
+                clearTimeout(room.roundTimer);
+                processRoundEnd(io, room);
+            }
+        }
 
         logger.info(`[SURVIVAL] ${userName} answered Q${questionIndex} | Correct: ${isCorrect}`);
     });
@@ -348,6 +359,9 @@ const sendNextQuestion = async (io, room) => {
         aliveCount:    alivePlayers.length
     });
 
+    // Track who needs to answer this round
+    room.pendingAnswers = new Set(alivePlayers.map(p => p.userId));
+
     // ── Try AI first, fallback to DB ───────────────────────────
     let qData = null;
     try {
@@ -361,6 +375,10 @@ const sendNextQuestion = async (io, room) => {
     if (!qData) {
         logger.warn(`[SURVIVAL] AI failed, falling back to DB for room ${roomId}`);
         qData = await fetchDBQuestion(topic, difficulty, room.usedQuestions);
+        if (!qData) {
+            io.to(`survival:${roomId}`).emit('survival:error', { message: 'Failed to generate question. Retrying...' });
+            return setTimeout(() => sendNextQuestion(io, room), 3000);
+        }
     }
 
     if (!qData) {
@@ -461,6 +479,16 @@ const processRoundEnd = async (io, room) => {
             player.isAlive       = false;
             player.eliminatedAt  = q.index;
             eliminated.push({ userId: player.userId, name: player.name });
+            
+            // Notify player immediately with correct payload shape
+            if (player.socketId) {
+                io.to(player.socketId).emit('survival:eliminated', {
+                    survivalRounds: q.index, 
+                    finalScore: player.score,
+                    message: lastAnswer ? "Wrong Answer! You have been eliminated." : "Time's up! You have been eliminated."
+                });
+            }
+
             logger.info(`[SURVIVAL] 💥 ${player.name} eliminated at Q${q.index + 1}`);
         } else {
             survivors.push({ userId: player.userId, name: player.name, score: player.score });
@@ -480,18 +508,7 @@ const processRoundEnd = async (io, room) => {
         leaderboard:     getScoreboard(room)
     });
 
-    // ── Push targeted elimination feedback ─────────────────────
-    if (eliminated.length > 0) {
-        // Notify eliminated players specifically
-        for (const e of eliminated) {
-            io.to(`user:${e.userId}`).emit('survival:eliminated', {
-                message:       `You were eliminated at Round ${q.index + 1}. Better luck next time!`,
-                survivalRounds: q.index + 1,
-                finalScore:    room.alivePlayers.get(e.userId)?.score || 0,
-                leaderboard:   getScoreboard(room)
-            });
-        }
-    }
+    /* Individual notifications moved to the loop above for immediate feedback */
 
     // Survive/end check
     const stillAlive = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
@@ -600,7 +617,25 @@ const endGame = async (io, room, reason = 'completed') => {
 
     // Cleanup room after 5 minutes
     setTimeout(() => survivalRooms.delete(roomId), 5 * 60 * 1000);
+    broadcastRoomsList(io); // Update lobby
     logger.info(`[SURVIVAL] 🏆 Game ended: ${roomId} | Reason: ${reason} | Winner: ${winner?.name || 'None'}`);
+};
+
+const broadcastRoomsList = (io) => {
+    const openRooms = [];
+    for (const [roomId, room] of survivalRooms.entries()) {
+        if (room.status === 'waiting') {
+            openRooms.push({
+                roomId,
+                hostName:    room.hostName,
+                topic:       room.topic,
+                difficulty:  room.difficulty,
+                playerCount: room.alivePlayers.size,
+                maxPlayers:  50
+            });
+        }
+    }
+    io.emit('survival:rooms_list', openRooms);
 };
 
 // ── Utility helpers ───────────────────────────────────────────
