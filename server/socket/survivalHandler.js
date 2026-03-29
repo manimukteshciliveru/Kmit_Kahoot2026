@@ -185,7 +185,9 @@ module.exports = (io, socket) => {
 
             socket.emit('survival:created', { 
                 roomId, pin, topic, title, description,
-                difficulty, maxQuestions: 5, maxPlayers: room.maxPlayers 
+                difficulty, maxQuestions: 5, 
+                maxPlayers: room.maxPlayers,
+                host: userId // CRITICAL: Host must know they ARE the host!
             });
             broadcastRoomsList(io); 
             logger.info(`[SURVIVAL] Match Saved & Created: ${roomId} | PIN: ${pin}`);
@@ -261,7 +263,9 @@ module.exports = (io, socket) => {
             topic:      room.topic,
             difficulty: room.difficulty,
             players:    playersArr,
-            status:     room.status
+            status:     room.status,
+            host:       room.host, // Send host!
+            maxPlayers: room.maxPlayers
         });
 
         logger.info(`[SURVIVAL] ${userName} joined room ${roomId}`);
