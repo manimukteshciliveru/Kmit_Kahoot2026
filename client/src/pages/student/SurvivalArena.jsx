@@ -7,7 +7,7 @@ import {
     FiZap, FiUsers, FiAward, FiAlertCircle, 
     FiShield, FiTrendingUp, FiCheckCircle, FiXCircle,
     FiSearch, FiLayers, FiClock, FiCopy, FiFileText, FiBookOpen,
-    FiUploadCloud, FiArrowRight, FiTarget
+    FiUploadCloud, FiArrowRight, FiTarget, FiUser
 } from 'react-icons/fi';
 import './SurvivalArena.css';
 
@@ -357,13 +357,19 @@ const SurvivalArena = () => {
                         )}
                         
                         <div className="form-row">
-                            <div className="form-group">
-                                <label>Difficulty</label>
-                                <select value={configDifficulty} onChange={e => setConfigDifficulty(e.target.value)}>
-                                    <option value="easy">Easy (Fundamentals)</option>
-                                    <option value="medium">Medium (Standard)</option>
-                                    <option value="hard">Hard (Competitive)</option>
-                                </select>
+                            <div className="config-group">
+                                <label>INTENSITY PROTOCOL</label>
+                                <div className="select-wrapper glass">
+                                    <select 
+                                        value={configDifficulty} 
+                                        onChange={(e) => setConfigDifficulty(e.target.value)}
+                                        className="difficulty-select"
+                                    >
+                                        <option value="easy">EASY (BASIC RECALL)</option>
+                                        <option value="medium">MEDIUM (CORE CONCEPTS)</option>
+                                        <option value="hard">HARD (ADVANCED LOGIC)</option>
+                                    </select>
+                                </div>
                             </div>
                             <div className="form-group rounds-locked">
                                 <label>Rounds</label>
@@ -500,19 +506,29 @@ const SurvivalArena = () => {
                         </div>
 
                         <div className="roster-section">
-                            <h3>Currently Synchronized:</h3>
-                            <div className="survivor-pills">
-                                {roomState?.players?.map(p => (
-                                    <div key={p.userId} className="survivor-pill animate-slideDown">
-                                        <img src={p.avatar} alt="Avatar" />
-                                        <span>{p.name} {p.userId === myId ? '(You)' : ''}</span>
-                                        {p.userId === roomState.host && <FiTarget className="host-indicator" title="Match Host" />}
+                            <div className="synchronized-roster">
+                                {roomState?.players?.map((p, idx) => (
+                                    <div key={p.userId || idx} className="roster-item profile-entrance">
+                                        <div className="roster-avatar">
+                                            {p.avatar ? (
+                                                <img src={p.avatar} alt="avatar" />
+                                            ) : (
+                                                <FiUser />
+                                            )}
+                                            {roomState.host === p.userId && (
+                                                <span className="host-crown" title="High Host">👑</span>
+                                            )}
+                                        </div>
+                                        <div className="roster-info">
+                                            <span className="roster-name">{p.name} {p.userId === myId ? '(You)' : ''}</span>
+                                            <span className="roster-status">READY FOR PROTOCOL</span>
+                                        </div>
                                     </div>
                                 ))}
-                                {(!roomState?.players || roomState.players.length === 0) && (
-                                    <div className="waiting-pill">Calibrating sensors...</div>
-                                )}
                             </div>
+                            {(!roomState?.players || roomState.players.length === 0) && (
+                                <div className="waiting-pill">Calibrating sensors...</div>
+                            )}
                         </div>
                         
                         <div className="preparing-actions">

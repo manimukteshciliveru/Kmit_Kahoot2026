@@ -451,13 +451,32 @@ const sendNextQuestion = async (io, room, retryCount = 0) => {
     }
 
     if (!qData) {
-        // Absolute failure — end game gracefully
-        logger.error(`[SURVIVAL] Critical failure: All generation attempts failed for room ${roomId}. Ending game.`);
-        io.to(`survival:${roomId}`).emit('survival:error', { 
-            message: 'Arena collapse: Could not generate quiz content after multiple attempts.',
-            isCritical: true 
-        });
-        return endGame(io, room, 'generation_failure');
+        // --- ABSOLUTE FINAL RESORT: Panic Fallback (Never Fail) ---
+        logger.warn(`[SURVIVAL] 🚨 Panic Fallback triggered for room ${roomId}`);
+        const fallbacks = [
+            {
+                question: `In a high-stakes survival simulation on "${topic}", which factor is generally considered THE most critical for long-term endurance?`,
+                options:  ['Strategic Planning', 'Resource Management', 'Emotional Intelligence', 'Technical Skill'],
+                correctAnswer: 'Resource Management',
+                explanation: 'While all are important, managing your limited resources is the foundation of survival in any competitive arena.',
+                timer: 25
+            },
+            {
+                question: `A sudden shift in ${topic} protocol occurs. What is the most adaptive response for a synchronized participant?`,
+                options:  ['Immediate Pivot', 'Consult Manual', 'Wait for Command', 'Ignore Change'],
+                correctAnswer: 'Immediate Pivot',
+                explanation: 'Adaptability and rapid pivoting are the hallmarks of survival in dynamic environments.',
+                timer: 20
+            }
+        ];
+        const pick = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+        qData = {
+            ...pick,
+            difficulty,
+            topic,
+            timeEstimate: { averageStudent: 15, belowAverageStudent: 25 },
+            source: 'panic_fallback'
+        };
     }
 
     // Mark question as used
