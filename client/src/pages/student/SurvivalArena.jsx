@@ -6,7 +6,7 @@ import { toast } from 'react-hot-toast';
 import { 
     FiZap, FiUsers, FiAward, FiAlertCircle, 
     FiShield, FiTrendingUp, FiCheckCircle, FiXCircle,
-    FiSearch
+    FiSearch, FiLayers, FiClock, FiCopy
 } from 'react-icons/fi';
 import './SurvivalArena.css';
 
@@ -35,6 +35,9 @@ const SurvivalArena = () => {
     const [finalResults, setFinalResults] = useState(null);
     const [availableRooms, setAvailableRooms] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [pinInput, setPinInput] = useState('');
+    const [configTopic, setConfigTopic] = useState('General');
+    const [configQuestions, setConfigQuestions] = useState(10);
 
     const timerRef = useRef(null);
     const myAnswerRef = useRef(null);
@@ -58,8 +61,20 @@ const SurvivalArena = () => {
         }
     }, [isSubmitting, roomState, currentQuestion, socket]);
 
-    const handleCreateRoom = (topic = 'General', difficulty = 'mixed') => {
-        socket.emit('survival:create', { topic, difficulty });
+    const handleCreateRoom = () => {
+        socket.emit('survival:create', { 
+            topic: configTopic, 
+            difficulty: 'mixed',
+            maxQuestions: configQuestions 
+        });
+    };
+
+    const handleJoinByPin = () => {
+        if (!pinInput || pinInput.length !== 6) {
+            toast.error('Please enter a valid 6-digit PIN');
+            return;
+        }
+        socket.emit('survival:join_by_pin', { pin: pinInput });
     };
 
     const handleJoinRoom = (roomId) => {
@@ -96,9 +111,16 @@ const SurvivalArena = () => {
 
         socket.on('survival:rooms_list', setAvailableRooms);
         socket.on('survival:created', (data) => {
-            setView('preparing');
             setRoomState(data);
+            setView('preparing');
+            toast.success('Battle room ready!');
         });
+
+        socket.on('survival:pin_resolved', (data) => {
+            handleJoinRoom(data.roomId);
+        });
+
+        socket.on('survival:room_state', setRoomState);
         socket.on('survival:player_joined', (data) => {
             setRoomState(prev => prev ? { ...prev, players: data.players } : null);
         });
@@ -179,6 +201,48 @@ const SurvivalArena = () => {
     const timerColor = timeLeft <= 5 ? '#EF4444' : timeLeft <= 10 ? '#F59E0B' : '#10B981';
 
     // -- Views --
+    if (view === 'configure') {
+        return (
+            <div className="survival-arena-root">
+                <div className="survival-config-card glass animate-fadeIn">
+                    <FiLayers className="config-icon" />
+                    <h2>Setup Survival Room</h2>
+                    <p>Customize your private arena rules</p>
+                    
+                    <div className="config-form">
+                        <div className="form-group">
+                            <label>Battle Topic</label>
+                            <select value={configTopic} onChange={(e) => setConfigTopic(e.target.value)}>
+                                <option value="General">General / mixed</option>
+                                <option value="Python">Python</option>
+                                <option value="Java">Java</option>
+                                <option value="JavaScript">JavaScript</option>
+                                <option value="Data Structures">Data Structures</option>
+                                <option value="Algorithms">Algorithms</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Total Questions ({configQuestions})</label>
+                            <input 
+                                type="range" 
+                                min="5" 
+                                max="50" 
+                                step="5" 
+                                value={configQuestions} 
+                                onChange={(e) => setConfigQuestions(parseInt(e.target.value))} 
+                                className="range-slider"
+                            />
+                        </div>
+                        
+                        <div className="config-actions">
+                            <button className="btn-cancel" onClick={() => setView('lobby')}>Cancel</button>
+                            <button className="btn-launch" onClick={handleCreateRoom}>Generate PIN</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
     if (view === 'lobby') {
         return (
             <div className="survival-arena-root">
@@ -189,11 +253,26 @@ const SurvivalArena = () => {
                             <p>One wrong answer = Elimination. Last person standing wins!</p>
                         </div>
                         <div className="header-actions">
-                            <button className="btn-create" onClick={() => handleCreateRoom('General', 'mixed')}>
-                                <FiZap /> Create Entry
+                            <button className="btn-create" onClick={() => setView('configure')}>
+                                <FiZap /> Setup Private Arena
                             </button>
                         </div>
                     </header>
+
+                    <div className="pin-join-section glass">
+                        <div className="pin-input-group">
+                            <FiShield />
+                            <input 
+                                type="text" 
+                                placeholder="Enter 6-digit Match PIN" 
+                                value={pinInput}
+                                maxLength={6}
+                                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                            />
+                        </div>
+                        <button className="btn-join-pin" onClick={handleJoinByPin}>Quick Join PIN</button>
+                    </div>
+
                     <div className="room-finder">
                         <div className="search-bar">
                             <FiSearch />
@@ -239,24 +318,57 @@ const SurvivalArena = () => {
             <div className="survival-arena-root">
                 <div className="survival-preparing animate-fadeIn">
                     <div className="preparing-card glass">
+                        {roomState?.pin && (
+                           <div className="match-pin-banner">
+                               <div className="pin-info">
+                                   <span className="label">ENTRY PIN</span>
+                                   <strong className="pin-code">{roomState.pin}</strong>
+                               </div>
+                               <button className="btn-copy-pin" onClick={() => {
+                                   navigator.clipboard.writeText(roomState.pin);
+                                   toast.success('PIN copied to clipboard!');
+                               }}>
+                                   <FiCopy /> Copy
+                               </button>
+                           </div>
+                        )}
                         <FiZap className="pulse-icon" />
-                        <h2>Entry Portal Active</h2>
-                        <div className="room-stat-row">
-                            <span>Topic: <strong>{roomState?.topic}</strong></span>
-                            <span>Diff: <strong>{roomState?.difficulty}</strong></span>
+                        <h1>Entry Portal Active</h1>
+                        <div className="room-summary">
+                            <div className="summary-item">
+                                <label>Topic</label>
+                                <strong>{roomState?.topic}</strong>
+                            </div>
+                            <div className="summary-item">
+                                <label>Target</label>
+                                <strong>{roomState?.maxQuestions} Questions</strong>
+                            </div>
                         </div>
-                        <div className="players-list">
+                        <div className="survivors-list">
                             <h3>Synchronized Survivors ({roomState?.players?.length || 0})</h3>
-                            <div className="players-grid-mini">
+                            <div className="p-grid">
                                 {roomState?.players?.map(p => (
-                                    <div key={p.userId} className="player-tag">{p.name}</div>
+                                    <div key={p.userId} className="p-chip animate-slideDown">
+                                        <img src={p.avatar} alt={p.name} />
+                                        <span>{p.name}</span>
+                                    </div>
                                 ))}
                             </div>
                         </div>
+                        
+                        <p className="status-note">
+                            {roomState?.host === myId 
+                                ? 'You are the host. Start when others have joined!' 
+                                : 'Vanguard sync in progress.. Waiting for host.'}
+                        </p>
+                        
                         {roomState?.host === myId ? (
-                            <button className="btn-start-now" onClick={handleStartGame}>IGNITE GAME</button>
+                            <div className="prep-actions">
+                                <button className="btn-start-now" onClick={handleStartGame}>INITIATE BATTLE</button>
+                                <button className="btn-abort" onClick={() => setView('lobby')}>CLOSE ROOM</button>
+                            </div>
                         ) : (
-                            <div className="waiting-msg">Vanguard sync in progress... Waiting for host.</div>
+                            <button className="btn-abort" onClick={() => setView('lobby')}>LEAVE PORTAL</button>
                         )}
                     </div>
                 </div>

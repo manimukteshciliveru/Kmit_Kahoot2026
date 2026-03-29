@@ -27,8 +27,10 @@ const { generateAIQuestion, decideTimer, difficultyTimer, preloadNextQuestion } 
 const logger         = require('../utils/logger');
 
 // ── In-memory survival rooms ──────────────────────────────────
-// roomId → { host, players, questions, config, status, currentQ, sessionId }
+// roomId → { host, players, questions, config, status, currentQ, sessionId, pin }
 const survivalRooms = new Map();
+// pin → roomId (for quick lookup)
+const pinToRoomId = new Map();
 
 // ── Helper: broadcast to all in room ─────────────────────────
 const roomcast = (io, roomId, event, data) => {
@@ -37,6 +39,13 @@ const roomcast = (io, roomId, event, data) => {
 
 // ── Helper: generate a safe room ID ──────────────────────────
 const mkRoomId = () => `sv_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+const mkPin = () => {
+    let pin;
+    do {
+        pin = Math.floor(100000 + Math.random() * 900000).toString();
+    } while (pinToRoomId.has(pin)); // Ensure uniqueness
+    return pin;
+};
 
 // ── Helper: calculate ai question stats ──────────────────────
 const calcStats = (players) => {
@@ -106,8 +115,10 @@ module.exports = (io, socket) => {
         } = data || {};
 
         const roomId = mkRoomId();
+        const pin    = mkPin();
         const room = {
             roomId,
+            pin,
             host:          userId,
             hostName:      userName,
             topic,
@@ -125,6 +136,7 @@ module.exports = (io, socket) => {
         };
 
         survivalRooms.set(roomId, room);
+        pinToRoomId.set(pin, roomId);
         socket.join(`survival:${roomId}`);
 
         // Add host as first player
@@ -135,15 +147,28 @@ module.exports = (io, socket) => {
             rollNumber:     socket.user.rollNumber || '',
             department:     socket.user.department || '',
             section:        socket.user.section    || '',
+            socketId:       socket.id,
             score:          0,
             answers:        [],
             isAlive:        true,
             eliminatedAt:   null
         });
 
-        socket.emit('survival:created', { roomId, topic, difficulty, maxQuestions });
-        broadcastRoomsList(io); // Add this helper broadcast
-        logger.info(`[SURVIVAL] Room created: ${roomId} by ${userName}`);
+        socket.emit('survival:created', { roomId, pin, topic, difficulty, maxQuestions });
+        broadcastRoomsList(io); 
+        logger.info(`[SURVIVAL] Room created: ${roomId} | PIN: ${pin} by ${userName}`);
+    });
+
+    // ── 1.1 JOIN BY PIN ───────────────────────────────────────
+    socket.on('survival:join_by_pin', async (data) => {
+        const { pin } = data || {};
+        if (!pin) return socket.emit('error', { message: 'PIN is required.' });
+        
+        const roomId = pinToRoomId.get(pin.toString());
+        if (!roomId) return socket.emit('error', { message: 'Invalid PIN. Room not found.' });
+
+        // Forward to the standard join logic
+        socket.emit('survival:pin_resolved', { roomId });
     });
 
     // ── 2. JOIN ROOM ──────────────────────────────────────────
@@ -616,7 +641,10 @@ const endGame = async (io, room, reason = 'completed') => {
     }
 
     // Cleanup room after 5 minutes
-    setTimeout(() => survivalRooms.delete(roomId), 5 * 60 * 1000);
+    setTimeout(() => {
+        if (room.pin) pinToRoomId.delete(room.pin);
+        survivalRooms.delete(roomId);
+    }, 5 * 60 * 1000);
     broadcastRoomsList(io); // Update lobby
     logger.info(`[SURVIVAL] 🏆 Game ended: ${roomId} | Reason: ${reason} | Winner: ${winner?.name || 'None'}`);
 };
