@@ -74,6 +74,9 @@ const SurvivalArena = () => {
         if (configSource === 'topic' && !configTopic) return toast.error('Enter a topic keyword');
         if (configSource === 'text' && !configContent) return toast.error('Paste some content');
 
+        // STRICT CLAMPING 2-75
+        const finalMax = Math.min(75, Math.max(2, parseInt(configMaxPlayers) || 10));
+
         socket.emit('survival:create', { 
             title: configTitle,
             description: configDescription,
@@ -81,7 +84,7 @@ const SurvivalArena = () => {
             content: configSource === 'text' ? configContent : null,
             difficulty: configDifficulty,
             maxQuestions: 5,
-            maxPlayers: Math.min(75, Math.max(2, configMaxPlayers))
+            maxPlayers: finalMax
         });
     };
 
@@ -228,12 +231,19 @@ const SurvivalArena = () => {
                     <div className="config-form scroll-form">
                         <div className="form-row">
                             <div className="form-group">
-                                <label>Battle Title</label>
+                                <label>Match Title</label>
                                 <input type="text" placeholder="e.g., Python Masters" value={configTitle} onChange={e => setConfigTitle(e.target.value)} />
                             </div>
                             <div className="form-group">
-                                <label>Capacity (2-75)</label>
-                                <input type="number" min="2" max="75" value={configMaxPlayers} onChange={e => setConfigMaxPlayers(e.target.value)} />
+                                <label>Participation Cap (2-75)</label>
+                                <input 
+                                    type="number" 
+                                    min="2" 
+                                    max="75" 
+                                    value={configMaxPlayers} 
+                                    onChange={e => setConfigMaxPlayers(e.target.value)} 
+                                    onBlur={() => setConfigMaxPlayers(Math.min(75, Math.max(2, parseInt(configMaxPlayers) || 2)))}
+                                />
                             </div>
                         </div>
 
@@ -369,62 +379,70 @@ const SurvivalArena = () => {
                 <div className="survival-preparing animate-fadeIn">
                     <div className="preparing-card glass">
                         {roomState?.pin && (
-                           <div className="match-pin-banner">
+                           <div className="match-pin-banner pulse-border">
                                <div className="pin-info">
-                                   <span className="label">ENTRY PIN</span>
+                                   <span className="label">PORTAL ACCESS PIN</span>
                                    <strong className="pin-code">{roomState.pin}</strong>
                                </div>
                                <button className="btn-copy-pin" onClick={() => {
                                    navigator.clipboard.writeText(roomState.pin);
-                                   toast.success('PIN copied to clipboard!');
+                                   toast.success('Access PIN copied!');
                                }}>
                                    <FiCopy /> Copy
                                </button>
                            </div>
                         )}
-                        <FiZap className="pulse-icon" />
-                        <h1>{roomState?.title || 'Entry Portal Active'}</h1>
-                        <p className="room-desc-banner">{roomState?.description}</p>
-                        <div className="room-summary">
-                            <div className="summary-item">
-                                <label>Focus</label>
-                                <strong>{roomState?.topic}</strong>
+                        <div className="preparing-header">
+                            <FiZap className="pulse-icon-small" />
+                            <h1>{roomState?.title || 'Survival Arena'}</h1>
+                            <p>{roomState?.description}</p>
+                        </div>
+
+                        <div className="portal-stats glass">
+                            <div className="portal-stat">
+                                <span className="label">TOPIC</span>
+                                <span className="value">{roomState?.topic}</span>
                             </div>
-                            <div className="summary-item">
-                                <label>Target</label>
-                                <strong>5 Rounds</strong>
+                            <div className="portal-stat">
+                                <span className="label">SURVIVORS</span>
+                                <span className="value">{roomState?.players?.length} / {roomState?.maxPlayers}</span>
                             </div>
-                            <div className="summary-item">
-                                <label>Capacity</label>
-                                <strong>{roomState?.maxPlayers} Slots</strong>
+                            <div className="portal-stat">
+                                <span className="label">PROTOCOL</span>
+                                <span className="value">5 ROUNDS</span>
                             </div>
                         </div>
-                        <div className="survivors-list">
-                            <h3>Synchronized Survivors ({roomState?.players?.length || 0})</h3>
-                            <div className="p-grid">
+
+                        <div className="roster-section">
+                            <h3>Currently Synchronized:</h3>
+                            <div className="survivor-pills">
                                 {roomState?.players?.map(p => (
-                                    <div key={p.userId} className="p-chip animate-slideDown">
-                                        <img src={p.avatar} alt={p.name} />
-                                        <span>{p.name}</span>
+                                    <div key={p.userId} className="survivor-pill animate-slideDown">
+                                        <img src={p.avatar} alt="Avatar" />
+                                        <span>{p.name} {p.userId === myId ? '(You)' : ''}</span>
+                                        {p.userId === roomState.host && <FiTarget className="host-indicator" title="Match Host" />}
                                     </div>
                                 ))}
+                                {(!roomState?.players || roomState.players.length === 0) && (
+                                    <div className="waiting-pill">Calibrating sensors...</div>
+                                )}
                             </div>
                         </div>
                         
-                        <p className="status-note">
-                            {roomState?.host === myId 
-                                ? 'You are the host. Start when others have joined!' 
-                                : 'Vanguard sync in progress.. Waiting for host.'}
-                        </p>
-                        
-                        {roomState?.host === myId ? (
-                            <div className="prep-actions">
-                                <button className="btn-start-now" onClick={handleStartGame}>INITIATE BATTLE</button>
-                                <button className="btn-abort" onClick={() => setView('lobby')}>CLOSE ROOM</button>
-                            </div>
-                        ) : (
-                            <button className="btn-abort" onClick={() => setView('lobby')}>LEAVE PORTAL</button>
-                        )}
+                        <div className="preparing-actions">
+                            {roomState?.host === myId ? (
+                                <>
+                                    <button className="btn-ignite" onClick={handleStartGame}>INITIATE BATTLE PROTOCOL</button>
+                                    <button className="btn-abort-match" onClick={() => setView('lobby')}>DISMANTLE ROOM</button>
+                                </>
+                            ) : (
+                                <div className="waiting-for-host">
+                                    <div className="loader-ring"></div>
+                                    <span>Standby: Awaiting Host Initiation...</span>
+                                    <button className="btn-leave-portal" onClick={() => setView('lobby')}>Exit Portal</button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

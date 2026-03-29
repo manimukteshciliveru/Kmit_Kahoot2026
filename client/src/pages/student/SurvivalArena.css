@@ -775,9 +775,174 @@
   .survival-sidebar { display: none; }
 }
 
-@media (max-width: 768px) {
-  .q-text { font-size: 1.5rem; }
-  .options-grid { grid-template-columns: 1fr; }
-  .preparing-card, .lobby-header { padding: 2rem 1.5rem; }
-  .btn-create { padding: 0.8rem 1.2rem; }
+/* ── Portal Styling ───────────────────────────────────────── */
+
+.pulse-border {
+  border: 1px solid #FDE047;
+  animation: border-pulse 2s infinite ease-in-out;
+}
+
+@keyframes border-pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(253, 224, 71, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(253, 224, 71, 0.4); }
+}
+
+.preparing-header {
+  margin-top: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.preparing-header h1 {
+  font-size: 2.2rem;
+  font-weight: 900;
+  margin-bottom: 0.5rem;
+}
+
+.preparing-header p {
+  opacity: 0.6;
+  font-size: 0.95rem;
+}
+
+.pulse-icon-small {
+  font-size: 3rem;
+  color: #FDE047;
+  margin-bottom: 1rem;
+  animation: pulse-glow 2s infinite;
+}
+
+.portal-stats {
+  display: flex;
+  justify-content: space-around;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  margin-bottom: 3rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.portal-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.portal-stat .label {
+  font-size: 0.65rem;
+  font-weight: 900;
+  opacity: 0.5;
+  letter-spacing: 1px;
+}
+
+.portal-stat .value {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #FDE047;
+}
+
+.roster-section {
+  text-align: left;
+  margin-bottom: 3.5rem;
+}
+
+.roster-section h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-bottom: 1.2rem;
+  font-weight: 900;
+}
+
+.survivor-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.survivor-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.4rem 0.8rem;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s;
+}
+
+.survivor-pill img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.host-indicator {
+  color: #FDE047;
+  font-size: 0.9rem;
+}
+
+.preparing-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.btn-ignite {
+  padding: 1.2rem;
+  background: #FDE047;
+  color: #0A0216;
+  border: none;
+  border-radius: 14px;
+  font-size: 1.1rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 30px rgba(253, 224, 71, 0.4);
+  transition: all 0.3s;
+}
+
+.btn-ignite:hover {
+  transform: scale(1.02);
+  box-shadow: 0 12px 40px rgba(253, 224, 71, 0.6);
+}
+
+.btn-abort-match {
+  padding: 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #F87171;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.waiting-for-host {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 2.5rem;
+  border-radius: 20px;
+}
+
+.loader-ring {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(253, 224, 71, 0.1);
+  border-top-color: #FDE047;
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+}
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.btn-leave-portal {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.6rem 1.5rem;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
 }
