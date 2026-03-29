@@ -197,16 +197,22 @@ module.exports = (io, socket) => {
         }
     });
 
-    // ── 1.1 JOIN BY PIN ───────────────────────────────────────
+    // ── 1.1 JOIN BY PIN (Direct Support) ───────────────────────
     socket.on('survival:join_by_pin', async (data) => {
         const { pin } = data || {};
         if (!pin) return socket.emit('error', { message: 'PIN is required.' });
         
-        const roomId = pinToRoomId.get(pin.toString());
+        const pinStr = pin.toString();
+        const roomId = pinToRoomId.get(pinStr);
         if (!roomId) return socket.emit('error', { message: 'Invalid PIN. Room not found.' });
+
+        const room = survivalRooms.get(roomId);
+        if (!room) return socket.emit('error', { message: 'Room data lost or expired.' });
+        if (room.status !== 'waiting') return socket.emit('error', { message: 'Match already in progress.' });
 
         // Forward to the standard join logic
         socket.emit('survival:pin_resolved', { roomId });
+        logger.info(`[SURVIVAL] PIN ${pinStr} resolved to ${roomId} for ${userName}`);
     });
 
     // ── 2. JOIN ROOM ──────────────────────────────────────────
@@ -710,6 +716,7 @@ const broadcastRoomsList = (io) => {
                 title:       room.title,
                 description: room.description,
                 hostName:    room.hostName,
+                pin:         room.pin, // Send PIN too
                 topic:       room.topic,
                 difficulty:  room.difficulty,
                 playerCount: room.alivePlayers.size,
@@ -717,6 +724,7 @@ const broadcastRoomsList = (io) => {
             });
         }
     }
+    // io.emit ensures ALL clients get the update
     io.emit('survival:rooms_list', openRooms);
 };
 

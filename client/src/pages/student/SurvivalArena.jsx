@@ -218,12 +218,20 @@ const SurvivalArena = () => {
             toast.error(data.message || 'Battle failure');
         });
 
+        socket.on('connect', () => {
+            console.log("📡 [SURVIVAL] Connection restored - refreshing room list...");
+            socket.emit('survival:get_rooms');
+        });
+
         socket.emit('survival:get_rooms');
         const fetchInterval = setInterval(() => {
-            socket.emit('survival:get_rooms');
-        }, 5000);
+            if (socket.connected) {
+                socket.emit('survival:get_rooms');
+            }
+        }, 3000); // Poll every 3 seconds
 
         return () => {
+            socket.off('connect');
             socket.off('survival:rooms_list');
             socket.off('survival:created');
             socket.off('survival:player_joined');

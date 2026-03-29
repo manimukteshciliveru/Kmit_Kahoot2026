@@ -69,6 +69,23 @@ app.get("/", (req, res) => {
     res.json({ message: "QuizMaster API is ONLINE", version: "1.0.4" });
 });
 
+// Health check endpoint for Render/Uptime monitoring
+app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.env.RENDER_SERVICE_ID ? 'render-active' : 'local' }));
+
+// Prevent Render free tier sleep
+const BACKEND_URL = process.env.BACKEND_URL || "https://kahoot-backend-w7i4.onrender.com";
+if (BACKEND_URL) {
+    setInterval(async () => {
+        try {
+            const { default: fetch } = await import('node-fetch');
+            await fetch(`${BACKEND_URL}/health`);
+            console.log('💓 [KEEP-ALIVE] Heartbeat sent to:', BACKEND_URL);
+        } catch (e) {
+            console.log('⚠️ [KEEP-ALIVE] Ping failed:', e.message);
+        }
+    }, 14 * 60 * 1000); // 14 minutes
+}
+
 // Request Logger (Debug 404s/CORS)
 app.use((req, res, next) => {
     console.log(`📡 [REQUEST] ${req.method} ${req.url} | Origin: ${req.headers.origin || 'Unknown'}`);
