@@ -46,6 +46,8 @@ const SurvivalArena = () => {
     const [configSource, setConfigSource] = useState('topic'); // 'topic' | 'text' | 'pdf'
     const [configMaxPlayers, setConfigMaxPlayers] = useState(50);
     const [configDifficulty, setConfigDifficulty] = useState('medium');
+    const [isCreating, setIsCreating] = useState(false);
+    const creationRef = useRef(null); // track current creation attempt
 
     const timerRef = useRef(null);
     const myAnswerRef = useRef(null);
@@ -70,12 +72,14 @@ const SurvivalArena = () => {
     }, [isSubmitting, roomState, currentQuestion, socket]);
 
     const handleCreateRoom = () => {
+        if (!socket?.connected) return toast.error('Check your internet connection!');
         if (!configTitle) return toast.error('Please enter a game title');
         if (configSource === 'topic' && !configTopic) return toast.error('Enter a topic keyword');
         if (configSource === 'text' && !configContent) return toast.error('Paste some content');
 
-        // STRICT CLAMPING 2-75
-        const finalMax = Math.min(75, Math.max(2, parseInt(configMaxPlayers) || 10));
+        setIsCreating(true); 
+        const attemptId = Date.now();
+        creationRef.current = attemptId;
 
         socket.emit('survival:create', { 
             title: configTitle,
@@ -86,6 +90,15 @@ const SurvivalArena = () => {
             maxQuestions: 5,
             maxPlayers: finalMax
         });
+
+        // SAFETY TIMEOUT (if server doesn't respond in 15s)
+        setTimeout(() => {
+            if (creationRef.current === attemptId) {
+                setIsCreating(false);
+                creationRef.current = null;
+                toast.error('Match creation timed out. Please try again.');
+            }
+        }, 15000);
     };
 
     const handleJoinByPin = () => {
@@ -130,9 +143,19 @@ const SurvivalArena = () => {
 
         socket.on('survival:rooms_list', setAvailableRooms);
         socket.on('survival:created', (data) => {
+            console.log("📡 [SURVIVAL] Match Successfully Created:", data);
+            creationRef.current = null; // Clear pending
             setRoomState(data);
             setView('preparing');
-            toast.success('Battle room ready!');
+            setIsCreating(false);
+            toast.success(`Arena Generated! PIN: ${data.pin}`);
+        });
+
+        socket.on('survival:error', (error) => {
+            console.error("❌ [SURVIVAL] Match Creation Error:", error);
+            creationRef.current = null; // Clear pending
+            setIsCreating(false);
+            toast.error(error.message || 'Battle setup failed');
         });
 
         socket.on('survival:pin_resolved', (data) => {
@@ -301,7 +324,13 @@ const SurvivalArena = () => {
                         
                         <div className="config-actions">
                             <button className="btn-cancel" onClick={() => setView('lobby')}>Back</button>
-                            <button className="btn-launch" onClick={handleCreateRoom}>GENERATE MATCH PIN</button>
+                            <button 
+                                className={`btn-launch ${isCreating ? 'loading' : ''}`} 
+                                onClick={handleCreateRoom} 
+                                disabled={isCreating}
+                            >
+                                {isCreating ? 'GENERATING PORTAL...' : 'GENERATE MATCH PIN'}
+                            </button>
                         </div>
                     </div>
                 </div>
