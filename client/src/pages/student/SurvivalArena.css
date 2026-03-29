@@ -656,6 +656,14 @@
   text-align: left;
 }
 
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  width: 100%;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;

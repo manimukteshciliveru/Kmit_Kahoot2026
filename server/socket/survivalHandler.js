@@ -262,6 +262,22 @@ module.exports = (io, socket) => {
             players: playersArr
         });
 
+        // Bug 5: Push new player to sessionDoc on join
+        if (room.sessionDoc) {
+            const alreadyInSession = room.sessionDoc.players.some(
+                p => p.userId?.toString() === userId
+            );
+            if (!alreadyInSession) {
+                room.sessionDoc.players.push({ 
+                    userId, 
+                    name: userName, 
+                    score: 0, 
+                    isAlive: true 
+                });
+                room.sessionDoc.save().catch(err => logger.error('[SURVIVAL] Session join save error:', err.message));
+            }
+        }
+
         socket.emit('survival:room_state', {
             roomId,
             title:      room.title,
@@ -283,6 +299,10 @@ module.exports = (io, socket) => {
         const room = survivalRooms.get(roomId);
         if (!room) return socket.emit('error', { message: 'Room not found.' });
         if (room.host !== userId) return socket.emit('error', { message: 'Only the host can start.' });
+
+        // Bug 1 & 2: Set status to active and startedAt
+        room.status = 'active';
+        room.startedAt = new Date();
 
         roomcast(io, roomId, 'survival:game_starting', {
             roomId,
@@ -357,9 +377,11 @@ module.exports = (io, socket) => {
         const room = survivalRooms.get(roomId);
         if (!room) return;
 
-        if (room.alivePlayers.has(userId)) {
-            const player = room.alivePlayers.get(userId);
-            player.isAlive = true; // Don't eliminate, just mark absent
+        // Bug 4: Actually eliminate on leave
+        const player = room.alivePlayers.get(userId);
+        if (player && player.isAlive) {
+            player.isAlive = false;
+            player.eliminatedAt = room.currentQIndex >= 0 ? room.currentQIndex : 0;
         }
 
         socket.leave(`survival:${roomId}`);
@@ -593,6 +615,9 @@ const processRoundEnd = async (io, room) => {
 
     /* Individual notifications moved to the loop above for immediate feedback */
 
+    // Bug 9: Broadcast live scores
+    broadcastScores(io, room);
+
     // Survive/end check
     const stillAlive = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
 
@@ -777,6 +802,20 @@ const buildStatusMessage = (aliveCount, roundIndex) => {
     if (aliveCount <= 5) return `🔥 Only ${aliveCount} survive! Stay sharp!`;
     if (roundIndex === 0) return '🚀 First elimination round! 1 wrong = OUT!';
     return `⚠️ Round ${roundIndex + 1}: ${aliveCount} players alive. One mistake = elimination!`;
+};
+
+// Bug 9 Helper: Broadcast live scores
+const broadcastScores = (io, room) => {
+    const scores = Array.from(room.alivePlayers.values())
+        .sort((a, b) => b.score - a.score)
+        .map((p, i) => ({
+            rank: i + 1,
+            userId: p.userId,
+            name: p.name,
+            score: p.score,
+            isAlive: p.isAlive
+        }));
+    roomcast(io, room.roomId, 'survival:score_update', { scores });
 };
 
 

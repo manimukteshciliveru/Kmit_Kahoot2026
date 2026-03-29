@@ -46,13 +46,18 @@ const SurvivalArena = () => {
     const [configSource, setConfigSource] = useState('topic'); // 'topic' | 'text' | 'pdf'
     const [configMaxPlayers, setConfigMaxPlayers] = useState(50);
     const [configDifficulty, setConfigDifficulty] = useState('medium');
+    const [configPdfFile, setConfigPdfFile] = useState(null); // Gap 1 state
     const [isCreating, setIsCreating] = useState(false);
-    const [isStarting, setIsStarting] = useState(false); // NEW
-    const creationRef = useRef(null); // track current creation attempt
+    const [isStarting, setIsStarting] = useState(false);
 
+    const creationTimeoutRef = useRef(null); // Bug 8 rename
     const timerRef = useRef(null);
     const myAnswerRef = useRef(null);
     const isEliminatedRef = useRef(false);
+
+    // Warning 2: Stabilize timer
+    const handleSubmitAnswerRef = useRef(handleSubmitAnswer);
+    useEffect(() => { handleSubmitAnswerRef.current = handleSubmitAnswer; }, [handleSubmitAnswer]);
 
     // Sync refs
     useEffect(() => { myAnswerRef.current = myAnswer; }, [myAnswer]);
@@ -72,35 +77,47 @@ const SurvivalArena = () => {
         }
     }, [isSubmitting, roomState, currentQuestion, socket]);
 
-    const handleCreateRoom = () => {
+    // Gap 1: readFileAsText helper
+    const readFileAsText = (file) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsText(file);
+    });
+
+    const handleCreateRoom = async () => {
         if (!socket?.connected) return toast.error('Check your internet connection!');
         if (!configTitle) return toast.error('Please enter a game title');
         if (configSource === 'topic' && !configTopic) return toast.error('Enter a topic keyword');
         if (configSource === 'text' && !configContent) return toast.error('Paste some content');
+        if (configSource === 'pdf' && !configPdfFile) return toast.error('Please select a PDF file');
 
         setIsCreating(true); 
-        const attemptId = Date.now();
-        creationRef.current = attemptId;
 
-        // DECLARE finalMax here
+        // Gap 1: Properly pass content
+        let content = null;
+        if (configSource === 'text') {
+            content = configContent;
+        } else if (configSource === 'pdf' && configPdfFile) {
+            content = await readFileAsText(configPdfFile);
+        }
+
         const finalMax = Math.min(75, Math.max(2, parseInt(configMaxPlayers) || 10));
 
         socket.emit('survival:create', { 
             title: configTitle,
             description: configDescription,
-            topic: configSource === 'topic' ? configTopic : (configTitle || 'Custom Content'),
-            content: configSource === 'text' ? configContent : null,
+            topic: configSource === 'topic' ? configTopic : configTitle,
             difficulty: configDifficulty,
-            maxQuestions: 5,
-            maxPlayers: finalMax
+            maxPlayers: finalMax,
+            content
         });
-
-        // SAFETY TIMEOUT (if server doesn't respond in 15s)
-        setTimeout(() => {
-            if (creationRef.current === attemptId) {
+        
+        // Bug 8: creationTimeoutRef
+        if (creationTimeoutRef.current) clearTimeout(creationTimeoutRef.current);
+        creationTimeoutRef.current = setTimeout(() => {
+            if (isCreating) {
                 setIsCreating(false);
-                creationRef.current = null;
-                toast.error('Match creation timed out. Please try again.');
+                toast.error('Arena Calibration Failed. Try again.');
             }
         }, 15000);
     };
@@ -137,7 +154,6 @@ const SurvivalArena = () => {
             return;
         }
 
-        // Cleanup existing timer before starting new one
         if (timerRef.current) clearInterval(timerRef.current);
 
         timerRef.current = setInterval(() => {
@@ -145,7 +161,7 @@ const SurvivalArena = () => {
                 if (prev <= 1) {
                     clearInterval(timerRef.current);
                     if (!myAnswerRef.current && !isEliminatedRef.current) {
-                        handleSubmitAnswer(null);
+                        handleSubmitAnswerRef.current(null); // Warning 2: stable ref
                     }
                     return 0;
                 }
@@ -154,7 +170,7 @@ const SurvivalArena = () => {
         }, 1000);
 
         return () => clearInterval(timerRef.current);
-    }, [view, timeLeft, myAnswer, handleSubmitAnswer]);
+    }, [view, timeLeft, myAnswer]); // Warning 2: stable deps
 
     // -- Socket Connections --
     useEffect(() => {
@@ -163,7 +179,7 @@ const SurvivalArena = () => {
         socket.on('survival:rooms_list', setAvailableRooms);
         socket.on('survival:created', (data) => {
             console.log("📡 [SURVIVAL] Match Successfully Created:", data);
-            creationRef.current = null; // Clear pending
+            if (creationTimeoutRef.current) clearTimeout(creationTimeoutRef.current); // Bug 8
             setRoomState(data);
             setView('preparing');
             setIsCreating(false);
@@ -172,22 +188,24 @@ const SurvivalArena = () => {
 
         socket.on('survival:error', (error) => {
             console.error("❌ [SURVIVAL] Match Creation Error:", error);
-            creationRef.current = null; // Clear pending
+            if (creationTimeoutRef.current) clearTimeout(creationTimeoutRef.current); // Bug 8
             setIsCreating(false);
             toast.error(error.message || 'Battle setup failed');
         });
 
+        // Gap 4: Let room_state drive the view
         socket.on('survival:pin_resolved', (data) => {
-            handleJoinRoom(data.roomId);
+            socket.emit('survival:join', { roomId: data.roomId });
         });
 
-        socket.on('survival:room_state', setRoomState);
-        socket.on('survival:player_joined', (data) => {
-            setRoomState(prev => prev ? { ...prev, players: data.players } : null);
-        });
+        // Bug 6 (Merged): Keep one room_state listener
         socket.on('survival:room_state', (data) => {
             setRoomState(data);
             if (data.status === 'active') setView('preparing');
+        });
+
+        socket.on('survival:player_joined', (data) => {
+            setRoomState(prev => prev ? { ...prev, players: data.players } : null);
         });
 
         socket.on('survival:game_starting', () => {
@@ -206,18 +224,28 @@ const SurvivalArena = () => {
 
         socket.on('survival:new_question', (data) => {
             console.log("🔥 [SURVIVAL] Received Question:", data.questionIndex);
-            
-            // 1. CLEAR previous round state instantly
             setMyAnswer(null);
             setIsSubmitting(false);
             setRoundResult(null);
-            
-            // 2. SET new state AND timer simultaneously
             setCurrentQuestion(data);
             setTimerDuration(data.timer);
             setTimeLeft(data.timer);
-            
             setView('playing');
+        });
+
+        // Bug 7: round_result listener
+        socket.on('survival:round_result', (data) => {
+            setRoundResult(data);
+            setScores(data.leaderboard || []);
+            if (data.correctAnswer) {
+                const eliminatedAtThisRound = data.eliminated?.some(e => e.userId === myId);
+                toast(
+                    eliminatedAtThisRound
+                        ? `Eliminated! Correct was: ${data.correctAnswer}`
+                        : `Correct! ${data.explanation || ''}`,
+                    { duration: 3000, icon: eliminatedAtThisRound ? '💥' : '✅' }
+                );
+            }
         });
 
         socket.on('survival:answer_ack', (data) => {
@@ -276,6 +304,7 @@ const SurvivalArena = () => {
             socket.off('survival:game_starting');
             socket.off('survival:preparing_question');
             socket.off('survival:new_question');
+            socket.off('survival:round_result'); // Bug 7 cleanup
             socket.off('survival:answer_ack');
             socket.off('survival:score_update');
             socket.off('survival:round_result');
@@ -352,7 +381,13 @@ const SurvivalArena = () => {
                         {configSource === 'pdf' && (
                             <div className="pdf-upload-hint animate-slideDown">
                                 <FiUploadCloud />
-                                <p>Upload PDF feature coming soon! Use Paste Text for now.</p>
+                                <input 
+                                    type="file" 
+                                    accept=".pdf,.txt"
+                                    onChange={(e) => setConfigPdfFile(e.target.files[0])}
+                                    className="pdf-input"
+                                />
+                                <p>{configPdfFile ? configPdfFile.name : 'Upload PDF (Text content will be extracted)'}</p>
                             </div>
                         )}
                         
@@ -586,7 +621,7 @@ const SurvivalArena = () => {
                                         key={opt}
                                         className={`opt-btn ${isSelected ? 'selected' : ''} ${isCorrect ? 'correct' : ''} ${isWrong ? 'wrong' : ''}`}
                                         onClick={() => !isSubmitting && handleSubmitAnswer(opt)}
-                                        disabled={isSubmitting || roundResult}
+                                        disabled={isSubmitting || roundResult || isEliminated}
                                     >
                                         <span className="opt-marker">{String.fromCharCode(65 + i)}</span>
                                         <span className="opt-label">{opt}</span>
@@ -626,7 +661,11 @@ const SurvivalArena = () => {
                             <span className="label">Final Score</span>
                             <span className="value">{finalResults?.personal?.finalScore || 0}</span>
                         </div>
-                        <button className="btn-spectate" onClick={() => setView('playing')}>Spectate Remainder</button>
+                        {/* Gap 3: Spectate Logic */}
+                        <button className="btn-spectate" onClick={() => {
+                            setIsEliminated(true);
+                            setView('playing');
+                        }}>Spectate Remainder</button>
                         <button className="btn-exit" onClick={() => navigate('/student/games')}>Exit Arena</button>
                     </div>
                 </div>

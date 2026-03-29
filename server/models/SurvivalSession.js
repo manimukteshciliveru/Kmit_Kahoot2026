@@ -12,24 +12,57 @@ const SurvivalSessionSchema = new mongoose.Schema({
     difficulty:  { type: String },
     maxPlayers:  { type: Number },
     status:      { type: String, enum: ['waiting', 'playing', 'completed', 'aborted'], default: 'waiting' },
-    
-    players: [{
-        userId:       { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        name:         { type: String },
-        score:        { type: Number, default: 0 },
-        survivalRounds: { type: Number, default: 0 },
-        isAlive:      { type: Boolean, default: true },
-        eliminatedAt: { type: Date }
+    startedAt:   { type: Date },
+    endedAt:     { type: Date },
+    duration:    { type: Number },
+    totalQuestions: { type: Number },
+    avgAccuracy:    { type: Number },
+    totalCorrectAnswers: { type: Number },
+
+    questions: [{
+        questionIndex: Number,
+        questionText:  String,
+        options:       [String],
+        correctAnswer: String,
+        explanation:   String,
+        topic:         String,
+        difficulty:    String,
+        source:        String,
+        timerGiven:    Number,
+        timeEstimate:  { averageStudent: Number }
     }],
-    
+
+    players: [{
+        userId:         { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        name:           String,
+        rollNumber:     String,
+        department:     String,
+        section:        String,
+        score:          { type: Number, default: 0 },
+        rank:           Number,
+        survivalRounds: { type: Number, default: 0 },
+        isAlive:        { type: Boolean, default: true },
+        isWinner:       { type: Boolean, default: false },
+        eliminatedAt:   Number,
+        accuracy:       Number,
+        avgTimeTaken:   Number,
+        weakTopics:     [String],
+        answers: [{
+            questionIndex:  Number,
+            questionText:   String,
+            selectedAnswer: String,
+            correctAnswer:  String,
+            isCorrect:      Boolean,
+            timeTaken:      Number,
+            scoreAwarded:   Number
+        }]
+    }],
+
     winner: {
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        name:   { type: String },
-        score:  { type: Number }
-    },
-
-    startedAt: { type: Date },
-    endedAt:   { type: Date }
+        name:   String,
+        score:  Number
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('SurvivalSession', SurvivalSessionSchema);
