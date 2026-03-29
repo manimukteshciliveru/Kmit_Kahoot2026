@@ -42,7 +42,7 @@ const Login = () => {
             const result = await login(userId, password, selectedRole);
             if (result.success) {
                 toast.success(`Welcome back!`);
-                navigate('/dashboard');
+                navigate(`/${selectedRole}/dashboard`);
             } else {
                 toast.error(result.message);
             }
