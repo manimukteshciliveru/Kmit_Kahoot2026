@@ -225,7 +225,18 @@ const SurvivalArena = () => {
         });
 
         socket.on('survival:error', (data) => {
+            console.error("❌ [SURVIVAL] Match Error:", data);
             toast.error(data.message || 'Battle failure');
+            
+            // If critical (e.g., generation failed), return to lobby
+            if (data.isCritical) {
+                setIsCreating(false);
+                setIsStarting(false);
+                setTimeout(() => {
+                    setView('lobby');
+                    setRoomState(null);
+                }, 3000);
+            }
         });
 
         socket.on('connect', () => {

@@ -110,12 +110,23 @@ const difficultyTimer = (difficulty) => {
 
 // ── JSON Extractor ────────────────────────────────────────────
 const extractJSON = (raw) => {
-    // Handle markdown code fences
-    const stripped = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const first = stripped.indexOf('{');
-    const last  = stripped.lastIndexOf('}');
-    if (first === -1 || last === -1) throw new Error('No JSON object found in Gemini response');
-    return stripped.substring(first, last + 1);
+    if (!raw) return null;
+    // Handle markdown code fences robustly
+    let cleaned = raw
+        .replace(/^```json\s*/im, '')
+        .replace(/^```\s*/im, '')
+        .replace(/```\s*$/im, '')
+        .trim();
+    
+    const first = cleaned.indexOf('{');
+    const last  = cleaned.lastIndexOf('}');
+    if (first === -1 || last === -1) {
+        // Fallback: try finding any JSON-like structure
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) return match[0];
+        throw new Error('No valid JSON object found in Gemini response');
+    }
+    return cleaned.substring(first, last + 1);
 };
 
 // ── Core Generation Function ──────────────────────────────────

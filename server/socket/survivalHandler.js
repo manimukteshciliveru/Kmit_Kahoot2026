@@ -395,8 +395,10 @@ module.exports = (io, socket) => {
  * Emits the next AI-generated question to the room.
  * Falls back to DB if Gemini fails.
  */
-const sendNextQuestion = async (io, room) => {
-    const { roomId, topic, difficulty, maxQuestions } = room;
+const sendNextQuestion = async (io, room, retryCount = 0) => {
+    const { roomId, topic, difficulty, currentQIndex } = room;
+    const MAX_RETRIES = 3;
+    const ROUND_LIMIT = 5;
 
     // Check termination conditions
     const alivePlayers = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
@@ -405,15 +407,16 @@ const sendNextQuestion = async (io, room) => {
         return endGame(io, room, 'no_survivors');
     }
 
-    if (alivePlayers.length === 1) {
+    if (alivePlayers.length === 1 && room.currentQIndex >= 0) {
         return endGame(io, room, 'last_survivor');
     }
 
-    room.currentQIndex++;
-
-    if (room.currentQIndex >= maxQuestions) {
-        return endGame(io, room, 'max_questions');
+    // STRICT 5 ROUND LIMIT
+    if (room.currentQIndex >= ROUND_LIMIT - 1) {
+        return endGame(io, room, 'max_rounds_reached');
     }
+
+    room.currentQIndex++;
 
     // ── Inform room: preparing next question ───────────────────
     roomcast(io, roomId, 'survival:preparing_question', {
@@ -424,37 +427,37 @@ const sendNextQuestion = async (io, room) => {
     // Track who needs to answer this round
     room.pendingAnswers = new Set(alivePlayers.map(p => p.userId));
 
+    let qData = null;
     // ── Try AI first, fallback to DB ───────────────────────────
     try {
-        logger.info(`[SURVIVAL] Generating AI Q for room ${roomId} | Q${room.currentQIndex + 1} | Source: ${room.content ? 'Content' : 'Topic'}`);
+        logger.info(`[SURVIVAL] Generating AI Q (Attempt ${retryCount + 1}/3) for room ${roomId} | Q${room.currentQIndex + 1}`);
         qData = await generateAIQuestion(topic, difficulty, room.content);
-        if (qData) qData.source = 'ai';
+        if (qData) {
+            qData.source = 'ai';
+        } else {
+            throw new Error('AI returned null payload');
+        }
     } catch (err) {
-        logger.warn(`[SURVIVAL] AI generation exception: ${err.message}`);
-    }
-
-    if (!qData) {
-        logger.warn(`[SURVIVAL] AI failed, falling back to DB for room ${roomId}`);
-        qData = await fetchDBQuestion(topic, difficulty, room.usedQuestions);
-        if (!qData) {
-            io.to(`survival:${roomId}`).emit('survival:error', { message: 'Failed to generate question. Retrying...' });
-            return setTimeout(() => sendNextQuestion(io, room), 3000);
+        logger.warn(`[SURVIVAL] AI generation failure (Attempt ${retryCount + 1}): ${err.message}`);
+        
+        if (retryCount < MAX_RETRIES) {
+            // Wait 2s and retry
+            return setTimeout(() => sendNextQuestion(io, room, retryCount + 1), 2000);
+        } else {
+            // Give up on AI, try ONE DB fallback
+            logger.warn(`[SURVIVAL] AI failed 3 times. Falling back to DB...`);
+            qData = await fetchDBQuestion(topic, difficulty, room.usedQuestions);
         }
     }
 
     if (!qData) {
-        // Last resort: generic placeholder
-        qData = {
-            question:      `Sample ${difficulty} question on ${topic} #${room.currentQIndex + 1}`,
-            options:       ['Option A', 'Option B', 'Option C', 'Option D'],
-            correctAnswer: 'Option A',
-            explanation:   'AI service temporarily unavailable.',
-            difficulty,
-            topic,
-            timer:         difficultyTimer(difficulty),
-            timeEstimate:  { averageStudent: 15, belowAverageStudent: 25 },
-            source:        'fallback'
-        };
+        // Absolute failure — end game gracefully
+        logger.error(`[SURVIVAL] Critical failure: All generation attempts failed for room ${roomId}. Ending game.`);
+        io.to(`survival:${roomId}`).emit('survival:error', { 
+            message: 'Arena collapse: Could not generate quiz content after multiple attempts.',
+            isCritical: true 
+        });
+        return endGame(io, room, 'generation_failure');
     }
 
     // Mark question as used
