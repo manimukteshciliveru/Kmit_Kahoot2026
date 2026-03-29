@@ -787,6 +787,26 @@
   50% { box-shadow: 0 0 20px rgba(253, 224, 71, 0.4); }
 }
 
+.pin-required-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(253, 224, 71, 0.1);
+  color: #FDE047;
+  padding: 0.6rem 1.2rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid rgba(253, 224, 71, 0.2);
+  white-space: nowrap;
+  animation: glow-soft 2s infinite ease-in-out;
+}
+
+@keyframes glow-soft {
+  0%, 100% { opacity: 0.8; box-shadow: 0 0 5px rgba(253, 224, 71, 0.1); }
+  50% { opacity: 1; box-shadow: 0 0 15px rgba(253, 224, 71, 0.3); }
+}
+
 .preparing-header {
   margin-top: 1rem;
   margin-bottom: 2.5rem;

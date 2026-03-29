@@ -119,6 +119,7 @@ const SurvivalArena = () => {
 
     const handleStartGame = () => {
         if (roomState?.roomId) {
+            console.log("🚀 [SURVIVAL] Initiating Battle Protocol...");
             socket.emit('survival:start', { roomId: roomState.roomId });
         }
     };
@@ -175,7 +176,8 @@ const SurvivalArena = () => {
         });
 
         socket.on('survival:game_starting', () => {
-            setView('preparing');
+            console.log("🏁 [SURVIVAL] Match Initiated by Host!");
+            setView('playing'); // Force move to battle zone!
             toast.success('Survival Commencing!', { icon: '🔥' });
         });
 
@@ -409,7 +411,9 @@ const SurvivalArena = () => {
                                                     <span className="players"><FiUsers /> {room.playerCount} / {room.maxPlayers}</span>
                                                 </div>
                                             </div>
-                                            <button className="btn-join" onClick={() => handleJoinRoom(room.roomId)}>Join Battle</button>
+                                            <div className="pin-required-badge">
+                                                <FiShield /> PIN Required
+                                            </div>
                                         </div>
                                     ))
                             )}
