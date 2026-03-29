@@ -55,23 +55,17 @@ Difficulty: "${difficulty}"
 
 STRICT OUTPUT RULES:
 1. Return ONLY a valid JSON object.
-2. Keys: "question", "options" (4), "correctAnswer", "explanation", "difficulty", "topic", "timeEstimate".
-3. TIME MASTER RULE: You must individually decide the timer for this specific question based on its depth.
-   - Simple recall: 10–15s
-   - Logic/Math/Analysis: 20–40s
-   - Very Complex: 40–60s
+2. Keys: "question", "options" (exactly 4), "correctAnswer", "explanation", "timeEstimate".
+3. TIME MASTER RULE: Decided specific timer (10-45s) based on depth.
    Return this in "timeEstimate.averageStudent".
-4. If context is provided, ensure the question and all options are derived EXCLUSIVELY from that text.
 
-Example:
+JSON Example:
 {
   "question": "...",
-  "options": ["...", "...", "...", "..."],
-  "correctAnswer": "...",
+  "options": ["A", "B", "C", "D"],
+  "correctAnswer": "A",
   "explanation": "...",
-  "difficulty": "${difficulty}",
-  "topic": "${topic}",
-  "timeEstimate": { "averageStudent": 25, "belowAverageStudent": 35 }
+  "timeEstimate": { "averageStudent": 20 }
 }
 `.trim();
 
@@ -206,9 +200,19 @@ const generateAIQuestion = async (topic, difficulty = 'medium', content = null) 
         }
     }
 
-    // All Gemini models failed
-    logger.error(`[AIQuestionService] ❌ All Gemini models failed for "${topic}". Last error: ${lastError?.message}`);
-    return null; // Caller must handle null with DB fallback
+    // ── FINAL PANIC FALLBACK ──────────────────────────────────
+    logger.warn(`[AIQuestionService] 🚨 EMERGENCY FALLBACK triggered for topic: "${topic}"`);
+    return {
+        question: `In a standard survival scenario on "${topic}", which factor is generally considered most critical?`,
+        options:  ['Strategic Planning', 'Speed of Execution', 'Resource Management', 'Adaptability'],
+        correctAnswer: 'Adaptability',
+        explanation: 'In survival mode, the ability to adapt to changing conditions is usually the defining factor.',
+        difficulty,
+        topic,
+        timeEstimate: { averageStudent: 15 },
+        timer: 20,
+        source: 'panic_fallback'
+    };
 };
 
 // ── Preload Helper (for next question while current plays) ────

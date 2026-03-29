@@ -131,22 +131,30 @@ const SurvivalArena = () => {
         }
     };
 
-    const startTimer = useCallback((duration) => {
+    useEffect(() => {
+        if (view !== 'playing' || timeLeft <= 0 || myAnswer !== null) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            return;
+        }
+
+        // Cleanup existing timer before starting new one
         if (timerRef.current) clearInterval(timerRef.current);
-        let time = duration;
-        setTimeLeft(time);
-        
+
         timerRef.current = setInterval(() => {
-            time -= 1;
-            setTimeLeft(time);
-            if (time <= 0) {
-                if (timerRef.current) clearInterval(timerRef.current);
-                if (!myAnswerRef.current && !isEliminatedRef.current) {
-                   handleSubmitAnswer(null);
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timerRef.current);
+                    if (!myAnswerRef.current && !isEliminatedRef.current) {
+                        handleSubmitAnswer(null);
+                    }
+                    return 0;
                 }
-            }
+                return prev - 1;
+            });
         }, 1000);
-    }, [handleSubmitAnswer]);
+
+        return () => clearInterval(timerRef.current);
+    }, [view, timeLeft, myAnswer, handleSubmitAnswer]);
 
     // -- Socket Connections --
     useEffect(() => {
@@ -197,10 +205,18 @@ const SurvivalArena = () => {
         });
 
         socket.on('survival:new_question', (data) => {
+            console.log("🔥 [SURVIVAL] Received Question:", data.questionIndex);
+            
+            // 1. CLEAR previous round state instantly
+            setMyAnswer(null);
+            setIsSubmitting(false);
+            setRoundResult(null);
+            
+            // 2. SET new state AND timer simultaneously
             setCurrentQuestion(data);
             setTimerDuration(data.timer);
             setTimeLeft(data.timer);
-            startTimer(data.timer);
+            
             setView('playing');
         });
 
@@ -268,10 +284,10 @@ const SurvivalArena = () => {
             clearInterval(fetchInterval);
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, [socket, connected, startTimer]);
+    }, [socket, connected]);
 
     // -- Progress & Aesthetics --
-    const finalMax = timerDuration || 20; 
+    const finalMax = roomState?.timer || timerDuration || 20; 
     const timerPercent = finalMax > 0 ? (timeLeft / finalMax) * 100 : 0;
     const timerColor = timeLeft <= 5 ? '#EF4444' : timeLeft <= 10 ? '#F59E0B' : '#10B981';
 
