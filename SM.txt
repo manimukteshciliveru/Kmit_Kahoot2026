@@ -1487,9 +1487,37 @@ const SurvivalArena = () => {
         };
     }, [socket, connected]);
 
-    // UI Rendering omitted...
+    // UI Rendering ...
 };
 ```
 
 ## 5. client/src/pages/student/SurvivalArena.css
-[Aesthetic and Animation styles for Survival Mode]
+[Aesthetic and Animation styles for Survival Mode - Full code in version control]
+```css
+.survival-arena-root {
+  min-height: 100vh;
+  width: 100%;
+  background: #0A0216;
+  background-image: 
+    linear-gradient(135deg, rgba(82, 35, 128, 0.2) 0%, transparent 40%),
+    linear-gradient(225deg, rgba(253, 224, 71, 0.05) 0%, transparent 40%);
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
+  justify-content: flex-start;
+  position: relative;
+  overflow-x: hidden;
+  font-family: 'Montserrat', 'Inter', sans-serif;
+  color: #F8FAFC;
+}
+
+.wide-config {
+  width: 95%;
+  max-width: 900px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 3rem !important;
+  margin: 2rem auto !important;
+  z-index: 10;
+}
+```

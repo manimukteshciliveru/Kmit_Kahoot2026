@@ -4,14 +4,17 @@
 
 .survival-arena-root {
   min-height: 100vh;
+  width: 100%;
   background: #0A0216;
   background-image: 
-    radial-gradient(ellipse at 30% 10%, rgba(253, 224, 71, 0.1) 0%, transparent 60%),
-    radial-gradient(ellipse at 70% 90%, rgba(226, 27, 60, 0.1) 0%, transparent 60%);
+    linear-gradient(135deg, rgba(82, 35, 128, 0.2) 0%, transparent 40%),
+    linear-gradient(225deg, rgba(253, 224, 71, 0.05) 0%, transparent 40%);
   display: flex;
   flex-direction: column;
+  align-items: center; /* Centering Fix - Issue 2 */
+  justify-content: flex-start;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
   font-family: 'Montserrat', 'Inter', sans-serif;
   color: #F8FAFC;
 }
@@ -32,6 +35,7 @@
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  flex: 1;
 }
 
 .lobby-header {
@@ -59,10 +63,13 @@
 }
 
 .wide-config {
-  max-width: 800px !important;
+  width: 95%;
+  max-width: 900px !important;
   display: flex !important;
   flex-direction: column !important;
   padding: 3rem !important;
+  margin: 2rem auto !important; /* Centering Fix - Issue 2 */
+  z-index: 10;
 }
 
 .scroll-form {
