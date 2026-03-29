@@ -5,7 +5,7 @@ import { toast } from 'react-hot-toast';
 import { 
     LuSword, LuUsers, LuTrophy, LuTimer, LuSkull, 
     LuBookOpen, LuX, LuChevronRight, LuTarget, 
-    LuZap, LuShieldCheck, LuCrown, LuFlame, LuHeart, LuLoader2
+    LuZap, LuShieldCheck, LuCrown, LuFlame, LuHeart, LuLoader
 } from 'react-icons/lu';
 import './BattleArena.css';
 
@@ -397,7 +397,7 @@ const BattleArena = () => {
                         )}
                         {roundStatus === 'waiting_match_end' && (
                             <div className="waiting-overlay glass animate-float">
-                                <LuLoader2 className="spinner-icon mx-auto text-4xl mb-4 text-blue-400 animate-spin" />
+                                <LuLoader className="spinner-icon mx-auto text-4xl mb-4 text-blue-400 animate-spin" />
                                 <h3>Finishing up!</h3>
                                 <p>Waiting for the battle to conclude...</p>
                             </div>

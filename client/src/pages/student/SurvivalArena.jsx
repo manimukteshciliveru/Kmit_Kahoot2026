@@ -6,7 +6,7 @@ import { toast } from 'react-hot-toast';
 import { 
     FiZap, FiUsers, FiAward, FiAlertCircle, 
     FiShield, FiTrendingUp, FiCheckCircle, FiXCircle,
-    FiSearch, FiTrophy
+    FiSearch
 } from 'react-icons/fi';
 import './SurvivalArena.css';
 
@@ -348,7 +348,7 @@ const SurvivalArena = () => {
             <div className="survival-arena-root">
                 <div className="survival-results animate-fadeIn">
                     <div className="results-card glass">
-                        {isMe ? <FiAward className="winner-icon animate-bounce" /> : <FiTrophy className="winner-icon" />}
+                        <FiAward className="winner-icon" />
                         <h1>{isMe ? 'SURVIVOR SUPREME' : 'ARENA CONCLUDED'}</h1>
                         <p>Winner: <strong>{winner?.name || 'Absolute Stalemate'}</strong></p>
                         <div className="final-lb">
