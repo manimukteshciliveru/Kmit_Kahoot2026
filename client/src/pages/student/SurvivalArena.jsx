@@ -392,7 +392,7 @@ const SurvivalArena = () => {
                         )}
                         
                         <div className="form-row">
-                            <div className="config-group">
+                            <div className="form-group">
                                 <label>INTENSITY PROTOCOL</label>
                                 <div className="select-wrapper glass">
                                     <select 
