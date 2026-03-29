@@ -58,6 +58,87 @@
   font-size: 1.1rem;
 }
 
+.wide-config {
+  max-width: 800px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 3rem !important;
+}
+
+.scroll-form {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 1rem;
+  margin-top: 1.5rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.source-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.5rem;
+  border-radius: 14px;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.source-tabs button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  border: none;
+  background: none;
+  color: white;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0.6;
+}
+
+.source-tabs button.active {
+  background: rgba(253, 224, 71, 0.15);
+  color: #FDE047;
+  opacity: 1;
+}
+
+.locked-badge {
+  background: rgba(253, 224, 71, 0.05);
+  border: 1px dashed rgba(253, 224, 71, 0.3);
+  padding: 0.8rem;
+  border-radius: 10px;
+  color: #FDE047;
+  font-weight: 900;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.pdf-upload-hint {
+  background: rgba(253, 224, 71, 0.05);
+  border: 1px solid rgba(253, 224, 71, 0.1);
+  padding: 2rem;
+  border-radius: 14px;
+  text-align: center;
+  color: #FDE047;
+}
+
+.room-desc-banner {
+  opacity: 0.7;
+  font-size: 1rem;
+  margin-bottom: 2rem;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .btn-create {
   display: flex;
   align-items: center;

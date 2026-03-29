@@ -108,9 +108,10 @@ module.exports = (io, socket) => {
     // ── 1. CREATE ROOM ────────────────────────────────────────
     socket.on('survival:create', async (data) => {
         const {
-            topic       = 'General',
-            difficulty  = 'medium',
-            maxQuestions = 10,
+            topic        = 'General',
+            difficulty   = 'medium',
+            title        = 'Survival Arena',
+            description  = 'Survival Match',
             maxPlayers   = 50,
             quizId       = null
         } = data || {};
@@ -120,11 +121,14 @@ module.exports = (io, socket) => {
         const room = {
             roomId,
             pin,
+            title,
+            description,
             host:          userId,
             hostName:      userName,
             topic,
+            content:       data.content || null, // Store pasted text or PDF content
             difficulty,
-            maxQuestions,
+            maxQuestions:  5,
             maxPlayers:    parseInt(maxPlayers) || 50,
             quizId,
             status:        'waiting',
@@ -157,11 +161,11 @@ module.exports = (io, socket) => {
         });
 
         socket.emit('survival:created', { 
-            roomId, pin, topic, difficulty, 
-            maxQuestions, maxPlayers: room.maxPlayers 
+            roomId, pin, topic, title, description,
+            difficulty, maxQuestions: 5, maxPlayers: room.maxPlayers 
         });
         broadcastRoomsList(io); 
-        logger.info(`[SURVIVAL] Room created: ${roomId} | PIN: ${pin} by ${userName}`);
+        logger.info(`[SURVIVAL] Room created: ${roomId} | PIN: ${pin} | Rounds: 5`);
     });
 
     // ── 1.1 JOIN BY PIN ───────────────────────────────────────
@@ -225,6 +229,8 @@ module.exports = (io, socket) => {
 
         socket.emit('survival:room_state', {
             roomId,
+            title:      room.title,
+            description: room.description,
             topic:      room.topic,
             difficulty: room.difficulty,
             players:    playersArr,
@@ -298,7 +304,7 @@ module.exports = (io, socket) => {
             correctAnswer:  q.correctAnswer,
             isCorrect,
             timeTaken,
-            scoreAwarded:  isCorrect ? getPoints(room.difficulty) : 0
+            scoreAwarded:  isCorrect ? getPointsByRound(questionIndex + 1) : 0
         };
 
         player.answers.push(answerRecord);
@@ -398,10 +404,9 @@ const sendNextQuestion = async (io, room) => {
     room.pendingAnswers = new Set(alivePlayers.map(p => p.userId));
 
     // ── Try AI first, fallback to DB ───────────────────────────
-    let qData = null;
     try {
-        logger.info(`[SURVIVAL] Generating AI question for room ${roomId} | Q${room.currentQIndex + 1}`);
-        qData = await generateAIQuestion(topic, difficulty);
+        logger.info(`[SURVIVAL] Generating AI Q for room ${roomId} | Q${room.currentQIndex + 1} | Source: ${room.content ? 'Content' : 'Topic'}`);
+        qData = await generateAIQuestion(topic, difficulty, room.content);
         if (qData) qData.source = 'ai';
     } catch (err) {
         logger.warn(`[SURVIVAL] AI generation exception: ${err.message}`);
@@ -581,7 +586,11 @@ const endGame = async (io, room, reason = 'completed') => {
 
     // Assign final ranks
     allPlayers.forEach((p, i) => { p.rank = i + 1; });
-    const winner = allPlayers[0] || null;
+    
+    // Rule: Stalemate? (Everyone eliminated in same round)
+    // Or did someone actually survive?
+    const actualSurvivors = allPlayers.filter(p => p.isAlive);
+    const winner = actualSurvivors.length === 1 ? actualSurvivors[0] : allPlayers[0];
 
     // Build leaderboard payload
     const leaderboard = allPlayers.map(p => ({
@@ -665,18 +674,24 @@ const broadcastRoomsList = (io) => {
         if (room.status === 'waiting') {
             openRooms.push({
                 roomId,
+                title:       room.title,
+                description: room.description,
                 hostName:    room.hostName,
                 topic:       room.topic,
                 difficulty:  room.difficulty,
                 playerCount: room.alivePlayers.size,
-                maxPlayers:  50
+                maxPlayers:  room.maxPlayers
             });
         }
     }
     io.emit('survival:rooms_list', openRooms);
 };
 
-// ── Utility helpers ───────────────────────────────────────────
+// -- Round-based Scoring (Requirement: 5, 10, 15, 20, 25) --
+const getPointsByRound = (round) => {
+    const table = { 1: 5, 2: 10, 3: 15, 4: 20, 5: 25 };
+    return table[round] || 0;
+};
 
 const getPoints = (difficulty) => {
     const pts = { easy: 5, medium: 10, hard: 15, advanced: 20 };

@@ -6,7 +6,8 @@ import { toast } from 'react-hot-toast';
 import { 
     FiZap, FiUsers, FiAward, FiAlertCircle, 
     FiShield, FiTrendingUp, FiCheckCircle, FiXCircle,
-    FiSearch, FiLayers, FiClock, FiCopy
+    FiSearch, FiLayers, FiClock, FiCopy, FiFileText, FiBookOpen,
+    FiUploadCloud, FiArrowRight, FiTarget
 } from 'react-icons/fi';
 import './SurvivalArena.css';
 
@@ -36,9 +37,15 @@ const SurvivalArena = () => {
     const [availableRooms, setAvailableRooms] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [pinInput, setPinInput] = useState('');
-    const [configTopic, setConfigTopic] = useState('General');
-    const [configQuestions, setConfigQuestions] = useState(10);
+    
+    // -- Enhanced Config States --
+    const [configTitle, setConfigTitle] = useState('');
+    const [configDescription, setConfigDescription] = useState('');
+    const [configTopic, setConfigTopic] = useState('');
+    const [configContent, setConfigContent] = useState('');
+    const [configSource, setConfigSource] = useState('topic'); // 'topic' | 'text' | 'pdf'
     const [configMaxPlayers, setConfigMaxPlayers] = useState(50);
+    const [configDifficulty, setConfigDifficulty] = useState('medium');
 
     const timerRef = useRef(null);
     const myAnswerRef = useRef(null);
@@ -63,11 +70,18 @@ const SurvivalArena = () => {
     }, [isSubmitting, roomState, currentQuestion, socket]);
 
     const handleCreateRoom = () => {
+        if (!configTitle) return toast.error('Please enter a game title');
+        if (configSource === 'topic' && !configTopic) return toast.error('Enter a topic keyword');
+        if (configSource === 'text' && !configContent) return toast.error('Paste some content');
+
         socket.emit('survival:create', { 
-            topic: configTopic, 
-            difficulty: 'mixed',
-            maxQuestions: configQuestions,
-            maxPlayers: configMaxPlayers
+            title: configTitle,
+            description: configDescription,
+            topic: configSource === 'topic' ? configTopic : (configTitle || 'Custom Content'),
+            content: configSource === 'text' ? configContent : null,
+            difficulty: configDifficulty,
+            maxQuestions: 5,
+            maxPlayers: Math.min(75, Math.max(2, configMaxPlayers))
         });
     };
 
@@ -206,52 +220,73 @@ const SurvivalArena = () => {
     if (view === 'configure') {
         return (
             <div className="survival-arena-root">
-                <div className="survival-config-card glass animate-fadeIn">
+                <div className="survival-config-card glass animate-fadeIn wide-config">
                     <FiLayers className="config-icon" />
-                    <h2>Setup Survival Room</h2>
-                    <p>Customize your private arena rules</p>
+                    <h2>Launch Survival Arena</h2>
+                    <p>Setup a 5-round elimination battle</p>
                     
-                    <div className="config-form">
-                        <div className="form-group">
-                            <label>Battle Topic</label>
-                            <select value={configTopic} onChange={(e) => setConfigTopic(e.target.value)}>
-                                <option value="General">General / mixed</option>
-                                <option value="Python">Python</option>
-                                <option value="Java">Java</option>
-                                <option value="JavaScript">JavaScript</option>
-                                <option value="Data Structures">Data Structures</option>
-                                <option value="Algorithms">Algorithms</option>
-                            </select>
+                    <div className="config-form scroll-form">
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Battle Title</label>
+                                <input type="text" placeholder="e.g., Python Masters" value={configTitle} onChange={e => setConfigTitle(e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                                <label>Capacity (2-75)</label>
+                                <input type="number" min="2" max="75" value={configMaxPlayers} onChange={e => setConfigMaxPlayers(e.target.value)} />
+                            </div>
                         </div>
+
                         <div className="form-group">
-                            <label>Total Questions ({configQuestions})</label>
-                            <input 
-                                type="range" 
-                                min="5" 
-                                max="50" 
-                                step="5" 
-                                value={configQuestions} 
-                                onChange={(e) => setConfigQuestions(parseInt(e.target.value))} 
-                                className="range-slider"
-                            />
+                            <label>Description</label>
+                            <textarea placeholder="Tell players what this match is about..." value={configDescription} onChange={e => setConfigDescription(e.target.value)} rows="2" />
                         </div>
+
+                        <div className="source-tabs">
+                            <button className={configSource === 'topic' ? 'active' : ''} onClick={() => setConfigSource('topic')}><FiSearch /> Topic</button>
+                            <button className={configSource === 'text' ? 'active' : ''} onClick={() => setConfigSource('text')}><FiFileText /> Paste Text</button>
+                            <button className={configSource === 'pdf' ? 'active' : ''} onClick={() => setConfigSource('pdf')}><FiBookOpen /> PDF</button>
+                        </div>
+
+                        {configSource === 'topic' && (
+                            <div className="form-group animate-slideDown">
+                                <label>Topic Keyword</label>
+                                <input type="text" placeholder="e.g., Photosynthesis" value={configTopic} onChange={e => setConfigTopic(e.target.value)} />
+                            </div>
+                        )}
+
+                        {configSource === 'text' && (
+                            <div className="form-group animate-slideDown">
+                                <label>Paste Content</label>
+                                <textarea placeholder="Paste text here... Gemini will generate questions from it." value={configContent} onChange={e => setConfigContent(e.target.value)} rows="4" />
+                            </div>
+                        )}
+
+                        {configSource === 'pdf' && (
+                            <div className="pdf-upload-hint animate-slideDown">
+                                <FiUploadCloud />
+                                <p>Upload PDF feature coming soon! Use Paste Text for now.</p>
+                            </div>
+                        )}
                         
-                        <div className="form-group">
-                            <label>Player Limit ({configMaxPlayers})</label>
-                            <input 
-                                type="range" 
-                                min="2" 
-                                max="100" 
-                                step="5" 
-                                value={configMaxPlayers} 
-                                onChange={(e) => setConfigMaxPlayers(parseInt(e.target.value))} 
-                                className="range-slider"
-                            />
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Difficulty</label>
+                                <select value={configDifficulty} onChange={e => setConfigDifficulty(e.target.value)}>
+                                    <option value="easy">Easy (Fundamentals)</option>
+                                    <option value="medium">Medium (Standard)</option>
+                                    <option value="hard">Hard (Competitive)</option>
+                                </select>
+                            </div>
+                            <div className="form-group rounds-locked">
+                                <label>Rounds</label>
+                                <div className="locked-badge">5 FIXED</div>
+                            </div>
                         </div>
                         
                         <div className="config-actions">
-                            <button className="btn-cancel" onClick={() => setView('lobby')}>Cancel</button>
-                            <button className="btn-launch" onClick={handleCreateRoom}>Generate PIN</button>
+                            <button className="btn-cancel" onClick={() => setView('lobby')}>Back</button>
+                            <button className="btn-launch" onClick={handleCreateRoom}>GENERATE MATCH PIN</button>
                         </div>
                     </div>
                 </div>
@@ -348,15 +383,16 @@ const SurvivalArena = () => {
                            </div>
                         )}
                         <FiZap className="pulse-icon" />
-                        <h1>Entry Portal Active</h1>
+                        <h1>{roomState?.title || 'Entry Portal Active'}</h1>
+                        <p className="room-desc-banner">{roomState?.description}</p>
                         <div className="room-summary">
                             <div className="summary-item">
-                                <label>Topic</label>
+                                <label>Focus</label>
                                 <strong>{roomState?.topic}</strong>
                             </div>
                             <div className="summary-item">
                                 <label>Target</label>
-                                <strong>{roomState?.maxQuestions} Rounds</strong>
+                                <strong>5 Rounds</strong>
                             </div>
                             <div className="summary-item">
                                 <label>Capacity</label>

@@ -46,47 +46,33 @@ const setCache = (key, data) => {
  * Builds a structured Gemini prompt for a single MCQ question
  * with adaptive time estimation for average and below-average students.
  */
-const buildPrompt = (topic, difficulty) => `
-You are an expert educational quiz creator for a competitive quiz platform.
+const buildPrompt = (topic, difficulty, content = null) => `
+You are an expert quiz master. Generate exactly 1 MCQ based on ${content ? 'the following context' : `the topic: "${topic}"`}.
 
-Generate exactly 1 multiple-choice question on the topic: "${topic}"
-Difficulty level: "${difficulty}"
+${content ? `CONTEXT: """${content}"""` : ''}
+
+Difficulty: "${difficulty}"
 
 STRICT OUTPUT RULES:
-1. Return ONLY a valid JSON object. No markdown, no backticks, no extra text.
-2. The JSON must have these exact keys:
-   - "question": string — the question text
-   - "options": array of exactly 4 strings — the answer choices
-   - "correctAnswer": string — must be the EXACT TEXT of the correct option (not an index)
-   - "explanation": string — one sentence explaining why the answer is correct
-   - "difficulty": "${difficulty}"
-   - "topic": "${topic}"
-   - "timeEstimate": object with keys:
-       - "averageStudent": number (seconds an average student needs to solve this)
-       - "belowAverageStudent": number (seconds a below-average student needs — always >= averageStudent)
+1. Return ONLY a valid JSON object.
+2. Keys: "question", "options" (4), "correctAnswer", "explanation", "difficulty", "topic", "timeEstimate".
+3. TIME MASTER RULE: You must individually decide the timer for this specific question based on its depth.
+   - Simple recall: 10–15s
+   - Logic/Math/Analysis: 20–40s
+   - Very Complex: 40–60s
+   Return this in "timeEstimate.averageStudent".
+4. If context is provided, ensure the question and all options are derived EXCLUSIVELY from that text.
 
-3. For difficulty calibration:
-   - easy:    averageStudent ≈ 8–12s,  belowAverageStudent ≈ 12–18s
-   - medium:  averageStudent ≈ 15–20s, belowAverageStudent ≈ 22–30s
-   - hard:    averageStudent ≈ 22–28s, belowAverageStudent ≈ 30–45s
-
-4. correctAnswer MUST match one of the 4 options exactly.
-
-Example output for a medium Java question:
+Example:
 {
-  "question": "What is the output of System.out.println(10 / 3) in Java?",
-  "options": ["3.33", "3", "Error", "3.0"],
-  "correctAnswer": "3",
-  "explanation": "Java performs integer division when both operands are int, truncating the decimal part.",
-  "difficulty": "medium",
-  "topic": "Java",
-  "timeEstimate": {
-    "averageStudent": 15,
-    "belowAverageStudent": 25
-  }
+  "question": "...",
+  "options": ["...", "...", "...", "..."],
+  "correctAnswer": "...",
+  "explanation": "...",
+  "difficulty": "${difficulty}",
+  "topic": "${topic}",
+  "timeEstimate": { "averageStudent": 25, "belowAverageStudent": 35 }
 }
-
-Now generate 1 question for topic "${topic}" at "${difficulty}" difficulty. Return ONLY the JSON object.
 `.trim();
 
 // ── Timer Decision Logic ──────────────────────────────────────
@@ -136,25 +122,14 @@ const extractJSON = (raw) => {
 /**
  * Generates a single AI MCQ question with time estimate.
  *
- * @param {string} topic      - Question topic (e.g., "Java", "Python", "DBMS")
- * @param {string} difficulty - "easy" | "medium" | "hard" | "advanced"
- * @returns {Promise<{
- *   question: string,
- *   options: string[],
- *   correctAnswer: string,
- *   explanation: string,
- *   difficulty: string,
- *   topic: string,
- *   timeEstimate: { averageStudent: number, belowAverageStudent: number },
- *   timer: number
- * }>}
+ * @param {string} topic      - Question topic
+ * @param {string} difficulty - "easy" | "medium" | "hard"
+ * @param {string} content    - (Optional) Pasted content or PDF context
+ * @returns {Promise<any>}
  */
-const generateAIQuestion = async (topic, difficulty = 'medium') => {
-    const cacheKey = `${topic}::${difficulty}::${Date.now() % 1000}`; // Soft refresh every second
-    const cached = getCached(`${topic}::${difficulty}`);
-    // We intentionally don't return cached for survival mode (unique each round)
-
-    const prompt = buildPrompt(topic, difficulty);
+const generateAIQuestion = async (topic, difficulty = 'medium', content = null) => {
+    const cacheKey = `${topic}::${difficulty}::${Date.now() % 1000}`; 
+    const prompt = buildPrompt(topic, difficulty, content);
     let lastError = null;
 
     for (const modelName of GEMINI_MODELS) {
