@@ -16,13 +16,7 @@ const SurvivalArena = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // -- Authentication Helper --
-    const myId = useMemo(() => {
-        const id = user?.id || user?._id;
-        return id ? id.toString() : null;
-    }, [user]);
-
-    // -- Game State --
+    // ── STEP 1: ALL useState Hooks First ───────────────────
     const [view, setView] = useState('lobby'); // lobby, preparing, playing, eliminated, results
     const [roomState, setRoomState] = useState(null);
     const [currentQuestion, setCurrentQuestion] = useState(null);
@@ -50,20 +44,19 @@ const SurvivalArena = () => {
     const [isCreating, setIsCreating] = useState(false);
     const [isStarting, setIsStarting] = useState(false);
 
+    // ── STEP 2: ALL useRef Hooks Second ───────────────────
     const creationTimeoutRef = useRef(null); // Bug 8 rename
     const timerRef = useRef(null);
     const myAnswerRef = useRef(null);
     const isEliminatedRef = useRef(false);
 
-    // Warning 2: Stabilize timer
-    const handleSubmitAnswerRef = useRef(handleSubmitAnswer);
-    useEffect(() => { handleSubmitAnswerRef.current = handleSubmitAnswer; }, [handleSubmitAnswer]);
+    // ── STEP 3: useMemo Hooks Third ───────────────────────
+    const myId = useMemo(() => {
+        const id = user?.id || user?._id;
+        return id ? id.toString() : null;
+    }, [user]);
 
-    // Sync refs
-    useEffect(() => { myAnswerRef.current = myAnswer; }, [myAnswer]);
-    useEffect(() => { isEliminatedRef.current = isEliminated; }, [isEliminated]);
-
-    // -- Actions --
+    // ── STEP 4: useCallback Hooks Fourth ──────────────────
     const handleSubmitAnswer = useCallback((answer) => {
         if (isSubmitting || isEliminatedRef.current) return;
         setMyAnswer(answer);
@@ -77,13 +70,20 @@ const SurvivalArena = () => {
         }
     }, [isSubmitting, roomState, currentQuestion, socket]);
 
-    // Gap 1: readFileAsText helper
+    // Use ref to keep a stable reference for the timer callback (Warning 2 Fix)
+    const handleSubmitAnswerRef = useRef(handleSubmitAnswer);
+    useEffect(() => { 
+        handleSubmitAnswerRef.current = handleSubmitAnswer; 
+    }, [handleSubmitAnswer]);
+
+    // ── STEP 5: Helper Functions ─────────────────────────
     const readFileAsText = (file) => new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => resolve(e.target.result);
         reader.readAsText(file);
     });
 
+    // ── Actions ───────────────────────────────────────────
     const handleCreateRoom = async () => {
         if (!socket?.connected) return toast.error('Check your internet connection!');
         if (!configTitle) return toast.error('Please enter a game title');
