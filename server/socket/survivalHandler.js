@@ -111,7 +111,8 @@ module.exports = (io, socket) => {
             topic       = 'General',
             difficulty  = 'medium',
             maxQuestions = 10,
-            quizId      = null
+            maxPlayers   = 50,
+            quizId       = null
         } = data || {};
 
         const roomId = mkRoomId();
@@ -124,6 +125,7 @@ module.exports = (io, socket) => {
             topic,
             difficulty,
             maxQuestions,
+            maxPlayers:    parseInt(maxPlayers) || 50,
             quizId,
             status:        'waiting',
             currentQIndex: -1,
@@ -154,7 +156,10 @@ module.exports = (io, socket) => {
             eliminatedAt:   null
         });
 
-        socket.emit('survival:created', { roomId, pin, topic, difficulty, maxQuestions });
+        socket.emit('survival:created', { 
+            roomId, pin, topic, difficulty, 
+            maxQuestions, maxPlayers: room.maxPlayers 
+        });
         broadcastRoomsList(io); 
         logger.info(`[SURVIVAL] Room created: ${roomId} | PIN: ${pin} by ${userName}`);
     });
@@ -178,6 +183,11 @@ module.exports = (io, socket) => {
 
         if (!room) return socket.emit('error', { message: 'Survival room not found.' });
         if (room.status !== 'waiting') return socket.emit('error', { message: 'Game already in progress.' });
+        
+        // CHECK PLAYER LIMIT
+        if (room.alivePlayers.size >= room.maxPlayers) {
+            return socket.emit('error', { message: `Room is full. Max capacity is ${room.maxPlayers} players.` });
+        }
 
         socket.join(`survival:${roomId}`);
 

@@ -38,6 +38,7 @@ const SurvivalArena = () => {
     const [pinInput, setPinInput] = useState('');
     const [configTopic, setConfigTopic] = useState('General');
     const [configQuestions, setConfigQuestions] = useState(10);
+    const [configMaxPlayers, setConfigMaxPlayers] = useState(50);
 
     const timerRef = useRef(null);
     const myAnswerRef = useRef(null);
@@ -65,7 +66,8 @@ const SurvivalArena = () => {
         socket.emit('survival:create', { 
             topic: configTopic, 
             difficulty: 'mixed',
-            maxQuestions: configQuestions 
+            maxQuestions: configQuestions,
+            maxPlayers: configMaxPlayers
         });
     };
 
@@ -234,6 +236,19 @@ const SurvivalArena = () => {
                             />
                         </div>
                         
+                        <div className="form-group">
+                            <label>Player Limit ({configMaxPlayers})</label>
+                            <input 
+                                type="range" 
+                                min="2" 
+                                max="100" 
+                                step="5" 
+                                value={configMaxPlayers} 
+                                onChange={(e) => setConfigMaxPlayers(parseInt(e.target.value))} 
+                                className="range-slider"
+                            />
+                        </div>
+                        
                         <div className="config-actions">
                             <button className="btn-cancel" onClick={() => setView('lobby')}>Cancel</button>
                             <button className="btn-launch" onClick={handleCreateRoom}>Generate PIN</button>
@@ -341,7 +356,11 @@ const SurvivalArena = () => {
                             </div>
                             <div className="summary-item">
                                 <label>Target</label>
-                                <strong>{roomState?.maxQuestions} Questions</strong>
+                                <strong>{roomState?.maxQuestions} Rounds</strong>
+                            </div>
+                            <div className="summary-item">
+                                <label>Capacity</label>
+                                <strong>{roomState?.maxPlayers} Slots</strong>
                             </div>
                         </div>
                         <div className="survivors-list">
