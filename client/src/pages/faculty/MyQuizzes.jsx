@@ -79,7 +79,7 @@ const MyQuizzes = () => {
                     <h1>My Quizzes</h1>
                     <p>Manage all your quizzes in one place</p>
                 </div>
-                <Link to="/create-quiz" className="btn btn-primary">
+                <Link to="/faculty/create" className="btn btn-primary">
                     <FiPlus /> New Quiz
                 </Link>
             </div>

@@ -62,6 +62,7 @@ const App = () => {
                     <Route path="users" element={<UserManagement />} />
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="settings" element={<Settings />} />
+                    <Route path="profile" element={<Profile />} />
                 </Route>
 
                 {/* Faculty Routes */}
@@ -71,6 +72,7 @@ const App = () => {
                     <Route path="quizzes" element={<MyQuizzes />} />
                     <Route path="create" element={<CreateQuiz />} />
                     <Route path="analytics" element={<FacultyAnalytics />} />
+                    <Route path="profile" element={<Profile />} />
                 </Route>
 
                 {/* Student Routes */}

@@ -274,7 +274,7 @@ const AdminDashboard = () => {
                         <div className="dashboard-card">
                             <div className="card-header">
                                 <h2>Recent Users</h2>
-                                <Link to="/users" className="view-all">
+                                <Link to="/admin/users" className="view-all">
                                     View All <FiArrowRight />
                                 </Link>
                             </div>
@@ -311,31 +311,31 @@ const AdminDashboard = () => {
                         </div>
                         <div className="card-body">
                             <div className="action-grid admin-actions">
-                                <Link to="/users/new" className="action-item">
+                                <Link to="/admin/users/new" className="action-item">
                                     <div className="action-icon primary">
                                         <FiUserPlus />
                                     </div>
                                     <span>Add User</span>
                                 </Link>
-                                <Link to="/analytics" className="action-item">
+                                <Link to="/admin/analytics" className="action-item">
                                     <div className="action-icon secondary">
                                         <FiActivity />
                                     </div>
                                     <span>Server Health</span>
                                 </Link>
-                                <Link to="/quiz-analytics" className="action-item">
+                                <Link to="/admin/quiz-analytics" className="action-item">
                                     <div className="action-icon info">
                                         <FiGrid />
                                     </div>
                                     <span>Quiz Metrics</span>
                                 </Link>
-                                <Link to="/users" className="action-item">
+                                <Link to="/admin/users" className="action-item">
                                     <div className="action-icon accent">
                                         <FiUsers />
                                     </div>
                                     <span>All Users</span>
                                 </Link>
-                                <Link to="/settings" className="action-item">
+                                <Link to="/admin/settings" className="action-item">
                                     <div className="action-icon info">
                                         <FiSettings />
                                     </div>

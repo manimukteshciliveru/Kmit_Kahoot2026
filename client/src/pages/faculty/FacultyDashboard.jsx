@@ -208,7 +208,7 @@ const FacultyDashboard = () => {
                     <h1>Welcome, {(user?.name || 'Faculty').split(' ')[0]}! 🎓</h1>
                     <p>Quiz analytics and management dashboard</p>
                 </div>
-                <Link to="/create-quiz" className="btn btn-primary">
+                <Link to="/faculty/create" className="btn btn-primary">
                     <FiPlus /> Create Quiz
                 </Link>
             </div>
@@ -348,7 +348,7 @@ const FacultyDashboard = () => {
                 <div className="section-header">
                     <h2><FiGrid /> {isDashboard ? 'Recent Quizzes' : (isAnalyticsView || filter === 'completed') ? 'Quiz Analytics' : 'All My Quizzes'}</h2>
                     {isDashboard && (
-                        <Link to="/my-quizzes" className="link-btn">
+                        <Link to="/faculty/quizzes" className="link-btn">
                             View All <FiArrowRight />
                         </Link>
                     )}
@@ -482,7 +482,7 @@ const FacultyDashboard = () => {
                         <span className="empty-icon">📋</span>
                         <h3>No quizzes yet</h3>
                         <p>Create your first quiz to get started</p>
-                        <Link to="/create-quiz" className="btn btn-primary">
+                        <Link to="/faculty/create" className="btn btn-primary">
                             <FiPlus /> Create Quiz
                         </Link>
                     </div>
@@ -556,16 +556,16 @@ const FacultyDashboard = () => {
                         <h3><FiTrendingUp /> Quick Actions</h3>
                     </div>
                     <div className="quick-grid">
-                        <Link to="/profile" className="quick-btn">
+                        <Link to="/faculty/profile" className="quick-btn">
                             <FiUser /> My Profile
                         </Link>
-                        <Link to="/create-quiz" className="quick-btn">
+                        <Link to="/faculty/create" className="quick-btn">
                             <FiPlus /> New Quiz
                         </Link>
-                        <Link to="/my-quizzes" className="quick-btn">
+                        <Link to="/faculty/quizzes" className="quick-btn">
                             <FiGrid /> All Quizzes
                         </Link>
-                        <Link to="/my-analytics" className="quick-btn">
+                        <Link to="/faculty/analytics" className="quick-btn">
                             <FiBarChart2 /> Analytics
                         </Link>
                     </div>

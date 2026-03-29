@@ -45,24 +45,23 @@ const Navbar = () => {
         switch (user.role) {
             case 'student':
                 return [
-                    { path: '/dashboard',  icon: <FiHome />,     label: 'Dashboard' },
-                    { path: '/join-quiz',  icon: <FiGrid />,     label: 'Join Quiz' },
-                    { path: '/games',      icon: <FiTarget />,   label: 'Game Hub' },
-                    { path: '/history',    icon: <FiFileText />, label: 'History' }
+                    { path: '/student/dashboard', icon: <FiHome />,     label: 'Dashboard' },
+                    { path: '/student/join',      icon: <FiGrid />,     label: 'Join Quiz' },
+                    { path: '/student/games',     icon: <FiTarget />,   label: 'Game Hub' },
+                    { path: '/student/history',   icon: <FiFileText />, label: 'History' }
                 ];
             case 'faculty':
                 return [
-                    { path: '/dashboard',   icon: <FiHome />,       label: 'Dashboard' },
-                    { path: '/my-quizzes',  icon: <FiGrid />,       label: 'My Quizzes' },
-                    { path: '/create-quiz', icon: <FiPlusCircle />, label: 'Create Quiz' }
+                    { path: '/faculty/dashboard', icon: <FiHome />,       label: 'Dashboard' },
+                    { path: '/faculty/quizzes',   icon: <FiGrid />,       label: 'My Quizzes' },
+                    { path: '/faculty/create',    icon: <FiPlusCircle />, label: 'Create Quiz' }
                 ];
             case 'admin':
                 return [
-                    { path: '/dashboard',      icon: <FiHome />,     label: 'Dashboard' },
-                    { path: '/analytics',      icon: <FiActivity />, label: 'Server Health' },
-                    { path: '/quiz-analytics', icon: <FiGrid />,     label: 'Quiz Metrics' },
-                    { path: '/users',          icon: <FiUsers />,    label: 'Users' },
-                    { path: '/settings',       icon: <FiSettings />, label: 'Settings' }
+                    { path: '/admin/dashboard', icon: <FiHome />,     label: 'Dashboard' },
+                    { path: '/admin/analytics', icon: <FiActivity />, label: 'Server Health' },
+                    { path: '/admin/users',     icon: <FiUsers />,    label: 'Users' },
+                    { path: '/admin/settings',  icon: <FiSettings />, label: 'Settings' }
                 ];
             default:
                 return [];
@@ -75,7 +74,7 @@ const Navbar = () => {
         <nav className="navbar">
             <div className="navbar-container">
                 {/* Brand */}
-                <Link to="/" className="navbar-brand">
+                <Link to={isAuthenticated ? `/${user.role}/dashboard` : "/"} className="navbar-brand">
                     <div className="brand-logo-wrapper">
                         <KmitLogo height="34px" />
                     </div>
@@ -127,7 +126,7 @@ const Navbar = () => {
                                     </div>
                                 </div>
                                 <div className="user-dropdown">
-                                    <Link to="/profile" className="dropdown-item">
+                                    <Link to={`/${user.role}/profile`} className="dropdown-item">
                                         <FiUser /><span>Profile</span>
                                     </Link>
                                     <button onClick={handleLogout} className="dropdown-item logout">
@@ -189,7 +188,7 @@ const Navbar = () => {
                         ))}
                         <li>
                             <Link
-                                to="/profile"
+                                to={`/${user.role}/profile`}
                                 className="mobile-nav-link"
                                 onClick={() => setMenuOpen(false)}
                             >

@@ -334,7 +334,7 @@ const SurvivalArena = () => {
                             <span className="value">{finalResults?.personal?.finalScore || 0}</span>
                         </div>
                         <button className="btn-spectate" onClick={() => setView('playing')}>Spectate Remainder</button>
-                        <button className="btn-exit" onClick={() => navigate('/games')}>Exit Arena</button>
+                        <button className="btn-exit" onClick={() => navigate('/student/games')}>Exit Arena</button>
                     </div>
                 </div>
             </div>
@@ -364,7 +364,7 @@ const SurvivalArena = () => {
                         </div>
                         <div className="actions">
                             <button className="btn-again" onClick={() => window.location.reload()}>Re-Enter Portal</button>
-                            <button className="btn-exit" onClick={() => navigate('/games')}>Main Hub</button>
+                            <button className="btn-exit" onClick={() => navigate('/student/games')}>Main Hub</button>
                         </div>
                     </div>
                 </div>

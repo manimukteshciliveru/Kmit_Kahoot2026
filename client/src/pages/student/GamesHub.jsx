@@ -15,7 +15,7 @@ const GamesHub = () => {
             description: 'Challenge other students in a real-time high-speed quiz duel. Winner takes all!',
             icon: <FiZap />,
             color: '#EF4444',
-            path: '/battle',
+            path: '/student/battle',
             tag: 'LIVE'
         },
         {
@@ -24,7 +24,7 @@ const GamesHub = () => {
             description: 'AI-powered study sets. Master any subject with active recall and spaced repetition.',
             icon: <FiLayers />,
             color: '#3B82F6',
-            path: '/flashcards',
+            path: '/student/flashcards',
             tag: 'SOLO'
         },
         {
@@ -33,7 +33,7 @@ const GamesHub = () => {
             description: 'How long can you last? One wrong answer and you are out. Build your record streak!',
             icon: <FiTrendingUp />,
             color: '#FDE047',
-            path: '/survival',
+            path: '/student/survival',
             tag: 'NEW'
         }
     ];

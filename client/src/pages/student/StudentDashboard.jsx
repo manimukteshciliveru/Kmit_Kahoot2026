@@ -105,13 +105,11 @@ const StudentDashboard = () => {
                     <p>Ready to test your knowledge? Join a quiz and climb the leaderboard!</p>
                 </div>
                 <div className="header-actions">
-                    <Link to="/join-quiz" className="btn btn-primary btn-lg">
-                        <FiGrid />
-                        Join Quiz
+                    <Link to="/student/join" className="btn btn-primary btn-lg">
+                        <FiZap /> Join a Live Quiz
                     </Link>
-                    <Link to="/games" className="btn btn-accent btn-lg">
-                        <FiTarget />
-                        Game Hub
+                    <Link to="/student/games" className="btn btn-accent btn-lg">
+                        <FiTarget /> Enter Game Hub
                     </Link>
                 </div>
             </div>
@@ -229,8 +227,8 @@ const StudentDashboard = () => {
                 <div className="dashboard-card">
                     <div className="card-header">
                         <h2>Recent Quizzes</h2>
-                        <Link to="/history" className="view-all">
-                            Test Analytics <FiArrowRight />
+                        <Link to="/student/history" className="view-all">
+                            View All <FiArrowRight />
                         </Link>
                     </div>
                     <div className="card-body">
@@ -266,7 +264,7 @@ const StudentDashboard = () => {
                                 <span className="empty-icon">📝</span>
                                 <h3>No quizzes yet</h3>
                                 <p>Join your first quiz to start tracking your progress!</p>
-                                <Link to="/join-quiz" className="btn btn-primary">
+                                <Link to="/student/join" className="btn btn-primary">
                                     Join a Quiz
                                 </Link>
                             </div>
@@ -280,13 +278,13 @@ const StudentDashboard = () => {
                     </div>
                     <div className="card-body">
                         <div className="action-grid">
-                            <Link to="/join-quiz" className="action-item">
+                            <Link to="/student/join" className="action-item">
                                 <div className="action-icon primary">
                                     <FiGrid />
                                 </div>
                                 <span>Join Quiz</span>
                             </Link>
-                            <Link to="/profile" className="action-item">
+                            <Link to="/student/profile" className="action-item">
                                 <div className="action-icon accent">
                                     <FiUser />
                                 </div>

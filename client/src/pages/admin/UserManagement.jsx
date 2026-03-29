@@ -145,16 +145,16 @@ const UserManagement = () => {
         <div className="admin-page">
             <div className="page-header">
                 <div className="header-left">
-                    <Link to="/dashboard" className="back-btn">
-                        <FiArrowLeft /> Back
+                    <Link to="/admin/dashboard" className="back-btn">
+                        <FiArrowLeft /> Back to Dashboard
                     </Link>
                     <h1><FiUsers /> User Management</h1>
                 </div>
                 <div className="header-actions">
-                    <Link to="/users/bulk" className="btn-highlight">
+                    <Link to="/admin/users/bulk" className="btn-highlight">
                         <FiUpload /> Bulk Upload
                     </Link>
-                    <Link to="/users/new" className="btn btn-primary">
+                    <Link to="/admin/users/new" className="btn btn-primary">
                         <FiUserPlus /> Add User
                     </Link>
                 </div>

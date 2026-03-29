@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -21,6 +21,14 @@ const Register = () => {
     const { register } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
+    const { isAuthenticated, user: authUser } = useAuth();
+
+    // 🚀 Auto-redirect if already logged in
+    useEffect(() => {
+        if (isAuthenticated && authUser) {
+            navigate(`/${authUser.role}/dashboard`);
+        }
+    }, [isAuthenticated, authUser, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
