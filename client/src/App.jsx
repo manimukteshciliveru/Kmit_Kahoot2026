@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import React from 'react';
 import { useAuth } from './context/AuthContext';
 
@@ -46,9 +46,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
 const App = () => {
     return (
-        <Router>
-            <Routes>
-                {/* Public Routes */}
+        <Routes>
+            {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/unauthorized" element={<Unauthorized />} />
@@ -93,7 +92,6 @@ const App = () => {
                 {/* Catch All */}
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
-        </Router>
     );
 };
 
