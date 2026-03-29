@@ -81,6 +81,9 @@ const SurvivalArena = () => {
         const attemptId = Date.now();
         creationRef.current = attemptId;
 
+        // DECLARE finalMax here
+        const finalMax = Math.min(75, Math.max(2, parseInt(configMaxPlayers) || 10));
+
         socket.emit('survival:create', { 
             title: configTitle,
             description: configDescription,
@@ -238,8 +241,9 @@ const SurvivalArena = () => {
         };
     }, [socket, connected, startTimer]);
 
-    // -- Helpers --
-    const timerPercent = timerDuration > 0 ? (timeLeft / timerDuration) * 100 : 0;
+    // -- Progress & Aesthetics --
+    const finalMax = timerDuration || 20; 
+    const timerPercent = finalMax > 0 ? (timeLeft / finalMax) * 100 : 0;
     const timerColor = timeLeft <= 5 ? '#EF4444' : timeLeft <= 10 ? '#F59E0B' : '#10B981';
 
     // -- Views --
