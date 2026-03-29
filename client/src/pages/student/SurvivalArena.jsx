@@ -235,14 +235,19 @@ const SurvivalArena = () => {
                                 <input type="text" placeholder="e.g., Python Masters" value={configTitle} onChange={e => setConfigTitle(e.target.value)} />
                             </div>
                             <div className="form-group">
-                                <label>Participation Cap (2-75)</label>
+                                <label>Participation Pool (2-75)</label>
                                 <input 
                                     type="number" 
                                     min="2" 
                                     max="75" 
                                     value={configMaxPlayers} 
                                     onChange={e => setConfigMaxPlayers(e.target.value)} 
-                                    onBlur={() => setConfigMaxPlayers(Math.min(75, Math.max(2, parseInt(configMaxPlayers) || 2)))}
+                                    onBlur={() => {
+                                        let val = parseInt(configMaxPlayers) || 2;
+                                        if (val < 2) val = 2;
+                                        if (val > 75) val = 75;
+                                        setConfigMaxPlayers(val);
+                                    }}
                                 />
                             </div>
                         </div>
@@ -353,13 +358,14 @@ const SurvivalArena = () => {
                                 availableRooms
                                     .filter(r => r.topic.toLowerCase().includes(searchQuery.toLowerCase()) || r.hostName.toLowerCase().includes(searchQuery.toLowerCase()))
                                     .map(room => (
-                                        <div key={room.roomId} className="room-card glass">
+                                        <div key={room.roomId} className="room-card glass animate-slideDown">
                                             <div className="room-info">
-                                                <h3>{room.topic}</h3>
+                                                <h3 className="room-title">{room.title || room.topic}</h3>
+                                                <span className="room-topic-mini">{room.topic}</span>
                                                 <span className="host-name">Host: {room.hostName}</span>
                                                 <div className="room-tags">
                                                     <span className={`difficulty ${room.difficulty}`}>{room.difficulty}</span>
-                                                    <span className="players"><FiUsers /> {room.playerCount}/50</span>
+                                                    <span className="players"><FiUsers /> {room.playerCount} / {room.maxPlayers}</span>
                                                 </div>
                                             </div>
                                             <button className="btn-join" onClick={() => handleJoinRoom(room.roomId)}>Join Battle</button>

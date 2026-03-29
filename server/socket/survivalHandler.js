@@ -28,9 +28,13 @@ const logger         = require('../utils/logger');
 
 // ── In-memory survival rooms ──────────────────────────────────
 // roomId → { host, players, questions, config, status, currentQ, sessionId, pin }
-const survivalRooms = new Map();
+let survivalRooms = new Map();
 // pin → roomId (for quick lookup)
-const pinToRoomId = new Map();
+let pinToRoomId = new Map();
+
+// --- RESET ON START (Fresh Slate Requirement) ---
+survivalRooms.clear();
+pinToRoomId.clear();
 
 // ── Helper: broadcast to all in room ─────────────────────────
 const roomcast = (io, roomId, event, data) => {
@@ -160,12 +164,35 @@ module.exports = (io, socket) => {
             eliminatedAt:   null
         });
 
-        socket.emit('survival:created', { 
-            roomId, pin, topic, title, description,
-            difficulty, maxQuestions: 5, maxPlayers: room.maxPlayers 
-        });
-        broadcastRoomsList(io); 
-        logger.info(`[SURVIVAL] Room created: ${roomId} | PIN: ${pin} | Rounds: 5`);
+        try {
+            const sessionDoc = new SurvivalSession({
+                roomId,
+                pin,
+                title,
+                description,
+                host:       userId,
+                hostName:   userName,
+                topic,
+                difficulty,
+                maxPlayers: room.maxPlayers,
+                status:     'waiting',
+                players:    [{
+                    userId, name: userName, score: 0, isAlive: true
+                }]
+            });
+            await sessionDoc.save();
+            room.sessionDoc = sessionDoc;
+
+            socket.emit('survival:created', { 
+                roomId, pin, topic, title, description,
+                difficulty, maxQuestions: 5, maxPlayers: room.maxPlayers 
+            });
+            broadcastRoomsList(io); 
+            logger.info(`[SURVIVAL] Match Saved & Created: ${roomId} | PIN: ${pin}`);
+        } catch (err) {
+            logger.error('[SURVIVAL] DB Save/Create failed:', err.message);
+            socket.emit('error', { message: 'Database failure. Please try again.' });
+        }
     });
 
     // ── 1.1 JOIN BY PIN ───────────────────────────────────────
@@ -354,11 +381,13 @@ module.exports = (io, socket) => {
             if (room.status === 'waiting') {
                 openRooms.push({
                     roomId,
+                    title:       room.title,
+                    description: room.description,
                     hostName:    room.hostName,
                     topic:       room.topic,
                     difficulty:  room.difficulty,
                     playerCount: room.alivePlayers.size,
-                    maxPlayers:  50
+                    maxPlayers:  room.maxPlayers
                 });
             }
         }
