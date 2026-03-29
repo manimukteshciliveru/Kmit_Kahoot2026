@@ -283,24 +283,6 @@ module.exports = (io, socket) => {
         const room = survivalRooms.get(roomId);
         if (!room) return socket.emit('error', { message: 'Room not found.' });
         if (room.host !== userId) return socket.emit('error', { message: 'Only the host can start.' });
-        if (room.status !== 'waiting') return socket.emit('error', { message: 'Game already started.' });
-        if (room.alivePlayers.size < 1) return socket.emit('error', { message: 'Need at least 1 player.' });
-
-        room.status    = 'active';
-        room.startedAt = new Date();
-
-        // Create MongoDB session document
-        const sessionDoc = new SurvivalSession({
-            roomId,
-            quizId:     room.quizId || null,
-            topic:      room.topic,
-            difficulty: room.difficulty,
-            status:     'active',
-            startedAt:  room.startedAt,
-            players:    []
-        });
-        await sessionDoc.save();
-        room.sessionDoc = sessionDoc;
 
         roomcast(io, roomId, 'survival:game_starting', {
             roomId,

@@ -47,6 +47,7 @@ const SurvivalArena = () => {
     const [configMaxPlayers, setConfigMaxPlayers] = useState(50);
     const [configDifficulty, setConfigDifficulty] = useState('medium');
     const [isCreating, setIsCreating] = useState(false);
+    const [isStarting, setIsStarting] = useState(false); // NEW
     const creationRef = useRef(null); // track current creation attempt
 
     const timerRef = useRef(null);
@@ -118,9 +119,15 @@ const SurvivalArena = () => {
     };
 
     const handleStartGame = () => {
-        if (roomState?.roomId) {
+        if (roomState?.roomId && !isStarting) {
             console.log("🚀 [SURVIVAL] Initiating Battle Protocol...");
+            setIsStarting(true);
             socket.emit('survival:start', { roomId: roomState.roomId });
+            
+            // Safety timeout for start
+            setTimeout(() => {
+                setIsStarting(false);
+            }, 30000); // 30s max for AI generation
         }
     };
 
@@ -177,6 +184,7 @@ const SurvivalArena = () => {
 
         socket.on('survival:game_starting', () => {
             console.log("🏁 [SURVIVAL] Match Initiated by Host!");
+            setIsStarting(false);
             setView('playing'); // Force move to battle zone!
             toast.success('Survival Commencing!', { icon: '🔥' });
         });
@@ -481,11 +489,17 @@ const SurvivalArena = () => {
                         </div>
                         
                         <div className="preparing-actions">
-                            {roomState?.host === myId ? (
-                                <>
-                                    <button className="btn-ignite" onClick={handleStartGame}>INITIATE BATTLE PROTOCOL</button>
-                                    <button className="btn-abort-match" onClick={() => setView('lobby')}>DISMANTLE ROOM</button>
-                                </>
+                             {roomState?.host === myId ? (
+                                 <>
+                                     <button 
+                                        className={`btn-ignite ${isStarting ? 'loading' : ''}`} 
+                                        onClick={handleStartGame}
+                                        disabled={isStarting}
+                                     >
+                                         {isStarting ? 'LAUNCHING BATTLE ENGINES...' : 'INITIATE BATTLE PROTOCOL'}
+                                     </button>
+                                     <button className="btn-abort-match" onClick={() => setView('lobby')}>DISMANTLE ROOM</button>
+                                 </>
                             ) : (
                                 <div className="waiting-for-host">
                                     <div className="loader-ring"></div>
