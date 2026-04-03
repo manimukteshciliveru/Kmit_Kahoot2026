@@ -92,7 +92,8 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
     // 3. Section-wise Performance
     const sectionData = useMemo(() => {
         const topics = {};
-        (report.quizId?.questions || []).forEach(q => {
+        const questions = report?.quizId?.questions || [];
+        questions.forEach(q => {
             const topic = q.topic || 'General';
             if (!topics[topic]) topics[topic] = { topic, total: 0, correct: 0, wrong: 0 };
             topics[topic].total++;
@@ -142,7 +143,6 @@ const StudentVisualReport = ({ report, analytics = {} }) => {
         const avgGlobalTime = validTimes.length ? validTimes.reduce((a, b) => a + b, 0) / validTimes.length : 0;
 
         const result = { data: mapped, averageLine: Number(avgGlobalTime.toFixed(1)) };
-        console.log('[DEBUG] StudentVisualReport - timeData:', result);
         return result;
     }, [report]);
 

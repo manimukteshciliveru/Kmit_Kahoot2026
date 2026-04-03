@@ -64,6 +64,9 @@ const QuizReport = () => {
                     const lbData = lbRes.data.data.leaderboard || [];
                     setLeaderboard(lbData);
                     generateAnalytics(reportData, lbData);
+                } else {
+                    // Quiz might be deleted but response exists
+                    generateAnalytics(reportData, []);
                 }
             } catch (lbError) {
                 console.warn('Leaderboard hidden or inaccessible:', lbError.message);
@@ -124,9 +127,9 @@ const QuizReport = () => {
     };
 
     const generateAnalytics = (data, lbData) => {
-        const totalQ = data.quizId.questions.length;
-        const attempted = data.answers.filter(a => a.answer).length;
-        const correct = data.answers.filter(a => a.isCorrect).length;
+        const totalQ = data.quizId?.questions?.length || data.answers?.length || 0;
+        const attempted = (data.answers || []).filter(a => a.answer).length;
+        const correct = (data.answers || []).filter(a => a.isCorrect).length;
         const incorrect = attempted - correct;
 
         // Calculate Percentile
@@ -146,7 +149,7 @@ const QuizReport = () => {
         setAnalytics({
             totalQuestions: totalQ,
             attempted,
-            unattempted: totalQ - attempted,
+            unattempted: Math.max(0, totalQ - attempted),
             correct,
             incorrect,
             accuracy: attempted > 0 ? ((correct / attempted) * 100).toFixed(1) : 0,
@@ -154,7 +157,7 @@ const QuizReport = () => {
             classAvgTime: Math.max(0, classAvgTimePerQ / 1000).toFixed(1),
             percentile,
             rank: data.rank || '-',
-            classAvgScore: (lbData.reduce((acc, curr) => acc + curr.totalScore, 0) / (lbData.length || 1)).toFixed(1),
+            classAvgScore: lbData?.length > 0 ? (lbData.reduce((acc, curr) => acc + (curr.totalScore || 0), 0) / (lbData.length)).toFixed(1) : data.totalScore,
             performanceCategory: getPerformanceCategory(data.percentage)
         });
     };
