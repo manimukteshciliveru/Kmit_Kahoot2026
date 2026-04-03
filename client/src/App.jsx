@@ -34,6 +34,8 @@ import Profile from './pages/common/Profile';
 
 // Quiz Pages
 import PlayQuiz from './pages/quiz/PlayQuiz';
+import QuizResults from './pages/faculty/QuizResults';
+import QuizReport from './pages/student/QuizReport';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -90,6 +92,16 @@ const App = () => {
 
                 {/* Shared Quiz Play Route */}
                 <Route path="/play/:quizId" element={<ProtectedRoute><PlayQuiz /></ProtectedRoute>} />
+
+                {/* Faculty Quiz Results (shared route outside /faculty prefix) */}
+                <Route path="/quiz/:quizId/results" element={<ProtectedRoute allowedRoles={['faculty', 'admin']}><Layout /></ProtectedRoute>}>
+                    <Route index element={<QuizResults />} />
+                </Route>
+
+                {/* Student Quiz Report (shared route outside /student prefix) */}
+                <Route path="/history/report/:responseId" element={<ProtectedRoute allowedRoles={['student']}><Layout /></ProtectedRoute>}>
+                    <Route index element={<QuizReport />} />
+                </Route>
 
                 {/* Catch All */}
                 <Route path="*" element={<Navigate to="/" />} />
