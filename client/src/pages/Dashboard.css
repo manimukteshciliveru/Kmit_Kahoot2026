@@ -23,7 +23,6 @@
   backdrop-filter: blur(20px);
   position: relative;
   overflow: hidden;
-  animation: fadeInUp 0.5s ease-out;
 }
 
 .dashboard-header::before {
@@ -151,7 +150,6 @@
   overflow: hidden;
   backdrop-filter: blur(12px);
   transition: all 0.3s ease;
-  animation: fadeInUp 0.5s ease-out both;
 }
 
 .dashboard-card:hover {
@@ -172,6 +170,7 @@
   font-weight: 800;
   color: var(--text-primary);
   font-family: 'Montserrat', sans-serif;
+  margin: 0;
 }
 
 .dashboard-card .card-body {

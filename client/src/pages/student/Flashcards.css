@@ -19,8 +19,8 @@
     padding: 2rem;
     max-width: 1200px;
     margin: 0 auto;
-    color: var(--fc-text-main);
-    background-color: var(--fc-bg-main);
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
     overflow-x: hidden;
 }
 

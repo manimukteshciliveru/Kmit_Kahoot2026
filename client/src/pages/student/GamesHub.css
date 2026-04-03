@@ -2,7 +2,7 @@
     padding: 2rem;
     max-width: 1200px;
     margin: 0 auto;
-    color: #F8FAFC;
+    color: var(--text-primary);
     min-height: 85vh;
 }
 
@@ -10,10 +10,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(15, 23, 42, 0.4);
+    background: var(--bg-card);
     padding: 2.5rem;
     border-radius: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
     backdrop-filter: blur(10px);
     margin-bottom: 3rem;
 }
@@ -34,14 +34,11 @@
     font-size: 2.5rem;
     font-weight: 800;
     margin: 0;
-    background: linear-gradient(to right, #fff, #94a3b8);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-primary);
 }
 
 .hub-title-section p {
-    color: #94a3b8;
+    color: var(--text-secondary);
     margin: 4px 0 0;
     font-size: 1.1rem;
 }
@@ -59,8 +56,8 @@
     border-radius: 20px;
     font-weight: 700;
     transition: all 0.3s;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    background: rgba(var(--primary-rgb, 123, 47, 190), 0.05);
 }
 
 .hub-stat-item.arena {
@@ -103,8 +100,8 @@
 }
 
 .game-card {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--bg-card);
+    border: 2px solid var(--border);
     border-radius: 30px;
     padding: 2.5rem;
     display: flex;
@@ -144,6 +141,7 @@
     font-size: 1.5rem;
     margin: 0;
     font-weight: 700;
+    color: var(--text-primary);
 }
 
 .game-tag {
@@ -160,7 +158,7 @@
 .game-tag.coming-soon { background: #475569; color: #94a3b8; }
 
 .game-card-content p {
-    color: #94a3b8;
+    color: var(--text-secondary);
     font-size: 0.95rem;
     line-height: 1.6;
     margin-bottom: 1.5rem;
