@@ -13,6 +13,9 @@ import Unauthorized from './pages/auth/Unauthorized';
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
+import AddUser from './pages/admin/AddUser';
+import BulkUpload from './pages/admin/BulkUpload';
+import QuizAnalytics from './pages/admin/QuizAnalytics';
 import Analytics from './pages/admin/Analytics';
 import Settings from './pages/admin/Settings';
 
@@ -62,6 +65,9 @@ const App = () => {
                     <Route index element={<Navigate to="dashboard" />} />
                     <Route path="dashboard" element={<AdminDashboard />} />
                     <Route path="users" element={<UserManagement />} />
+                    <Route path="users/new" element={<AddUser />} />
+                    <Route path="users/bulk" element={<BulkUpload />} />
+                    <Route path="quiz-analytics" element={<QuizAnalytics />} />
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="profile" element={<Profile />} />

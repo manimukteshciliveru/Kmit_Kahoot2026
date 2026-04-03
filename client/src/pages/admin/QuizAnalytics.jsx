@@ -40,9 +40,11 @@ const QuizAnalytics = () => {
     };
 
     const filteredQuizzes = quizzes.filter(quiz => {
-        const matchesSearch = quiz.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            quiz.code.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || quiz.status === statusFilter;
+        const matchesSearch = (quiz.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (quiz.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (quiz.createdBy?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === 'all' || 
+            (statusFilter === 'done' ? ['done', 'completed', 'finished'].includes(quiz.status) : quiz.status === statusFilter);
         return matchesSearch && matchesStatus;
     });
 
@@ -59,7 +61,7 @@ const QuizAnalytics = () => {
         <div className="admin-page quizzes-analytics-page">
             <div className="page-header">
                 <div className="header-left">
-                    <Link to="/dashboard" className="back-btn">
+                    <Link to="/admin/dashboard" className="back-btn">
                         <FiArrowLeft /> Back to Dashboard
                     </Link>
                     <h1><FiGrid /> Quiz Analytics & Metrics</h1>
@@ -84,8 +86,8 @@ const QuizAnalytics = () => {
                         All Quizzes
                     </button>
                     <button
-                        className={`tab-btn ${statusFilter === 'completed' ? 'active' : ''}`}
-                        onClick={() => setStatusFilter('completed')}
+                        className={`tab-btn ${statusFilter === 'done' ? 'active' : ''}`}
+                        onClick={() => setStatusFilter('done')}
                     >
                         Completed
                     </button>
@@ -112,6 +114,7 @@ const QuizAnalytics = () => {
                                 <th>Created By</th>
                                 <th>Date Conducted</th>
                                 <th>Questions</th>
+                                <th>Participants</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -144,8 +147,13 @@ const QuizAnalytics = () => {
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={`status-badge ${quiz.status}`}>
-                                                {quiz.status}
+                                            <div className="stats-cell">
+                                                <span className="badge badge-success">{quiz.participants?.length || 0} Joined</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span className={`status-badge ${['done', 'completed', 'finished'].includes(quiz.status) ? 'status-completed' : quiz.status === 'active' ? 'status-active' : 'status-draft'}`}>
+                                                {['done', 'completed', 'finished'].includes(quiz.status) ? 'Done' : quiz.status}
                                             </span>
                                         </td>
                                         <td>
@@ -161,7 +169,7 @@ const QuizAnalytics = () => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" className="text-center" style={{ padding: '3rem' }}>
+                                    <td colSpan="7" className="text-center" style={{ padding: '3rem' }}>
                                         <p className="text-muted">No quizzes found matching your criteria.</p>
                                     </td>
                                 </tr>
