@@ -243,7 +243,24 @@ class AIQuestionGenerator {
                 }
             }
 
-            // Attempt 5: Local Fallback (Last Resort)
+            // Attempt 5: Colab RAG Fallback (Last Resort BEFORE dummy fallback)
+            if (!responseText && process.env.COLAB_RAG_URL) {
+                logger.info('AI Service: Falling back to Google Colab RAG Engine...');
+                const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
+                try {
+                    const colabResult = await this.generateFromColab(textContent, options);
+                    if (colabResult && colabResult.success) {
+                        responseText = JSON.stringify(colabResult.questions);
+                        providerUsed = 'colab';
+                        modelUsed = 'llama-3-rag';
+                        logger.info('✅ AI Service: Success with Colab RAG');
+                    }
+                } catch (colabError) {
+                    logger.error('❌ AI Service: Colab RAG Failed', colabError);
+                }
+            }
+
+            // Final fallback
             if (!responseText) {
                 throw new Error('All AI providers failed.');
             }
@@ -539,6 +556,25 @@ class AIQuestionGenerator {
 
     async generateFromTranscript(transcript, options, userId) {
         return this.generateFromMultimodal([transcript], options, userId);
+    }
+
+    async generateFromColab(content, options) {
+        const url = process.env.COLAB_RAG_URL;
+        if (!url) return null;
+
+        try {
+            const response = await axios.post(`${url}/generate`, {
+                content,
+                count: options.count || 10,
+                difficulty: options.difficulty || 'medium',
+                type: options.type || 'mcq'
+            }, { timeout: 120000 }); // Longer timeout for Colab generation
+
+            return response.data;
+        } catch (error) {
+            logger.error('Colab generation error:', error);
+            return null;
+        }
     }
 }
 
