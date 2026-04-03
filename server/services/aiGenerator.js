@@ -146,21 +146,33 @@ class AIQuestionGenerator {
         this.initialize();
         const { count = 10, difficulty = 'medium', type = 'mcq' } = options;
 
-        // 1. Construct the System Prompt
-        const promptSystem = `
-        You are an expert academic quiz creator. Generate exactly ${count} ${difficulty} level questions based on the provided content.
-        Question Type: ${type.toUpperCase()}
-        
-        STRICT FORMATTING RULES:
-        1. Return ONLY valid JSON array. No markdown, no 'json' code blocks.
-        2. Format: [{"text":"Question text here","options":["Option 1","Option 2","Option 3","Option 4"],"correctAnswer":"Option 1","explanation":"Explanation here"}]
-        3. For MCQ/MSQ: Provide 4 distinct options. 'correctAnswer' MUST be the exact text of the correct option.
-        4. For FILL-BLANK/QA: 'options' should be empty []. 'correctAnswer' should be the concise correct answer.
-        5. CRITICAL: The 'correctAnswer' field MUST be the exact string text. Do NOT use "A", "B", "1", "2" or indices.
-        6. Accuracy: 100% based on content.
-        
-        CONTENT:
-        `;
+            // 1. Construct the System Prompt
+            const isExtraction = options.mode === 'extract';
+            const promptSystem = isExtraction 
+                ? `
+                You are a data extraction specialist. Your task is to extract EVERY quiz question present in the provided content.
+                Format: [{"text":"Question text here","options":["Option 1","Option 2","Option 3","Option 4"],"correctAnswer":"Option 1","explanation":"Explanation here"}]
+                
+                STRICT RULES:
+                1. DO NOT CREATE NEW QUESTIONS. Only extract what exists.
+                2. Capture options exactly as written.
+                3. Identify the correct answer based on context or "Answer:" indicators.
+                4. Return ONLY valid JSON array.
+                `
+                : `
+                You are an expert academic quiz creator. Generate exactly ${count} ${difficulty} level questions based on the provided content.
+                Question Type: ${type.toUpperCase()}
+                
+                STRICT FORMATTING RULES:
+                1. Return ONLY valid JSON array. No markdown, no 'json' code blocks.
+                2. Format: [{"text":"Question text here","options":["Option 1","Option 2","Option 3","Option 4"],"correctAnswer":"Option 1","explanation":"Explanation here"}]
+                3. For MCQ/MSQ: Provide 4 distinct options. 'correctAnswer' MUST be the exact text of the correct option.
+                4. For FILL-BLANK/QA: 'options' should be empty []. 'correctAnswer' should be the concise correct answer.
+                5. CRITICAL: The 'correctAnswer' field MUST be the exact string text. Do NOT use "A", "B", "1", "2" or indices.
+                6. Accuracy: 100% based on content.
+                
+                CONTENT:
+                `;
 
         const requestParts = [promptSystem, ...parts];
         let responseText = '';

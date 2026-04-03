@@ -16,13 +16,14 @@ exports.generateFromFile = async (req, res) => {
             });
         }
 
-        const { count, difficulty, type, topic, quizId } = req.body;
+        const { count, difficulty, type, topic, quizId, mode } = req.body;
 
         const options = {
             count: parseInt(count) || 10,
             difficulty: difficulty || 'medium',
             type: type || 'mcq',
-            topic: topic || ''
+            topic: topic || '',
+            mode: mode || 'generate'
         };
 
         // Prepare parts for Gemini

@@ -340,28 +340,29 @@ const CreateQuiz = () => {
         toast.success('Question removed');
     };
 
-    const generateWithAI = async () => {
+    const generateWithAI = async (mode = 'generate') => {
         if (aiSource === 'text') {
             if (!aiText.trim() || aiText.length < 50) {
                 toast.error('Please enter at least 50 characters of content');
                 return;
             }
-        } else if (aiSource === 'file') {
+        } else if (aiSource === 'file' || aiSource === 'aiken') {
             if (aiFiles.length === 0) {
                 toast.error('Please select at least one file');
                 return;
             }
         }
-
+ 
         setAiLoading(true);
         try {
             let response;
-
+ 
             if (aiSource === 'text') {
                 response = await aiAPI.generateFromText({
                     text: aiText,
                     ...aiSettings,
-                    difficulty: quizData.settings.difficultyLevel
+                    difficulty: quizData.settings.difficultyLevel,
+                    mode
                 });
             } else {
                 const formData = new FormData();
@@ -371,7 +372,8 @@ const CreateQuiz = () => {
                 formData.append('count', aiSettings.count);
                 formData.append('difficulty', quizData.settings.difficultyLevel);
                 formData.append('type', aiSettings.type);
-
+                formData.append('mode', mode); // Pass the mode for extraction
+ 
                 response = await aiAPI.generateFromFile(formData);
             }
 
@@ -860,6 +862,12 @@ const CreateQuiz = () => {
                                     >
                                         <FiUpload /> AI from File
                                     </button>
+                                    <button
+                                        className={`tab ${aiSource === 'aiken' ? 'active' : ''}`}
+                                        onClick={() => setAiSource('aiken')}
+                                    >
+                                        <FiCheck /> Aiken PDF Upload
+                                    </button>
                                 </div>
 
                                 {aiSource === '' && (
@@ -1060,6 +1068,47 @@ const CreateQuiz = () => {
                                                 <><span className="spinner spinner-sm"></span> Generating...</>
                                             ) : (
                                                 <><FiCpu /> Generate Questions</>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+ 
+                                {aiSource === 'aiken' && (
+                                    <div className="ai-form">
+                                        <div className="aiken-info" style={{ 
+                                            background: 'rgba(255, 127, 17, 0.1)', 
+                                            padding: '12px', 
+                                            borderRadius: '8px', 
+                                            marginBottom: '15px',
+                                            fontSize: '0.9rem',
+                                            borderLeft: '4px solid var(--primary-color)'
+                                        }}>
+                                            <strong>AIKEN PDF Upload:</strong> Upload a PDF question paper. The AI will extract existing questions, options, and correct answers exactly as they appear.
+                                        </div>
+                                        <div className="file-upload-area">
+                                            <input
+                                                type="file"
+                                                id="aiken-upload"
+                                                accept=".pdf"
+                                                onChange={(e) => setAiFiles(Array.from(e.target.files))}
+                                            />
+                                            <label htmlFor="aiken-upload" className="file-upload-label">
+                                                <FiUpload className="upload-icon" />
+                                                <span>{aiFiles.length > 0 ? aiFiles[0].name : 'Select PDF Question Paper'}</span>
+                                                <small>Extraction works best with standard question paper layouts</small>
+                                            </label>
+                                        </div>
+ 
+                                        <button
+                                            className="btn btn-primary w-full"
+                                            style={{ marginTop: '15px' }}
+                                            onClick={() => generateWithAI('extract')}
+                                            disabled={aiLoading || aiFiles.length === 0}
+                                        >
+                                            {aiLoading ? (
+                                                <><span className="spinner spinner-sm"></span> Parsing PDF...</>
+                                            ) : (
+                                                <><FiCheck /> Extract & Import Questions</>
                                             )}
                                         </button>
                                     </div>
