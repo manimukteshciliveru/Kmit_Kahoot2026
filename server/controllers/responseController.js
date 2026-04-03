@@ -517,7 +517,12 @@ exports.completeQuiz = async (req, res) => {
         // Update user stats (Atomic and Efficient)
         const updatedUser = await User.findByIdAndUpdate(
             req.user._id,
-            { $inc: { 'stats.totalPoints': response.totalScore } },
+            { 
+                $inc: { 
+                    'stats.totalPoints': response.totalScore,
+                    'stats.quizzesAttended': 1 
+                } 
+            },
             { new: true }
         );
 
@@ -572,7 +577,8 @@ exports.getQuizHistory = async (req, res) => {
         const { page = 1, limit = 10 } = req.query;
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        const responses = await Response.find({ userId: req.user._id })
+        // 1. Try standard ID match
+        let responses = await Response.find({ userId: req.user._id })
             .populate({
                 path: 'quizId',
                 select: 'title subject createdBy startedAt endedAt questions',
@@ -584,6 +590,27 @@ exports.getQuizHistory = async (req, res) => {
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
+
+        // 2. Recovery: If migration occurred and new ID is used, find by userId populate matching email
+        if (responses.length === 0) {
+            console.log(`[HISTORY] Recovery: Searching by email for ${req.user.email}`);
+            responses = await Response.find()
+                .populate({
+                    path: 'userId',
+                    match: { email: req.user.email }
+                })
+                .populate({
+                    path: 'quizId',
+                    select: 'title subject createdBy startedAt endedAt questions',
+                    populate: { path: 'createdBy', select: 'name' }
+                })
+                .sort({ createdAt: -1 })
+                .lean();
+
+            // Filter out responses that don't match the email
+            responses = responses.filter(r => r.userId && r.userId._id)
+                .slice(skip, skip + parseInt(limit));
+        }
 
         const total = await Response.countDocuments({ userId: req.user._id });
 

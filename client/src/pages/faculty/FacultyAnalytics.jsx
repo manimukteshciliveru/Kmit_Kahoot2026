@@ -28,7 +28,8 @@ const FacultyAnalytics = () => {
         try {
             const response = await quizAPI.getAll({ limit: 100 });
             const allQuizzes = response.data.data.quizzes || [];
-            const completed = allQuizzes.filter(q => q.status === 'completed');
+            const finishedStatuses = ['completed', 'done', 'finished'];
+            const completed = allQuizzes.filter(q => finishedStatuses.includes(q.status));
             setQuizzes(completed);
             calculateStats(completed);
         } catch (error) {
@@ -100,7 +101,7 @@ const FacultyAnalytics = () => {
                     <div className="stat-icon info"><FiActivity /></div>
                     <div className="stat-content">
                         <span className="stat-number">{stats.completionRate}%</span>
-                        <span className="stat-title">Completion Rate</span>
+                        <span className="stat-title">Avg. Completion Rate</span>
                     </div>
                 </div>
             </div>

@@ -1200,7 +1200,7 @@ exports.getQuizResults = async (req, res) => {
                 },
                 analytics: {
                     totalParticipants: attemptedCount, // Frontend expects totalParticipants
-                    completedCount: mappedResponses.filter(r => r.status === 'completed').length,
+                    completedCount: mappedResponses.filter(r => ['completed', 'done', 'finished'].includes(r.status)).length,
                     inProgressCount: mappedResponses.filter(r => r.status === 'in-progress').length,
                     waitingCount: mappedResponses.filter(r => r.status === 'waiting' || r.status === 'joined').length,
                     terminatedCount: mappedResponses.filter(r => r.status === 'terminated').length,

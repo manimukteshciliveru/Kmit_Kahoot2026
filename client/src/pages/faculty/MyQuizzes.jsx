@@ -69,6 +69,7 @@ const MyQuizzes = () => {
 
     const filteredQuizzes = quizzes.filter(q => {
         if (filter === 'all') return true;
+        if (filter === 'done') return q.status === 'done' || q.status === 'completed' || q.status === 'finished';
         return q.status === filter;
     });
 
