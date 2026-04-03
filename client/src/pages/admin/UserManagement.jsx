@@ -112,14 +112,15 @@ const UserManagement = () => {
 
     // Filter by search
     const filteredUsers = getCurrentUsers().filter(user => {
+        if (!searchTerm) return true;
         const searchLower = searchTerm.toLowerCase();
-        return user.name.toLowerCase().includes(searchLower) ||
-            user.email.toLowerCase().includes(searchLower) ||
-            (user.studentId && user.studentId.toLowerCase().includes(searchLower)) ||
-            (user.rollNumber && user.rollNumber.toLowerCase().includes(searchLower)) ||
-            (user.employeeId && user.employeeId.toLowerCase().includes(searchLower)) ||
-            (user.department && user.department.toLowerCase().includes(searchLower)) ||
-            (user.section && user.section.toLowerCase().includes(searchLower));
+        return (user.name || '').toLowerCase().includes(searchLower) ||
+            (user.email || '').toLowerCase().includes(searchLower) ||
+            (user.studentId || '').toLowerCase().includes(searchLower) ||
+            (user.rollNumber || '').toLowerCase().includes(searchLower) ||
+            (user.employeeId || '').toLowerCase().includes(searchLower) ||
+            (user.department || '').toLowerCase().includes(searchLower) ||
+            (user.section || '').toLowerCase().includes(searchLower);
     });
 
     const getRoleIcon = (role) => {
