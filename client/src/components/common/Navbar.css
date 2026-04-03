@@ -44,7 +44,7 @@
 
 /* ===== Visibility Helpers ===== */
 .desktop-only { display: flex !important; }
-.mobile-only  { display: flex !important; }
+.mobile-only  { display: none !important; } /* Hidden by default, shown in mobile media query */
 
 /* ===== Desktop Nav Links ===== */
 .navbar-links {
@@ -303,7 +303,7 @@
 
 /* ===== Mobile Slide-Down Menu ===== */
 .mobile-menu {
-  display: none;
+  display: flex; /* Use flex and control visibility with max-height/opacity, allowing it to work on all screen sizes if toggled */
   flex-direction: column;
   background: rgba(20, 4, 42, 0.98);
   backdrop-filter: blur(20px);
@@ -402,7 +402,6 @@
 
   /* Show mobile elements */
   .hamburger-btn { display: flex; }
-  .mobile-menu   { display: flex; }
   .mobile-only   { display: flex !important; }
 
   .navbar-container { height: 58px; padding: 0 1rem; }
