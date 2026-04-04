@@ -89,6 +89,99 @@
     font-size: 0.95rem;
 }
 
+/* ── ANALYTICS CARDS (NEW) ── */
+.analytics-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2.5rem;
+}
+
+.analytics-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transition: all 0.3s;
+    box-shadow: var(--shadow);
+}
+
+.analytics-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--kahoot-purple);
+}
+
+.analytics-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.analytics-icon {
+    font-size: 1.2rem;
+    color: var(--kahoot-purple);
+}
+
+.analytics-value {
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: var(--text-primary);
+}
+
+.analytics-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* Attendance Column Span */
+.analytics-card.attendance {
+    min-width: 280px;
+    grid-column: span 2;
+}
+
+.attendance-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+.attendance-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.attendance-item svg { font-size: 1.5rem; margin-bottom: 4px; }
+.attendance-item.attended { color: #39D900; }
+.attendance-item.not-attended { color: #E21B3C; }
+
+.att-number { font-size: 1.25rem; font-weight: 900; }
+.att-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+
+.attendance-divider { width: 1px; height: 40px; background: var(--border); }
+
+.progress-mini {
+    height: 6px;
+    background: var(--bg-input);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--kahoot-purple);
+    border-radius: 3px;
+}
+
 /* ── DASH SECTIONS (CARDS) ── */
 .dash-section {
     background: var(--bg-card);
