@@ -88,8 +88,9 @@
     border-radius: var(--radius-lg);
     padding: var(--space-xl);
     margin-bottom: var(--space-lg);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md);
     max-width: 800px;
+    /* Limit width */
     margin-left: auto;
     margin-right: auto;
 }
@@ -99,7 +100,7 @@
     align-items: center;
     gap: var(--space-sm);
     font-size: 1.5rem;
-    color: var(--kahoot-purple);
+    color: var(--primary);
     margin-bottom: var(--space-lg);
     padding-bottom: var(--space-md);
     border-bottom: 2px solid var(--border);
@@ -136,10 +137,11 @@
 .form-textarea {
     width: 100%;
     padding: var(--space-md);
-    background: var(--bg-input);
-    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
     border-radius: var(--radius-md);
     font-size: 0.95rem;
+    /* Slightly smaller text */
     color: var(--text-primary);
     transition: all var(--transition-fast);
 }
@@ -148,9 +150,9 @@
 .form-select:focus,
 .form-textarea:focus {
     outline: none;
-    border-color: var(--kahoot-purple);
+    border-color: var(--primary);
     background: var(--bg-card);
-    box-shadow: 0 0 0 4px var(--primary-glow);
+    box-shadow: 0 0 0 4px rgba(255, 101, 0, 0.1);
 }
 
 /* Fix Calendar Icon in Dark Mode */
@@ -177,36 +179,31 @@
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-md);
-    background: var(--bg-input);
-    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all var(--transition-fast);
     color: var(--text-secondary);
 }
 
 .mode-btn:hover {
-    border-color: var(--kahoot-purple);
-    background: var(--bg-card);
-    color: var(--text-primary);
-    transform: translateY(-5px) scale(1.03);
-    box-shadow: 0 12px 30px var(--primary-glow);
+    border-color: var(--primary);
+    background: var(--primary-glow);
+    color: var(--primary);
+    transform: translateY(-4px);
+    box-shadow: 0 6px 20px var(--primary-glow);
 }
 
 .mode-btn.active {
-    border-color: var(--kahoot-purple);
+    border-color: var(--primary);
     background: var(--primary-glow);
-    color: var(--kahoot-purple);
-    box-shadow: inset 0 0 0 1px var(--kahoot-purple);
+    color: var(--primary);
+    box-shadow: inset 0 0 0 1px var(--primary);
 }
 
 .mode-btn svg {
     font-size: 1.5rem;
-    transition: transform 0.3s ease;
-}
-
-.mode-btn:hover svg {
-    transform: scale(1.15);
 }
 
 /* Difficulty Selector */
@@ -218,55 +215,64 @@
 .difficulty-btn {
     flex: 1;
     padding: var(--space-sm);
-    background: var(--bg-input);
-    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
     border-bottom: 4px solid var(--border);
     border-radius: var(--radius-md);
     cursor: pointer;
     font-weight: 700;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.1s;
     color: var(--text-secondary);
     text-align: center;
 }
 
 .difficulty-btn:hover {
     border-color: var(--text-muted);
-    transform: translateY(-3px);
-    background: var(--bg-card);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
 }
 
 .difficulty-btn:active {
-    transform: translateY(1px);
+    transform: translateY(2px);
     border-bottom-width: 2px;
 }
 
 .difficulty-btn.active.easy {
+    border-color: var(--secondary);
+    background: var(--secondary);
+    /* Ensure this is a solid color */
+    color: #fff;
+    /* White text should be fine on Green */
+}
+
+/* Fix for User Complaint: "appearing as white color" -> If they mean the button itself is white (invisible), it might be missing var. 
+   If they mean text is white on white, then bg is missing. 
+   I will force a specific green color to be safe. */
+.difficulty-btn.active.easy {
     border-color: #10b981;
     background: #10b981;
     color: white;
-    box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
 }
 
 .difficulty-btn.active.medium {
     border-color: #facc15;
     background: #facc15;
     color: #1a0533;
-    box-shadow: 0 5px 15px rgba(250, 204, 21, 0.3);
+    box-shadow: 0 0 15px rgba(250, 204, 21, 0.3);
 }
 
 .difficulty-btn.active.hard {
     border-color: #fb923c;
     background: #fb923c;
     color: white;
-    box-shadow: 0 5px 15px rgba(251, 146, 60, 0.3);
+    box-shadow: 0 0 15px rgba(251, 146, 60, 0.3);
 }
 
 .difficulty-btn.active.advanced {
     border-color: #ef4444;
     background: #ef4444;
     color: white;
-    box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
 }
 
 /* Step Actions */

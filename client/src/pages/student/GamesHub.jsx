@@ -75,24 +75,22 @@ const GamesHub = () => {
                         className={`game-card ${game.disabled ? 'disabled' : ''}`}
                         onClick={() => !game.disabled && navigate(game.path)}
                     >
-                        <div className="game-card-inner">
-                            <div className="game-card-icon" style={{ backgroundColor: `${game.color}15`, color: game.color }}>
-                                {game.icon}
+                        <div className="game-card-icon" style={{ color: game.color }}>
+                            {game.icon}
+                        </div>
+                        <div className="game-card-content">
+                            <div className="game-header">
+                                <h3>{game.title}</h3>
+                                <span className={`game-tag ${game.tag.toLowerCase().replace(' ', '-')}`}>
+                                    {game.tag}
+                                </span>
                             </div>
-                            <div className="game-card-body">
-                                <div className="game-header">
-                                    <h3>{game.title}</h3>
-                                    <span className={`game-tag ${game.tag.toLowerCase().replace(' ', '-')}`}>
-                                        {game.tag}
-                                    </span>
-                                </div>
-                                <p>{game.description}</p>
-                                <div className="game-card-footer">
-                                    <button className="btn-launch">
-                                        Launch Game
-                                    </button>
-                                </div>
-                            </div>
+                            <p>{game.description}</p>
+                            {!game.disabled && (
+                                <button className="btn-play">
+                                    Launch Game
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}
