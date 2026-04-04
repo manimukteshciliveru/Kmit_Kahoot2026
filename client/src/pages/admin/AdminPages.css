@@ -1,167 +1,123 @@
 /* ============================================================
-   KMIT KAHOOT — Admin Analytics High-Definition Overhaul
+   KMIT KAHOOT — Admin Analytics Wide-Search & Color Buttons
    ============================================================ */
 
 :root {
-    /* Day Mode (Crisp White & Indigo) */
-    --bg-primary: #F0F2F9;
-    --bg-secondary: #FFFFFF; 
-    --text-primary: #1A0533; /* CRISP BLACK-PURPLE FOR DATA */
-    --text-secondary: #475569;
-    --border-color: #E2E8F0;
-    --kahoot-purple: #46178F;
-    --kahoot-gold: #FFCC02;
+    /* Goal Colors */
+    --gold-active: #FFCC02;
+    --completed-active: #10B981; /* Vibrant Teal */
+    --all-active: #46178F; /* Solid Purple */
+    --hover-bg: rgba(70, 23, 143, 0.05);
 }
 
-[data-theme='dark'] {
-    /* Night Mode (Deep Space) */
-    --bg-primary: #1A0533;
-    --bg-secondary: #2D0B5A;
-    --text-primary: #FFFFFF;
-    --text-secondary: rgba(255, 255, 255, 0.7);
-    --border-color: rgba(255, 255, 255, 0.1);
-}
-
-.quizzes-analytics-page {
-    background-color: var(--bg-primary);
-    min-height: 100vh;
-    padding: 3rem;
-}
-
-/* ── ATTRACTIVE FILTER BAR ── */
 .filters-bar {
     display: flex;
     align-items: center;
     gap: 2rem;
-    margin-bottom: 3rem;
+    margin-bottom: 2.5rem;
+    padding: 1.5rem 2rem;
     background: var(--bg-secondary);
-    padding: 1.25rem 2rem;
-    border-radius: 30px;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
     border: 1px solid var(--border-color);
+    width: 100%; /* ENSURES FULL WIDTH */
 }
 
-.user-tabs {
-    background: var(--bg-primary);
-    padding: 6px;
-    border-radius: 18px;
+/* ── SEARCH BAR EXPANSION ── */
+.search-box {
+    flex: 2; /* MAKES SEARCH BAR MUCH LONGER */
+    position: relative;
     display: flex;
-    gap: 5px;
+    align-items: center;
 }
 
-.tab-btn {
-    padding: 0.8rem 1.8rem;
-    border-radius: 14px;
-    border: 2px solid transparent;
-    background: transparent;
-    color: var(--kahoot-purple);
-    font-weight: 900;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    cursor: pointer;
+.search-box input {
+    width: 100%;
+    padding: 1.1rem 1rem 1.1rem 3.5rem;
+    background: #F8FAFC; /* LIGHT GREY BG FOR VISIBILITY */
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.tab-btn.active {
-    background: var(--kahoot-gold);
+.search-box input:focus {
+    outline: none;
+    border-color: var(--all-active);
+    background: white;
+    box-shadow: 0 10px 20px rgba(70, 23, 143, 0.1);
+}
+
+.search-icon {
+    position: absolute;
+    left: 1.25rem;
+    color: var(--all-active);
+    font-size: 1.2rem;
+    pointer-events: none;
+}
+
+/* ── VIBRANT COLOR-CODED BUTTONS ── */
+.user-tabs {
+    flex: 1; /* ALIGNS BUTTONS TO RIGHT SIDE */
+    background: #F1F5F9;
+    padding: 6px;
+    border-radius: 16px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.tab-btn {
+    padding: 0.75rem 1.75rem;
+    border-radius: 12px;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.25s;
+}
+
+/* ALL QUIZZES ACTIVE (PURPLE) */
+.tab-btn.active:first-child {
+    background: var(--all-active);
+    color: white !important;
+    box-shadow: 0 6px 12px rgba(70, 23, 143, 0.3);
+}
+
+/* COMPLETED ACTIVE (TEAL) */
+.tab-btn.active:nth-child(2) {
+    background: var(--completed-active);
+    color: white !important;
+    box-shadow: 0 6px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* LIVE ACTIVE (GOLD) */
+.tab-btn.active:last-child {
+    background: var(--gold-active);
     color: #1A0533 !important;
-    border-color: var(--kahoot-gold);
-    box-shadow: 0 4px 12px rgba(255, 204, 2, 0.4);
+    box-shadow: 0 6px 12px rgba(234, 179, 8, 0.3);
 }
 
 .tab-btn:hover:not(.active) {
-    background: rgba(70, 23, 143, 0.05);
-    border-color: var(--kahoot-purple);
+    background: rgba(70, 23, 143, 0.08);
+    color: var(--all-active);
 }
 
-/* ── ULTIMATE VISIBILITY TABLE ── */
-.users-table-container {
-    background: var(--bg-secondary); /* FORCES WHITE BG IN DAY MODE */
-    border-radius: 35px;
-    padding: 1.5rem;
-    box-shadow: 0 15px 35px rgba(30, 27, 75, 0.1);
-    border: 1px solid var(--border-color);
-    overflow: hidden;
-}
-
+/* ── TABLE HEADER SEPARATION (SCREENSHOT STYLE) ── */
 .users-table th {
+    background: var(--all-active);
+    color: white;
     padding: 1.5rem 1rem;
-    text-align: left;
-    background: var(--kahoot-purple);
-    color: white; /* BOLD WHITE HEADER */
-    font-weight: 900;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-}
-
-.users-table td {
-    padding: 1.75rem 1rem;
-    border-bottom: 2px solid var(--bg-primary);
-    color: var(--text-primary); /* FORCES VISIBILITY */
-    font-weight: 700;
-    vertical-align: middle;
-}
-
-/* Data Column Polishing */
-.quiz-title { color: var(--kahoot-purple); font-weight: 900; font-size: 1.1rem; }
-.user-info-cell span { font-weight: 800; color: #475569; }
-
-.badge {
-    padding: 10px 18px;
-    border-radius: 12px;
     font-weight: 950;
-    font-size: 0.8rem;
     text-transform: uppercase;
+    letter-spacing: 1.5px;
+    border-right: 2px solid rgba(255,255,255,0.1); /* VERTICAL SEPARATORS */
 }
 
-.badge-info {
-    background: #E0E7FF;
-    color: #1E40AF; /* DEEP BLUE */
-}
-
-.badge-success {
-    background: #DCFCE7;
-    color: #166534; /* DEEP GREEN */
-}
-
-/* ── EVERY BUTTON PREMIUM CSS ── */
-.btn-primary.btn-sm {
-    background: linear-gradient(135deg, #FFCC02 0%, #EAB308 100%);
-    color: #1A0533 !important;
-    border-radius: 15px;
-    font-weight: 950;
-    padding: 12px 24px;
-    border: none;
-    box-shadow: 0 6px 15px rgba(234, 179, 8, 0.25);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.btn-primary.btn-sm:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 12px 25px rgba(234, 179, 8, 0.4);
-    filter: brightness(1.1);
-}
-
-.btn-primary.btn-sm:active {
-    transform: translateY(0);
-}
-
-/* Back Button */
-.back-btn {
-    background: var(--bg-secondary);
-    padding: 10px 20px;
-    border-radius: 12px;
-    font-weight: 900;
-    color: var(--kahoot-purple);
-    box-shadow: var(--shadow-sm);
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 2rem;
-    border: 1px solid var(--border-color);
-}
+.users-table th:last-child { border-right: none; }
