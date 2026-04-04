@@ -28,7 +28,8 @@ exports.submitAnswer = async (req, res) => {
         }
 
         // Accept both legacy "active" and new state-machine "question_active"
-        if (!['active', 'question_active'].includes(quiz.status)) {
+        // Accept legacy "active", state-machine "question_active", and "live"
+        if (!['active', 'question_active', 'live'].includes(quiz.status)) {
             return res.status(400).json({
                 success: false,
                 message: 'Quiz is not active'
@@ -143,8 +144,8 @@ exports.submitAnswer = async (req, res) => {
             // 2. Requested event name for compatibility if needed
             io.to(String(quizId)).emit('leaderboardUpdate', { leaderboard });
 
-            // Notify faculty of detailed response with mapped fields
-            io.to(`${quizId}:host`).emit('response:received', {
+            // Notify faculty of detailed response using standardized host room name
+            io.to(`quiz_${quizId}:host`).emit('response:received', {
                 participantId: req.user._id,
                 participantName: req.user.name,
                 rollNumber: req.user.rollNumber,
@@ -401,10 +402,10 @@ exports.reportTabSwitch = async (req, res) => {
 
         await response.save();
 
-        // Notify faculty
+        // Notify faculty using standardized host room name
         const io = req.app.get('io');
         if (io) {
-            io.to(`${quizId}:host`).emit('participant:tabswitch', {
+            io.to(`quiz_${quizId}:host`).emit('participant:tabswitch', {
                 participantId: req.user._id,
                 participantName: req.user.name,
                 tabSwitchCount: response.tabSwitchCount,

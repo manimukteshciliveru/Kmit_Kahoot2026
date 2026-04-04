@@ -38,6 +38,7 @@ import Profile from './pages/common/Profile';
 // Quiz Pages
 import PlayQuiz from './pages/quiz/PlayQuiz';
 import QuizResults from './pages/faculty/QuizResults';
+import HostQuiz from './pages/faculty/HostQuiz';
 import QuizReport from './pages/student/QuizReport';
 
 // Protected Route Component
@@ -98,6 +99,12 @@ const App = () => {
 
                 {/* Shared Quiz Play Route */}
                 <Route path="/play/:quizId" element={<ProtectedRoute><PlayQuiz /></ProtectedRoute>} />
+                <Route path="/quiz/:quizId/play" element={<ProtectedRoute allowedRoles={['student']}><PlayQuiz /></ProtectedRoute>} />
+
+                {/* Faculty Host Quiz Route */}
+                <Route path="/quiz/:quizId/host" element={<ProtectedRoute allowedRoles={['faculty', 'admin']}><Layout /></ProtectedRoute>}>
+                    <Route index element={<HostQuiz />} />
+                </Route>
 
                 {/* Faculty Quiz Results (shared route outside /faculty prefix) */}
                 <Route path="/quiz/:quizId/results" element={<ProtectedRoute allowedRoles={['faculty', 'admin']}><Layout /></ProtectedRoute>}>

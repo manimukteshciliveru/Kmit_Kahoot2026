@@ -66,7 +66,7 @@ module.exports = (io) => {
     };
 
     const forceEndQuiz = async (quizId) => {
-        const roomName = String(quizId);
+        const roomName = `quiz_${quizId}`;
         try {
             logger.info(`⏹️ [FORCE END] Terminating quiz arena: ${quizId}`);
             const quiz = await Quiz.findById(quizId);
@@ -158,7 +158,7 @@ module.exports = (io) => {
         // --- 1. QUIZ SYNC (GROUND TRUTH) ---
         socket.on('quiz:sync', async (data) => {
             const { quizId } = data;
-            const roomName = String(quizId);
+            const roomName = `quiz_${quizId}`;
             try {
                 const quiz = await Quiz.findById(quizId).lean();
                 if (!quiz) return socket.emit('error', { message: 'Quiz not found' });
@@ -232,7 +232,7 @@ module.exports = (io) => {
         socket.on('quiz:start', async (data) => {
             if (userRole === 'student') return;
             const { quizId } = data;
-            const roomName = String(quizId);
+            const roomName = `quiz_${quizId}`;
             try {
                 logger.info(`🚀 [LAUNCH] Faculty ${socket.user.name} starting quiz ${quizId}`);
                 const quiz = await Quiz.findById(quizId);
@@ -280,7 +280,7 @@ module.exports = (io) => {
         socket.on('quiz:next-question', async (data) => {
             if (userRole === 'student') return;
             const { quizId } = data;
-            const roomName = String(quizId);
+            const roomName = `quiz_${quizId}`;
             try {
                 const quiz = await Quiz.findById(quizId);
                 if (!quiz) return;
@@ -292,8 +292,9 @@ module.exports = (io) => {
                         return await forceEndQuiz(quizId);
                     }
 
+                    const wasLive = quiz.status === STATES.LIVE;
                     quiz.status = STATES.QUESTION_ACTIVE;
-                    quiz.currentQuestionIndex = (quiz.status === STATES.LIVE) ? 0 : nextIdx;
+                    quiz.currentQuestionIndex = wasLive ? 0 : nextIdx;
                     quiz.expiresAt = quiz.settings?.questionTimer > 0 ? new Date(Date.now() + quiz.settings.questionTimer * 1000) : null;
                     await quiz.save();
 

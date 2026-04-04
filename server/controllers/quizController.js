@@ -246,15 +246,17 @@ exports.getQuiz = async (req, res) => {
         let quizData = quiz.toObject();
 
         if (req.user.role === 'student') {
+            const activeStatuses = ['active', 'live', 'question_active', 'started'];
+            
             // Check expiry first
-            if (quiz.status === 'active' && quiz.expiresAt && new Date(quiz.expiresAt) < new Date()) {
+            if (activeStatuses.includes(quiz.status) && quiz.expiresAt && new Date(quiz.expiresAt) < new Date()) {
                 // Auto-close if expired (lazy check)
                 quiz.status = 'completed';
                 await quiz.save();
                 quizData.status = 'completed';
             }
 
-            if (quizData.status === 'active') {
+            if (activeStatuses.includes(quizData.status)) {
                 quizData.questions = quizData.questions.map(q => ({
                     ...q,
                     correctAnswer: undefined,
@@ -709,10 +711,9 @@ exports.startQuiz = async (req, res) => {
         quiz.startedAt = new Date();
         quiz.currentQuestionIndex = 0;
 
-        // Set expiration time if quiz timer is set
-        // Adding a 5 second buffer for network latency
-        if (quiz.settings?.questionTimer > 0) {
-            quiz.expiresAt = new Date(quiz.startedAt.getTime() + (quiz.settings.questionTimer * 1000));
+        // Use correct timer setting: quizTimer (total time)
+        if (quiz.settings?.quizTimer > 0) {
+            quiz.expiresAt = new Date(quiz.startedAt.getTime() + (quiz.settings.quizTimer * 1000));
             console.log(`[START QUIZ] Timer set. Expires at: ${quiz.expiresAt}`);
         } else {
             quiz.expiresAt = null;

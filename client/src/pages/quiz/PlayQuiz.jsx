@@ -556,12 +556,12 @@ const PlayQuiz = () => {
     if (!isFullscreenMode && ['active', 'question_active', 'live'].includes(status)) {
         return (
             <div className="quiz-waiting-modern">
-                <div className="waiting-glass-card animate-fadeInUp" style={{ borderColor: '#F43F5E' }}>
-                    <div className="pulse-logo" style={{ color: '#F43F5E' }}><FiInfo className="zap-icon" /></div>
-                    <h1 style={{ color: '#F43F5E' }}>Fullscreen Required</h1>
+                <div className="waiting-glass-card animate-fadeInUp" style={{ borderTop: '4px solid var(--danger)' }}>
+                    <div className="pulse-logo icon icon-xl text-danger"><FiInfo /></div>
+                    <h1 className="text-danger">Fullscreen Required</h1>
                     <p>This exam operates in strict secure mode. You must enter Fullscreen to reveal the questions and continue.</p>
                     <button 
-                        className="btn-premium primary pulse-button" 
+                        className="btn btn-primary pulse-button" 
                         style={{ marginTop: '2rem' }}
                         onClick={() => document.documentElement.requestFullscreen().catch(() => toast.error('Failed to enter fullscreen'))}
                     >
@@ -590,12 +590,12 @@ const PlayQuiz = () => {
                             const mins = Math.floor((diff % 3600000) / 60000);
                             const secs = Math.floor((diff % 60000) / 1000);
                             return (
-                                <div style={{ margin: '1rem 0', padding: '0.75rem 1.5rem', background: 'rgba(255,204,2,0.1)', borderRadius: '12px', border: '1px solid rgba(255,204,2,0.3)', color: '#FFCC02', fontWeight: 700, fontSize: '1.1rem', letterSpacing: 1 }}>
+                                <div style={{ margin: '1rem 0', padding: '0.75rem 1.5rem', background: 'var(--bg-card-light)', borderRadius: '12px', border: '1px solid var(--accent)', color: 'var(--accent)', fontWeight: 700, fontSize: '1.1rem', letterSpacing: 1 }}>
                                     ⏰ Starts in: {hrs > 0 ? `${hrs}h ` : ''}{mins}m {secs}s
                                 </div>
                             );
                         }
-                        return <div style={{ color: '#10B981', fontWeight: 700, margin: '0.5rem 0' }}>🚀 Starting any moment now...</div>;
+                        return <div className="text-success" style={{ fontWeight: 700, margin: '0.5rem 0' }}>🚀 Starting any moment now...</div>;
                     })()}
 
                     <div className="quiz-stats-banner">

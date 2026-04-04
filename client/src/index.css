@@ -109,16 +109,32 @@
 
 /* ===== Light Theme Override ===== */
 [data-theme="light"] {
-  --bg-primary:   #f0e6ff;
-  --bg-secondary: #e6d4ff;
-  --bg-card:      #ffffff;
-  --bg-card-light:#f7f0ff;
+  --bg-primary:   #F8F9FE;
+  --bg-secondary: #EDF2FF;
+  --bg-card:      #FFFFFF;
+  --bg-card-light:#F1F5F9;
+  --bg-glass:     rgba(255, 255, 255, 0.9);
+  --bg-overlay:   rgba(0, 0, 0, 0.4);
   --text-primary:   #1A0533;
   --text-secondary: #4A1F6E;
-  --text-muted:     #8B6AAF;
-  --border: rgba(70, 23, 143, 0.15);
-  --shadow-md: 0 6px 20px rgba(70, 23, 143, 0.12);
+  --text-muted:     #64748B;
+  --border: rgba(74, 31, 110, 0.1);
+  --border-focus: #46178F;
+  --shadow-md: 0 4px 12px rgba(46, 23, 143, 0.08);
+  --shadow-lg: 0 12px 32px rgba(46, 23, 143, 0.12);
 }
+
+/* Base Icon Utility */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.icon-sm { font-size: 1.1rem; }
+.icon-md { font-size: 1.5rem; }
+.icon-lg { font-size: 2.2rem; }
+.icon-xl { font-size: 3.5rem; }
 
 /* ===== HTML & Body ===== */
 html {
@@ -365,14 +381,18 @@ a:hover { color: var(--kahoot-yellow); }
 .form-select,
 .form-textarea {
   width: 100%;
-  padding: 0.85rem 1.1rem;
-  background: rgba(255,255,255,0.08);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-md);
   font-size: 1rem;
   color: var(--text-primary);
   transition: var(--transition);
   font-family: var(--font-sans);
+  border-width: 1px;
+}
+
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-select,
+[data-theme="light"] .form-textarea {
+  background: #FFFFFF;
+  border-color: #CBD5E1;
 }
 
 .form-input:focus,
