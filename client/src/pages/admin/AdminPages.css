@@ -1,122 +1,119 @@
 /* ============================================================
-   KMIT KAHOOT — Admin Analytics High-Definition Branding
+   KMIT KAHOOT — Admin Analytics High-Contrast Slate Upgrade
    ============================================================ */
 
 :root {
-    /* Day Mode (Premium Indigo & White) */
+    /* Day Mode Base */
     --bg-primary: #F0F2F9;
     --bg-secondary: #FFFFFF;
     --text-primary: #1A0533;
     --text-secondary: #4A5568;
     --border-color: rgba(70, 23, 143, 0.1);
-    --shadow: 0 8px 30px rgba(70, 23, 143, 0.08);
+    
+    /* Dark Accents for Day Mode */
+    --admin-dark: #1E1B4B; /* Deep Navy */
+    --kahoot-purple: #46178F;
+    --kahoot-gold: #FFCC02;
+    --shadow: 0 12px 35px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme='dark'] {
-    /* Night Mode (Deep Purple) */
+    /* Night Mode remains Deep Space */
     --bg-primary: #1A0533;
     --bg-secondary: #2D0B5A;
     --text-primary: #FFFFFF;
     --text-secondary: rgba(255, 255, 255, 0.7);
     --border-color: rgba(255, 255, 255, 0.1);
-    --shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
 }
 
 .quizzes-analytics-page {
     background-color: var(--bg-primary);
     min-height: 100vh;
-    padding: 2.5rem;
-    animation: fadeIn 0.5s ease-in-out;
+    padding: 3rem;
 }
 
-/* ── HEADER & SEARCH (DAY/NIGHT) ── */
+/* ── BOLD DARK HEADER & SEARCH ── */
 .header-left h1 {
-    font-size: 2.4rem;
-    font-weight: 900;
+    font-size: 2.6rem;
+    font-weight: 950;
     color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    letter-spacing: -1px;
+    margin-bottom: 0.5rem;
 }
 
 .filters-bar {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    margin-bottom: 2.5rem;
-    padding: 1.25rem;
-    background: var(--bg-secondary);
-    border-radius: 24px;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border-color);
-}
-
-.search-box {
-    flex: 1;
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.search-icon {
-    position: absolute;
-    left: 1.25rem;
-    color: #46178F;
-    font-size: 1.2rem;
+    gap: 2rem;
+    margin-bottom: 3rem;
+    padding: 1.5rem 2rem;
+    background: var(--admin-dark); /* BOLD DARK BACKGROUND */
+    border-radius: 30px;
+    box-shadow: 0 20px 40px rgba(30, 27, 75, 0.2);
 }
 
 .search-box input {
     width: 100%;
-    padding: 1rem 1rem 1rem 3.5rem;
-    background: var(--bg-primary);
-    border: 2px solid transparent;
-    border-radius: 16px;
-    color: var(--text-primary);
-    font-weight: 700;
-    font-size: 1rem;
+    padding: 1.1rem 1rem 1.1rem 4rem;
+    background: rgba(255, 255, 255, 0.1); /* SEMI-DARK GLASS */
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    color: white; /* WHITE TEXT IN SEARCH */
+    font-weight: 600;
+    font-size: 1.1rem;
     transition: all 0.3s;
 }
 
+.search-box input::placeholder { color: rgba(255, 255, 255, 0.5); }
+
 .search-box input:focus {
     outline: none;
-    border-color: #46178F;
-    background: var(--bg-secondary);
-    box-shadow: 0 0 0 5px rgba(70, 23, 143, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--kahoot-gold);
+    box-shadow: 0 0 0 4px rgba(255, 204, 2, 0.2);
 }
 
-/* Filter Buttons (Day mode fix) */
+.search-icon {
+    position: absolute;
+    left: 1.5rem;
+    color: var(--kahoot-gold);
+}
+
+/* Status Tabs (The Slate Switcher) */
 .user-tabs {
-    background: var(--bg-primary);
+    background: rgba(255, 255, 255, 0.08);
     padding: 6px;
-    border-radius: 14px;
+    border-radius: 20px;
     display: flex;
-    gap: 4px;
+    gap: 6px;
 }
 
 .tab-btn {
-    padding: 0.75rem 1.5rem;
-    border-radius: 10px;
+    padding: 0.85rem 1.75rem;
+    border-radius: 15px;
     border: none;
     background: transparent;
-    color: var(--text-secondary);
-    font-weight: 800;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 900;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    transition: all 0.2s;
+    transition: all 0.25s;
 }
 
 .tab-btn.active {
-    background: #46178F;
-    color: white !important;
-    box-shadow: 0 5px 15px rgba(70, 23, 143, 0.3);
+    background: var(--kahoot-gold);
+    color: var(--admin-dark) !important;
+    box-shadow: 0 8px 16px rgba(255, 204, 2, 0.3);
 }
 
-/* ── TABLE VISIBILITY OVERHAUL ── */
+.tab-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+/* ── THE DARK TABLE HEADER ── */
 .users-table-container {
     background: var(--bg-secondary);
-    border-radius: 28px;
+    border-radius: 35px;
     padding: 1.5rem;
     box-shadow: var(--shadow);
     border: 1px solid var(--border-color);
@@ -125,72 +122,60 @@
 .users-table th {
     padding: 1.5rem 1rem;
     text-align: left;
-    background: rgba(70, 23, 143, 0.03);
-    color: #46178F;
+    background: var(--admin-dark); /* BOLD NAVY HEADER */
+    color: white;
     font-weight: 900;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    border-bottom: 2px solid var(--border-color);
+    letter-spacing: 2px;
 }
 
+.users-table th:first-child { border-top-left-radius: 20px; }
+.users-table th:last-child { border-top-right-radius: 20px; }
+
 .users-table td {
-    padding: 1.8rem 1rem;
-    border-bottom: 1px solid var(--border-color);
-    font-weight: 500;
+    padding: 1.75rem 1rem;
+    border-bottom: 2px solid var(--bg-primary);
+    color: var(--text-primary);
+    font-weight: 700;
 }
 
 .users-table tr:hover td {
-    background: rgba(70, 23, 143, 0.015);
+    background: rgba(30, 27, 75, 0.02);
 }
 
-/* Hardened Badges for DAY mode */
+/* ── BADGES (NEAREST COLORS) ── */
 .badge {
-    padding: 8px 16px;
-    border-radius: 10px;
+    padding: 8px 18px;
+    border-radius: 12px;
     font-weight: 950;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 0.5px;
+    font-size: 0.8rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 
 .badge-info {
-    background: rgba(19, 104, 206, 0.12);
-    color: #0c4a9e; /* DEEP ROYAL BLUE */
-    border: 1px solid rgba(19, 104, 206, 0.2);
+    background: #E0E7FF;
+    color: #312E81;
+    border: 1px solid #C7D2FE;
 }
 
 .badge-success {
-    background: rgba(34, 197, 94, 0.12);
-    color: #166534; /* DEEP EMERALD GREEN */
-    border: 1px solid rgba(34, 197, 94, 0.2);
+    background: #DCFCE7;
+    color: #166534;
+    border: 1px solid #BBF7D0;
 }
 
-/* Detailed Analytics Button (Day Fix) */
+/* Action Button */
 .btn-primary.btn-sm {
-    background: #FFCC02; /* BOLD GOLD */
-    color: #1A0533 !important;
-    border-radius: 12px;
-    font-weight: 900;
-    border: none;
-    padding: 10px 20px;
-    box-shadow: 0 4px 0 #EAB308;
-    transition: all 0.2s;
+    background: linear-gradient(to bottom, #FFCC02, #EAB308);
+    color: #1B1B1B !important;
+    border-radius: 15px;
+    font-weight: 950;
+    padding: 12px 24px;
+    box-shadow: 0 5px 15px rgba(234, 179, 8, 0.3);
 }
 
 .btn-primary.btn-sm:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 0 #EAB308;
-    filter: brightness(1.05);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 25px rgba(234, 179, 8, 0.5);
 }
-
-.status-badge {
-    font-weight: 900;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-}
-
-.status-completed { background: #E2E8F0; color: #475569; }
-.status-active { background: #E21B3C; color: white; }
