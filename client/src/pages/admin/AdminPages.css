@@ -1,114 +1,85 @@
 /* ============================================================
-   KMIT KAHOOT — Admin Analytics Night-Visibility & Framed Buttons
+   KMIT KAHOOT — Admin Analytics Wide-Search & Thick-Green Column
    ============================================================ */
 
 :root {
-    /* Goal Colors */
     --gold-active: #FFCC02;
     --completed-active: #10B981; 
     --all-active: #46178F; 
-    --tab-inactive: #E2E8F0; /* VISIBLE SOFT GREY */
-    --text-inactive: #64748B;
+    --thick-green: #15803D; /* EXTRA BOLD EMERALD */
 }
 
-[data-theme='dark'] {
-    --bg-primary: #150E28;
-    --bg-secondary: #221B3D;
-    --text-primary: #FFFFFF; /* FORCES CRITICAL VISIBILITY */
-    --text-secondary: rgba(255, 255, 255, 0.7);
-    --border-color: rgba(255, 255, 255, 0.1);
-    --tab-inactive: #2D254F; /* DEEP VIOLET FRAME FOR NIGHT */
-    --text-inactive: #94A3B8;
-}
-
-/* ── VISIBLE FILTER BUTTONS (NO HOVER NEEDED) ── */
-.user-tabs {
-    background: transparent; 
-    padding: 0;
+/* ── MAXIMUM SEARCH EXPANSION ── */
+.filters-bar {
     display: flex;
-    gap: 12px;
-}
-
-.tab-btn {
-    padding: 0.8rem 1.8rem;
-    border-radius: 12px;
-    border: 2px solid var(--border-color); /* ADDS A VISIBLE FRAME */
-    background: var(--tab-inactive); /* ALWAYS VISIBLE BACKGROUND */
-    color: var(--text-inactive);
-    font-weight: 900;
-    text-transform: uppercase;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: all 0.25s;
-}
-
-/* ALL QUIZZES ACTIVE */
-.tab-btn.active:first-child {
-    background: var(--all-active);
-    color: white !important;
-    border-color: var(--all-active);
-    box-shadow: 0 8px 16px rgba(70, 23, 143, 0.4);
-}
-
-/* COMPLETED ACTIVE */
-.tab-btn.active:nth-child(2) {
-    background: var(--completed-active);
-    color: white !important;
-    border-color: var(--completed-active);
-}
-
-/* LIVE ACTIVE */
-.tab-btn.active:last-child {
-    background: var(--gold-active);
-    color: #1A0533 !important;
-    border-color: var(--gold-active);
-}
-
-.tab-btn:hover:not(.active) {
-    border-color: var(--all-active);
+    align-items: center;
+    gap: 3rem;
+    padding: 1.5rem 2.5rem;
     background: var(--bg-secondary);
-    color: var(--text-primary);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
 }
 
-/* ── NIGHT MODE TEXT VISIBILITY OVERHAUL ── */
-.users-table-container {
-    background: var(--bg-secondary);
-    border-radius: 28px;
-    border: 1px solid var(--border-color);
+.search-box {
+    flex: 3; /* TRIPLES THE WIDTH */
+    position: relative;
+    display: flex;
+    align-items: center;
 }
 
-.users-table td {
-    padding: 1.8rem 1rem;
-    border-bottom: 1.5px solid var(--border-color);
-    color: var(--text-primary) !important; /* ENSURES WHITE IN NIGHT */
+.search-box input {
+    width: 100%;
+    padding: 1.25rem 1.5rem 1.25rem 4rem; /* LARGER VERTICAL SIZE */
+    background: #F1F5F9;
+    border: 2px solid var(--border-color);
+    border-radius: 16px;
+    font-size: 1.15rem; /* LARGER FONT SIZE */
     font-weight: 700;
+    color: var(--text-primary);
+    transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* Specific Content Fixes */
-.quiz-title { 
-    color: var(--text-primary) !important; 
-    font-weight: 950; 
+.search-box input:focus {
+    outline: none;
+    background: white;
+    box-shadow: 0 15px 30px rgba(70, 23, 143, 0.2);
+    border-color: var(--all-active);
 }
 
-.user-info-cell span,
-.date-cell span { 
-    color: var(--text-secondary) !important; 
-    font-weight: 800; 
-}
-
-/* Badge Polish */
-.badge {
-    padding: 10px 18px;
-    border-radius: 10px;
-    font-weight: 950;
+/* ── THICK GREEN JOINED COLUMN ── */
+.badge-success {
+    background: rgba(21, 128, 61, 0.12) !important;
+    color: var(--thick-green) !important; /* THICK GREEN TEXT FOR 100% VISIBILITY */
+    font-weight: 950 !important;
+    padding: 10px 20px !important;
+    border-radius: 12px !important;
+    border: 1.5px solid rgba(21, 128, 61, 0.3) !important;
+    text-transform: uppercase;
     font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 
-/* Detailed Analytics Action Button */
+.badge-info {
+    background: rgba(59, 130, 246, 0.12) !important;
+    color: #1D4ED8 !important;
+    font-weight: 950 !important;
+    padding: 10px 20px !important;
+    border-radius: 12px !important;
+}
+
+/* Row Action Refresh */
 .btn-primary.btn-sm {
     background: var(--gold-active);
     color: #1A0533 !important;
     font-weight: 900;
     border-radius: 12px;
-    box-shadow: 0 5px 15px rgba(234, 179, 8, 0.2);
+    padding: 12px 24px;
+    box-shadow: 0 4px 0 #EAB308;
+    transition: all 0.2s;
+}
+
+.btn-primary.btn-sm:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 0 #EAB308;
 }
