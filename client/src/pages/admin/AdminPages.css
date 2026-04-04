@@ -1,227 +1,219 @@
 /* ============================================================
-   KMIT KAHOOT — Admin Pages Premium Styling
+   KMIT KAHOOT — Admin Pages (Premium Glassmorphism Style)
    ============================================================ */
 
 :root {
-    /* Day Mode (Light) */
-    --bg-primary: #F0F2F9;
+    /* Day Mode (Luxurious White) */
+    --bg-primary: #F4F7FF;
     --bg-secondary: #FFFFFF;
-    --text-primary: #1A0533;
-    --text-secondary: #475569;
-    --border-color: rgba(26, 5, 51, 0.08);
-    --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --text-primary: #1e1b4b;
+    --text-secondary: #6366f1;
+    --border-color: rgba(99, 102, 241, 0.1);
+    --shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.1);
     
-    /* Branding */
-    --kahoot-purple: #46178F;
-    --kahoot-gold: #FFCC02;
-    --gradient-primary: linear-gradient(135deg, #46178F 0%, #7B2FBE 100%);
+    /* Brand Colors */
+    --accent-purple: #46178F;
+    --accent-gold: #FFCC02;
+    --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.4) 100%);
+    --gradient-brand: linear-gradient(135deg, #46178F 0%, #a855f7 100%);
 }
 
 [data-theme='dark'] {
-    /* Night Mode */
-    --bg-primary: #1A0533;
-    --bg-secondary: #2D0B5A;
+    /* Night Mode (Deep Space) */
+    --bg-primary: #150E28;
+    --bg-secondary: #1E1736;
     --text-primary: #FFFFFF;
-    --text-secondary: rgba(255, 255, 255, 0.7);
-    --border-color: rgba(255, 255, 255, 0.1);
+    --text-secondary: #C4B5FD;
+    --border-color: rgba(255, 255, 255, 0.12);
+    --shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+    --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%);
 }
 
 .admin-page {
     background-color: var(--bg-primary);
     color: var(--text-primary);
     min-height: 100vh;
-    padding: 2.5rem;
-    transition: all 0.3s ease;
+    padding: 3rem;
+    transition: background 0.4s ease;
 }
 
-/* ── HEADER ── */
-.page-header h1 {
-    font-size: 2.2rem;
-    font-weight: 900;
-    margin-top: 0.5rem;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.page-header h1 svg { color: var(--kahoot-purple); }
-
-.back-btn {
-    color: var(--text-secondary);
-    text-decoration: none;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    opacity: 0.8;
-    transition: opacity 0.2s;
-}
-
-.back-btn:hover { opacity: 1; color: var(--kahoot-purple); }
-
-/* ── SEARCH & FILTERS (RE-DESIGNED v20) ── */
+/* ── SEARCH BAR & BUTTONS (HIGH FIDELITY) ── */
 .filters-bar {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    margin-bottom: 2.5rem;
+    gap: 2rem;
+    margin-bottom: 3rem;
+    padding: 1.25rem 2rem;
     background: var(--bg-secondary);
-    padding: 1.25rem;
-    border-radius: 20px;
+    border-radius: 30px;
     border: 1px solid var(--border-color);
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
 }
 
 .search-box {
     flex: 1;
     position: relative;
-    transition: transform 0.2s;
+    display: flex;
+    align-items: center;
 }
-
-.search-box:focus-within { transform: translateY(-2px); }
 
 .search-icon {
     position: absolute;
-    left: 1.25rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--kahoot-purple);
+    left: 1.5rem;
+    color: var(--accent-purple);
     font-size: 1.2rem;
-    z-index: 2;
 }
 
 .search-box input {
     width: 100%;
-    padding: 0.9rem 1rem 0.9rem 3.5rem;
+    padding: 1.1rem 1rem 1.1rem 4rem;
     background: var(--bg-primary);
-    border: 2px solid transparent;
-    border-radius: 12px;
+    border: 2.5px solid transparent;
+    border-radius: 20px;
     color: var(--text-primary);
-    font-size: 1rem;
-    font-weight: 600;
-    transition: all 0.3s;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+    font-size: 1.1rem;
+    font-weight: 700;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .search-box input:focus {
     outline: none;
     background: var(--bg-secondary);
-    border-color: var(--kahoot-purple);
-    box-shadow: 0 8px 20px rgba(70, 23, 143, 0.15);
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 0 6px rgba(70, 23, 143, 0.1);
 }
 
-/* Filter Tabs */
+/* Status Tabs (The Pill Switcher) */
 .user-tabs {
-    display: flex;
     background: var(--bg-primary);
-    padding: 5px;
-    border-radius: 12px;
+    padding: 6px;
+    border-radius: 20px;
+    display: flex;
     gap: 4px;
-    border: 1px solid var(--border-color);
 }
 
 .tab-btn {
-    padding: 0.7rem 1.4rem;
-    border-radius: 8px;
+    padding: 0.8rem 1.8rem;
+    border-radius: 16px;
     border: none;
     background: transparent;
     color: var(--text-secondary);
     font-weight: 800;
-    font-size: 0.85rem;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    white-space: nowrap;
+    transition: all 0.3s;
 }
 
 .tab-btn.active {
-    background: var(--kahoot-purple);
-    color: white !important;
-    box-shadow: 0 4px 10px rgba(70, 23, 143, 0.4);
-    transform: scale(1.02);
+    background: var(--accent-purple);
+    color: #FFFFFF !important;
+    box-shadow: 0 10px 20px rgba(70, 23, 143, 0.3);
+    transform: translateY(-2px);
 }
 
 .tab-btn:hover:not(.active) {
-    background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background: rgba(70, 23, 143, 0.1);
 }
 
-/* ── TABLE BADGES (SOLID & BOLD v20) ── */
-.badge {
-    padding: 7px 14px;
-    border-radius: 10px;
-    font-weight: 900;
-    font-size: 0.75rem;
-    letter-spacing: 0.5px;
+/* ── THE TABLE ── */
+.users-table-container {
+    background: var(--bg-secondary);
+    border-radius: 35px;
+    padding: 2rem;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.users-table th {
+    padding: 1.5rem 1rem;
+    text-align: left;
+    color: var(--accent-purple);
+    font-weight: 950;
+    font-size: 0.9rem;
     text-transform: uppercase;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    letter-spacing: 2px;
+    border-bottom: 2px solid var(--bg-primary);
 }
 
-/* Info (Questions) - Blue Solid */
-.badge-info { 
-    background: #1368CE; 
+.users-table td {
+    padding: 1.75rem 1rem;
+    border-bottom: 2.5px solid var(--bg-primary);
+    vertical-align: middle;
+}
+
+.users-table tr:hover td {
+    background: rgba(99, 102, 241, 0.03);
+}
+
+/* ── PARTICIPANTS COLUMN (VIBRANT RE-DESIGN) ── */
+.badge-success {
+    background: linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%) !important;
     color: white !important;
-    border: 1px solid #1368CE;
+    font-weight: 950 !important;
+    padding: 10px 20px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4) !important;
+    border: none !important;
 }
 
-/* Success (Participants) - Green Solid */
-.badge-success { 
-    background: #39D900; 
-    color: #1A0533 !important; /* DARK TEXT ON NEON BG */
-    border: 2.5px solid #28A745;
+.badge-info {
+    background: rgba(123, 47, 190, 0.1) !important;
+    color: #7B2FBE !important;
+    font-weight: 900 !important;
+    padding: 10px 18px !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(123, 47, 190, 0.2) !important;
 }
 
-/* Status Badges */
+/* ── STATUS COLUMN (GLOWY BADGES) ── */
 .status-badge {
-    padding: 7px 12px;
-    border-radius: 8px;
+    padding: 10px 18px;
+    border-radius: 14px;
     font-weight: 900;
-    font-size: 0.75rem;
-    letter-spacing: 0.5px;
-    display: inline-block;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
 }
 
-.status-completed { 
-    background: #102A43; /* Deep Navy */
-    color: #BCCCDC !important; 
-    border: 1px solid #243B53;
+.status-completed {
+    background: rgba(15, 118, 110, 0.1);
+    color: #0f766e;
+    border: 2px solid rgba(15, 118, 110, 0.2);
 }
 
-.status-active { 
-    background: #E21B3C; 
-    color: white !important; 
-    box-shadow: 0 0 15px rgba(226, 27, 60, 0.4);
-    animation: glow-pulse 2s infinite;
-}
-
-@keyframes glow-pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.05); opacity: 0.8; }
-    100% { transform: scale(1); opacity: 1; }
-}
-
-/* Button Refinement */
-.btn-primary.btn-sm {
-    background: var(--kahoot-gold);
+.status-active {
+    background: #FFCC02;
     color: #1A0533;
-    border-radius: 12px;
+    box-shadow: 0 0 15px rgba(255, 204, 2, 0.5);
+    border: 2.5px solid #EAB308;
+    animation: bounceSlow 3s infinite;
+}
+
+@keyframes bounceSlow {
+    0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); }
+}
+
+/* Admin Action Button */
+.btn-primary {
+    background: var(--accent-purple);
+    color: white !important;
+    padding: 0.85rem 1.5rem;
+    border-radius: 15px;
     font-weight: 800;
-    border: none;
-    box-shadow: 0 4px 0 #EAB308;
+    transition: all 0.3s;
+    box-shadow: 0 5px 15px rgba(70, 23, 143, 0.3);
 }
 
-.btn-primary.btn-sm:hover {
+.btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 0 #EAB308;
-    filter: brightness(1.05);
-}
-
-/* Mobile */
-@media (max-width: 900px) {
-    .filters-bar { flex-direction: column; align-items: stretch; }
-    .page-header h1 { font-size: 1.8rem; }
+    box-shadow: 0 8px 25px rgba(70, 23, 143, 0.5);
+    filter: brightness(1.2);
 }
