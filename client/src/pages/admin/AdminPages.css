@@ -1,123 +1,114 @@
 /* ============================================================
-   KMIT KAHOOT — Admin Analytics Wide-Search & Color Buttons
+   KMIT KAHOOT — Admin Analytics Night-Visibility & Framed Buttons
    ============================================================ */
 
 :root {
     /* Goal Colors */
     --gold-active: #FFCC02;
-    --completed-active: #10B981; /* Vibrant Teal */
-    --all-active: #46178F; /* Solid Purple */
-    --hover-bg: rgba(70, 23, 143, 0.05);
+    --completed-active: #10B981; 
+    --all-active: #46178F; 
+    --tab-inactive: #E2E8F0; /* VISIBLE SOFT GREY */
+    --text-inactive: #64748B;
 }
 
-.filters-bar {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-    margin-bottom: 2.5rem;
-    padding: 1.5rem 2rem;
-    background: var(--bg-secondary);
-    border-radius: 20px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-    border: 1px solid var(--border-color);
-    width: 100%; /* ENSURES FULL WIDTH */
+[data-theme='dark'] {
+    --bg-primary: #150E28;
+    --bg-secondary: #221B3D;
+    --text-primary: #FFFFFF; /* FORCES CRITICAL VISIBILITY */
+    --text-secondary: rgba(255, 255, 255, 0.7);
+    --border-color: rgba(255, 255, 255, 0.1);
+    --tab-inactive: #2D254F; /* DEEP VIOLET FRAME FOR NIGHT */
+    --text-inactive: #94A3B8;
 }
 
-/* ── SEARCH BAR EXPANSION ── */
-.search-box {
-    flex: 2; /* MAKES SEARCH BAR MUCH LONGER */
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.search-box input {
-    width: 100%;
-    padding: 1.1rem 1rem 1.1rem 3.5rem;
-    background: #F8FAFC; /* LIGHT GREY BG FOR VISIBILITY */
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.search-box input:focus {
-    outline: none;
-    border-color: var(--all-active);
-    background: white;
-    box-shadow: 0 10px 20px rgba(70, 23, 143, 0.1);
-}
-
-.search-icon {
-    position: absolute;
-    left: 1.25rem;
-    color: var(--all-active);
-    font-size: 1.2rem;
-    pointer-events: none;
-}
-
-/* ── VIBRANT COLOR-CODED BUTTONS ── */
+/* ── VISIBLE FILTER BUTTONS (NO HOVER NEEDED) ── */
 .user-tabs {
-    flex: 1; /* ALIGNS BUTTONS TO RIGHT SIDE */
-    background: #F1F5F9;
-    padding: 6px;
-    border-radius: 16px;
+    background: transparent; 
+    padding: 0;
     display: flex;
-    gap: 8px;
-    justify-content: flex-end;
+    gap: 12px;
 }
 
 .tab-btn {
-    padding: 0.75rem 1.75rem;
+    padding: 0.8rem 1.8rem;
     border-radius: 12px;
-    border: none;
-    background: transparent;
-    color: #64748B;
+    border: 2px solid var(--border-color); /* ADDS A VISIBLE FRAME */
+    background: var(--tab-inactive); /* ALWAYS VISIBLE BACKGROUND */
+    color: var(--text-inactive);
     font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     cursor: pointer;
     transition: all 0.25s;
 }
 
-/* ALL QUIZZES ACTIVE (PURPLE) */
+/* ALL QUIZZES ACTIVE */
 .tab-btn.active:first-child {
     background: var(--all-active);
     color: white !important;
-    box-shadow: 0 6px 12px rgba(70, 23, 143, 0.3);
+    border-color: var(--all-active);
+    box-shadow: 0 8px 16px rgba(70, 23, 143, 0.4);
 }
 
-/* COMPLETED ACTIVE (TEAL) */
+/* COMPLETED ACTIVE */
 .tab-btn.active:nth-child(2) {
     background: var(--completed-active);
     color: white !important;
-    box-shadow: 0 6px 12px rgba(16, 185, 129, 0.3);
+    border-color: var(--completed-active);
 }
 
-/* LIVE ACTIVE (GOLD) */
+/* LIVE ACTIVE */
 .tab-btn.active:last-child {
     background: var(--gold-active);
     color: #1A0533 !important;
-    box-shadow: 0 6px 12px rgba(234, 179, 8, 0.3);
+    border-color: var(--gold-active);
 }
 
 .tab-btn:hover:not(.active) {
-    background: rgba(70, 23, 143, 0.08);
-    color: var(--all-active);
+    border-color: var(--all-active);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
-/* ── TABLE HEADER SEPARATION (SCREENSHOT STYLE) ── */
-.users-table th {
-    background: var(--all-active);
-    color: white;
-    padding: 1.5rem 1rem;
+/* ── NIGHT MODE TEXT VISIBILITY OVERHAUL ── */
+.users-table-container {
+    background: var(--bg-secondary);
+    border-radius: 28px;
+    border: 1px solid var(--border-color);
+}
+
+.users-table td {
+    padding: 1.8rem 1rem;
+    border-bottom: 1.5px solid var(--border-color);
+    color: var(--text-primary) !important; /* ENSURES WHITE IN NIGHT */
+    font-weight: 700;
+}
+
+/* Specific Content Fixes */
+.quiz-title { 
+    color: var(--text-primary) !important; 
+    font-weight: 950; 
+}
+
+.user-info-cell span,
+.date-cell span { 
+    color: var(--text-secondary) !important; 
+    font-weight: 800; 
+}
+
+/* Badge Polish */
+.badge {
+    padding: 10px 18px;
+    border-radius: 10px;
     font-weight: 950;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    border-right: 2px solid rgba(255,255,255,0.1); /* VERTICAL SEPARATORS */
+    font-size: 0.8rem;
 }
 
-.users-table th:last-child { border-right: none; }
+/* Detailed Analytics Action Button */
+.btn-primary.btn-sm {
+    background: var(--gold-active);
+    color: #1A0533 !important;
+    font-weight: 900;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(234, 179, 8, 0.2);
+}
