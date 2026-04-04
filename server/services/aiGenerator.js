@@ -261,8 +261,12 @@ class AIQuestionGenerator {
                 const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
                 try {
                     const colabResult = await this.generateFromColab(textContent, options);
-                    if (colabResult && colabResult.success) {
-                        responseText = JSON.stringify(colabResult.questions);
+                    
+                    // Robust check: accept if it's an array OR has a questions property
+                    const questionsFound = Array.isArray(colabResult) ? colabResult : (colabResult?.questions || null);
+                    
+                    if (questionsFound && questionsFound.length > 0) {
+                        responseText = JSON.stringify(questionsFound);
                         providerUsed = 'colab';
                         modelUsed = 'llama-3-rag';
                         logger.info('✅ AI Service: Success with Colab RAG');
