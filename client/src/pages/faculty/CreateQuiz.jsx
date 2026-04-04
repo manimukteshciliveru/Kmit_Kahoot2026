@@ -1332,21 +1332,22 @@ const CreateQuiz = () => {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className="actions" style={{ display: 'flex', gap: '4px' }}>
+                                                        <div className="actions" style={{ display: 'flex', gap: '8px' }}>
                                                             <button
-                                                                className="btn btn-icon btn-ghost"
+                                                                className="btn btn-icon btn-secondary"
                                                                 onClick={() => startEditing(index)}
                                                                 title="Edit Question"
+                                                                style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.2)' }}
                                                             >
-                                                                <FiEdit2 size={16} />
+                                                                <FiEdit2 size={18} />
                                                             </button>
                                                             <button
-                                                                className="btn btn-icon btn-ghost"
+                                                                className="btn btn-icon btn-secondary"
                                                                 onClick={() => removeQuestion(index)}
                                                                 title="Delete Question"
-                                                                style={{ color: 'var(--danger)' }}
+                                                                style={{ padding: '10px', color: '#FF4D4D', background: 'rgba(255, 77, 77, 0.1)', borderColor: 'rgba(255, 77, 77, 0.2)' }}
                                                             >
-                                                                <FiTrash2 size={16} />
+                                                                <FiTrash2 size={18} />
                                                             </button>
                                                         </div>
                                                     </div>
