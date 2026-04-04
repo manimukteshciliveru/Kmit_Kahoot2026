@@ -13,6 +13,7 @@ const MyQuizzes = () => {
     const [quizzes, setQuizzes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         fetchQuizzes();
@@ -68,6 +69,14 @@ const MyQuizzes = () => {
     };
 
     const filteredQuizzes = quizzes.filter(q => {
+        // 1. Search Filter
+        const matchesSearch = 
+            q.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            q.code?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        if (!matchesSearch) return false;
+
+        // 2. Status Filter
         if (filter === 'all') return true;
         if (filter === 'done') return q.status === 'done' || q.status === 'completed' || q.status === 'finished';
         return q.status === filter;
@@ -80,9 +89,30 @@ const MyQuizzes = () => {
                     <h1>My Quizzes</h1>
                     <p>Manage all your quizzes in one place</p>
                 </div>
-                <Link to="/faculty/create" className="btn btn-primary">
-                    <FiPlus /> New Quiz
-                </Link>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <div style={{ position: 'relative' }}>
+                        <FiEye style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input
+                            type="text"
+                            placeholder="Search title or code..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            style={{
+                                padding: '0.75rem 1rem 0.75rem 2.5rem',
+                                borderRadius: '12px',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-card-light)',
+                                color: 'var(--text-primary)',
+                                outline: 'none',
+                                width: '260px',
+                                fontSize: '0.9rem'
+                            }}
+                        />
+                    </div>
+                    <Link to="/faculty/create" className="btn btn-primary">
+                        <FiPlus /> New Quiz
+                    </Link>
+                </div>
             </div>
 
             {/* Filter Tabs */}
@@ -151,13 +181,28 @@ const MyQuizzes = () => {
                                             <td><span className={`status-badge ${statusInfo.class}`}>{statusInfo.icon} {statusInfo.label}</span></td>
                                             <td className="cell-actions">
                                                 <div className="action-btns">
-                                                    <button className="action-btn view" onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${quiz._id}/${(quiz.status === 'completed' || quiz.status === 'done') ? 'results' : 'host'}`); }}>
+                                                    <button 
+                                                        className="action-btn view" 
+                                                        title="View Analytics"
+                                                        onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${quiz._id}/${(quiz.status === 'completed' || quiz.status === 'done') ? 'results' : 'host'}`); }}
+                                                        style={{ color: '#38BDF8', borderColor: 'rgba(56, 189, 248, 0.3)', background: 'rgba(56, 189, 248, 0.1)' }}
+                                                    >
                                                         {(quiz.status === 'completed' || quiz.status === 'done') ? <FiBarChart2 /> : <FiEye />}
                                                     </button>
-                                                    <button className="action-btn edit" onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${quiz._id}/edit`); }}>
+                                                    <button 
+                                                        className="action-btn edit" 
+                                                        title="Edit Quiz"
+                                                        onClick={(e) => { e.stopPropagation(); navigate(`/quiz/${quiz._id}/edit`); }}
+                                                        style={{ color: '#10B981', borderColor: 'rgba(16, 185, 129, 0.3)', background: 'rgba(16, 185, 129, 0.1)' }}
+                                                    >
                                                         <FiEdit2 />
                                                     </button>
-                                                    <button className="action-btn danger" onClick={(e) => handleDelete(quiz._id, e)}>
+                                                    <button 
+                                                        className="action-btn danger" 
+                                                        title="Delete Quiz"
+                                                        onClick={(e) => handleDelete(quiz._id, e)}
+                                                        style={{ color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.1)' }}
+                                                    >
                                                         <FiTrash2 />
                                                     </button>
                                                 </div>
