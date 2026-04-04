@@ -1,85 +1,120 @@
 /* ============================================================
-   KMIT KAHOOT — Admin Analytics Wide-Search & Thick-Green Column
+   KMIT KAHOOT — Admin Analytics High-Grid Precision Style
    ============================================================ */
 
 :root {
+    --indigo-primary: #312E81;
     --gold-active: #FFCC02;
-    --completed-active: #10B981; 
-    --all-active: #46178F; 
-    --thick-green: #15803D; /* EXTRA BOLD EMERALD */
+    --border-steel: #E2E8F0;
+    --bg-page: #F8FAFC;
+    --bg-card: #FFFFFF;
 }
 
-/* ── MAXIMUM SEARCH EXPANSION ── */
-.filters-bar {
-    display: flex;
-    align-items: center;
-    gap: 3rem;
-    padding: 1.5rem 2.5rem;
-    background: var(--bg-secondary);
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+[data-theme='dark'] {
+    --border-steel: rgba(255, 255, 255, 0.1);
+    --bg-page: #0F172A;
+    --bg-card: #1E293B;
 }
 
-.search-box {
-    flex: 3; /* TRIPLES THE WIDTH */
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
+/* ── SEARCH BAR GLOW TRANSITION ── */
 .search-box input {
-    width: 100%;
-    padding: 1.25rem 1.5rem 1.25rem 4rem; /* LARGER VERTICAL SIZE */
-    background: #F1F5F9;
-    border: 2px solid var(--border-color);
-    border-radius: 16px;
-    font-size: 1.15rem; /* LARGER FONT SIZE */
+    background: var(--bg-card);
+    border: 2px solid var(--border-steel);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem 1.25rem 3.5rem;
+    font-size: 1.1rem;
     font-weight: 700;
-    color: var(--text-primary);
-    transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    width: 100%;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
 }
 
 .search-box input:focus {
     outline: none;
-    background: white;
-    box-shadow: 0 15px 30px rgba(70, 23, 143, 0.2);
-    border-color: var(--all-active);
+    border-color: var(--indigo-primary);
+    box-shadow: 0 0 0 6px rgba(49, 46, 129, 0.1), 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
 }
 
-/* ── THICK GREEN JOINED COLUMN ── */
-.badge-success {
-    background: rgba(21, 128, 61, 0.12) !important;
-    color: var(--thick-green) !important; /* THICK GREEN TEXT FOR 100% VISIBILITY */
-    font-weight: 950 !important;
-    padding: 10px 20px !important;
-    border-radius: 12px !important;
-    border: 1.5px solid rgba(21, 128, 61, 0.3) !important;
+/* ── HIGH-GRID TABLE POLISH (SPACED & BORDERED) ── */
+.users-table-container {
+    background: var(--bg-card);
+    border-radius: 20px;
+    border: 2px solid var(--border-steel);
+    overflow: hidden;
+    margin-top: 2rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse; /* ENABLES GRID LINES */
+}
+
+/* Highlighted Header */
+.users-table th {
+    padding: 1.75rem 1.25rem;
+    background: var(--indigo-primary);
+    color: white;
+    font-weight: 900;
+    font-size: 0.9rem;
     text-transform: uppercase;
-    font-size: 0.8rem;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    letter-spacing: 1.5px;
+    border-right: 1.5px solid rgba(255, 255, 255, 0.1); /* VERTICAL SEPARATORS */
+    border-bottom: 4px solid var(--gold-active); /* GOLD ACCENT LINE */
+}
+
+.users-table th:last-child { border-right: none; }
+
+/* Spaced Cells & Column Lines */
+.users-table td {
+    padding: 2.25rem 1.25rem; /* INCREASED PADDING TO AVOID MESSINESS */
+    border-bottom: 1.5px solid var(--border-steel); /* HORIZONTAL GRID LINE */
+    border-right: 1.5px solid var(--border-steel); /* VERTICAL GRID LINE */
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.users-table td:last-child { border-right: none; }
+
+/* Grid Hover Effect */
+.users-table tr:hover td {
+    background: rgba(49, 46, 129, 0.02);
+    border-bottom-color: var(--indigo-primary);
+}
+
+/* ── ATTRACTIVE BUTTONS & METRICS ── */
+.badge {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 950;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.badge-success {
+    background: #DCFCE7;
+    color: #166534; /* THICK GREEN */
+    border: 1.5px solid #BBF7D0;
 }
 
 .badge-info {
-    background: rgba(59, 130, 246, 0.12) !important;
-    color: #1D4ED8 !important;
-    font-weight: 950 !important;
-    padding: 10px 20px !important;
-    border-radius: 12px !important;
+    background: #E0E7FF;
+    color: #3730A3;
+    border: 1.5px solid #C7D2FE;
 }
 
-/* Row Action Refresh */
+/* Action Button Expansion */
 .btn-primary.btn-sm {
     background: var(--gold-active);
     color: #1A0533 !important;
     font-weight: 900;
-    border-radius: 12px;
     padding: 12px 24px;
+    border-radius: 12px;
     box-shadow: 0 4px 0 #EAB308;
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .btn-primary.btn-sm:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 0 #EAB308;
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 15px rgba(234, 179, 8, 0.3);
 }
