@@ -251,24 +251,28 @@
     border-color: #10b981;
     background: #10b981;
     color: white;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
 }
 
 .difficulty-btn.active.medium {
-    border-color: var(--warning);
-    background: var(--warning);
-    color: white;
+    border-color: #facc15;
+    background: #facc15;
+    color: #1a0533;
+    box-shadow: 0 0 15px rgba(250, 204, 21, 0.3);
 }
 
 .difficulty-btn.active.hard {
-    border-color: var(--danger);
-    background: var(--danger);
+    border-color: #fb923c;
+    background: #fb923c;
     color: white;
+    box-shadow: 0 0 15px rgba(251, 146, 60, 0.3);
 }
 
 .difficulty-btn.active.advanced {
-    border-color: var(--primary);
-    background: var(--primary);
+    border-color: #ef4444;
+    background: #ef4444;
     color: white;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
 }
 
 /* Step Actions */
