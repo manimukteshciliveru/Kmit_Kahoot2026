@@ -88,9 +88,8 @@
     border-radius: var(--radius-lg);
     padding: var(--space-xl);
     margin-bottom: var(--space-lg);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow);
     max-width: 800px;
-    /* Limit width */
     margin-left: auto;
     margin-right: auto;
 }
@@ -100,7 +99,7 @@
     align-items: center;
     gap: var(--space-sm);
     font-size: 1.5rem;
-    color: var(--primary);
+    color: var(--kahoot-purple);
     margin-bottom: var(--space-lg);
     padding-bottom: var(--space-md);
     border-bottom: 2px solid var(--border);
@@ -137,11 +136,10 @@
 .form-textarea {
     width: 100%;
     padding: var(--space-md);
-    background: var(--bg-secondary);
-    border: 2px solid var(--border);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     font-size: 0.95rem;
-    /* Slightly smaller text */
     color: var(--text-primary);
     transition: all var(--transition-fast);
 }
@@ -150,9 +148,9 @@
 .form-select:focus,
 .form-textarea:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: var(--kahoot-purple);
     background: var(--bg-card);
-    box-shadow: 0 0 0 4px rgba(255, 101, 0, 0.1);
+    box-shadow: 0 0 0 4px var(--primary-glow);
 }
 
 /* Fix Calendar Icon in Dark Mode */
