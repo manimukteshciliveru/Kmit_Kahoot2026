@@ -177,31 +177,36 @@
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-md);
-    background: var(--bg-secondary);
-    border: 2px solid var(--border);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     color: var(--text-secondary);
 }
 
 .mode-btn:hover {
-    border-color: var(--primary);
-    background: var(--primary-glow);
-    color: var(--primary);
-    transform: translateY(-4px);
-    box-shadow: 0 6px 20px var(--primary-glow);
+    border-color: var(--kahoot-purple);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    transform: translateY(-5px) scale(1.03);
+    box-shadow: 0 12px 30px var(--primary-glow);
 }
 
 .mode-btn.active {
-    border-color: var(--primary);
+    border-color: var(--kahoot-purple);
     background: var(--primary-glow);
-    color: var(--primary);
-    box-shadow: inset 0 0 0 1px var(--primary);
+    color: var(--kahoot-purple);
+    box-shadow: inset 0 0 0 1px var(--kahoot-purple);
 }
 
 .mode-btn svg {
     font-size: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.mode-btn:hover svg {
+    transform: scale(1.15);
 }
 
 /* Difficulty Selector */
@@ -213,64 +218,55 @@
 .difficulty-btn {
     flex: 1;
     padding: var(--space-sm);
-    background: var(--bg-secondary);
-    border: 2px solid var(--border);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-bottom: 4px solid var(--border);
     border-radius: var(--radius-md);
     cursor: pointer;
     font-weight: 700;
-    transition: transform 0.1s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     color: var(--text-secondary);
     text-align: center;
 }
 
 .difficulty-btn:hover {
     border-color: var(--text-muted);
-    transform: translateY(-1px);
+    transform: translateY(-3px);
+    background: var(--bg-card);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
 }
 
 .difficulty-btn:active {
-    transform: translateY(2px);
+    transform: translateY(1px);
     border-bottom-width: 2px;
 }
 
 .difficulty-btn.active.easy {
-    border-color: var(--secondary);
-    background: var(--secondary);
-    /* Ensure this is a solid color */
-    color: #fff;
-    /* White text should be fine on Green */
-}
-
-/* Fix for User Complaint: "appearing as white color" -> If they mean the button itself is white (invisible), it might be missing var. 
-   If they mean text is white on white, then bg is missing. 
-   I will force a specific green color to be safe. */
-.difficulty-btn.active.easy {
     border-color: #10b981;
     background: #10b981;
     color: white;
-    box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+    box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
 }
 
 .difficulty-btn.active.medium {
     border-color: #facc15;
     background: #facc15;
     color: #1a0533;
-    box-shadow: 0 0 15px rgba(250, 204, 21, 0.3);
+    box-shadow: 0 5px 15px rgba(250, 204, 21, 0.3);
 }
 
 .difficulty-btn.active.hard {
     border-color: #fb923c;
     background: #fb923c;
     color: white;
-    box-shadow: 0 0 15px rgba(251, 146, 60, 0.3);
+    box-shadow: 0 5px 15px rgba(251, 146, 60, 0.3);
 }
 
 .difficulty-btn.active.advanced {
     border-color: #ef4444;
     background: #ef4444;
     color: white;
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
 }
 
 /* Step Actions */
