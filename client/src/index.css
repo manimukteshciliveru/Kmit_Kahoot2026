@@ -109,19 +109,22 @@
 
 /* ===== Light Theme Override ===== */
 [data-theme="light"] {
-  --bg-primary:   #F8F9FE;
-  --bg-secondary: #EDF2FF;
+  --bg-primary:   #F0F2F9;
+  --bg-secondary: #E8EBF5;
   --bg-card:      #FFFFFF;
-  --bg-card-light:#F1F5F9;
-  --bg-glass:     rgba(255, 255, 255, 0.9);
-  --bg-overlay:   rgba(0, 0, 0, 0.4);
+  --bg-card-light:#F8FAFC;
+  --bg-tertiary:  #E2E8F0;
+  --bg-glass:     rgba(255, 255, 255, 0.95);
+  --bg-overlay:   rgba(0, 0, 0, 0.5);
+  
   --text-primary:   #1A0533;
-  --text-secondary: #4A1F6E;
+  --text-secondary: #334155;
   --text-muted:     #64748B;
-  --border: rgba(74, 31, 110, 0.1);
+  
+  --border: rgba(26, 5, 51, 0.15);
   --border-focus: #46178F;
-  --shadow-md: 0 4px 12px rgba(46, 23, 143, 0.08);
-  --shadow-lg: 0 12px 32px rgba(46, 23, 143, 0.12);
+  --shadow-md: 0 4px 12px rgba(26, 5, 51, 0.08);
+  --shadow-lg: 0 12px 32px rgba(26, 5, 51, 0.12);
 }
 
 /* Base Icon Utility */
