@@ -2,16 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { FiUser, FiLock, FiEye, FiEyeOff, FiArrowRight, FiSun, FiMoon, FiInfo } from 'react-icons/fi';
+import { FiUser, FiLock, FiEye, FiEyeOff, FiArrowRight, FiSun, FiMoon } from 'react-icons/fi';
 import { HiAcademicCap, HiUserGroup, HiShieldCheck } from 'react-icons/hi2';
 import toast from 'react-hot-toast';
+import KmitLogo from '../../components/common/KmitLogo';
 import './Auth.css';
 
 // Role definitions for login form
 const ROLES = [
-    { id: 'student', label: 'Student', icon: HiAcademicCap, placeholder: 'e.g. 22R11A0501', fieldLabel: 'Roll Number' },
-    { id: 'faculty', label: 'Faculty', icon: HiUserGroup, placeholder: 'e.g. FAC10', fieldLabel: 'Faculty ID' },
-    { id: 'admin', label: 'Admin', icon: HiShieldCheck, placeholder: 'e.g. ADMIN01', fieldLabel: 'Admin ID' },
+    { id: 'student', label: 'Student', icon: HiAcademicCap, placeholder: 'Enter Roll Number (e.g., 24BD1A058J)', fieldLabel: 'Roll Number' },
+    { id: 'faculty', label: 'Faculty', icon: HiUserGroup, placeholder: 'Enter Faculty ID', fieldLabel: 'Faculty ID' },
+    { id: 'admin', label: 'Admin', icon: HiShieldCheck, placeholder: 'Enter Admin ID', fieldLabel: 'Admin ID' },
 ];
 
 const Login = () => {
@@ -107,13 +108,13 @@ const Login = () => {
         try {
             const result = await login(userId, password, selectedRole);
             if (result.success) {
-                toast.success('Welcome back to the Arena!');
+                toast.success('Welcome back!');
                 navigate(`/${selectedRole}/dashboard`);
             } else {
-                toast.error(result.message || 'Authentication failed');
+                toast.error(result.message || 'Login failed');
             }
         } catch (err) {
-            toast.error('Connection error. Please try again.');
+            toast.error('Connection error.');
         } finally {
             setLoading(false);
         }
@@ -123,7 +124,7 @@ const Login = () => {
         <div className="auth-page">
             <canvas id="pCanvas" ref={canvasRef}></canvas>
 
-            {/* Premium Decor: Gold Light Beams */}
+            {/* Gold Beams */}
             <div className="beam" style={{ left: '15%', bottom: 0, animationDelay: '0s' }}></div>
             <div className="beam" style={{ left: '30%', bottom: 0, animationDelay: '1.2s' }}></div>
             <div className="beam" style={{ left: '55%', bottom: 0, animationDelay: '2.1s' }}></div>
@@ -134,119 +135,110 @@ const Login = () => {
             <div className="gring" style={{ width: '560px', height: '560px', animation: 'spin1 20s linear infinite' }}></div>
             <div className="gring" style={{ width: '720px', height: '720px', animation: 'spin1 28s linear infinite reverse' }}></div>
 
-            {/* Corner Theme Toggle */}
             <div className="theme-toggle-corner">
-                <button onClick={toggleTheme} className="theme-selector-btn">
-                    {theme === 'dark' ? <><FiMoon /> Night Mode</> : <><FiSun /> Day Mode</>}
+                <button
+                    onClick={toggleTheme}
+                    className={`theme-selector-btn ${theme}`}
+                    title={theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}
+                >
+                    <span className="theme-icon">
+                        {theme === 'dark' ? <FiMoon /> : <FiSun />}
+                    </span>
+                    <span className="theme-label">
+                        {theme === 'dark' ? 'Night Mode' : 'Day Mode'}
+                    </span>
                 </button>
             </div>
 
             <div className="auth-container">
-                {/* Corner Sparkles */}
-                <div className="sparkle" style={{ top: '-12px', left: '-12px' }}></div>
-                <div className="sparkle" style={{ top: '-12px', right: '-12px', transform: 'rotate(45deg)', animationDelay: '0.5s' }}></div>
-                <div className="sparkle" style={{ bottom: '-12px', left: '-12px', transform: 'rotate(-45deg)', animationDelay: '1s' }}></div>
-                <div className="sparkle" style={{ bottom: '-12px', right: '-12px', transform: 'rotate(90deg)', animationDelay: '1.5s' }}></div>
-
-                <div className="card-outer">
-                    <div className="card-inner">
-                        {/* Gold Header */}
-                        <div className="gold-header">
-                            <h1>Welcome Back</h1>
-                            <p>Sign in to continue your learning journey</p>
-                            <div className="gold-chevron"></div>
-                        </div>
-
-                        {/* Role Selector Tabs */}
-                        <div className="role-selector">
-                            {ROLES.map((role) => {
-                                const Icon = role.icon;
-                                return (
-                                    <button
-                                        key={role.id}
-                                        type="button"
-                                        className={`role-btn ${selectedRole === role.id ? 'active' : ''}`}
-                                        onClick={() => setSelectedRole(role.id)}
-                                    >
-                                        <Icon className="role-icon" />
-                                        <span>{role.label}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Login Form */}
-                        <form onSubmit={handleSubmit} className="auth-form">
-                            <div className="form-group">
-                                <label className="form-label">{currentRole.fieldLabel}</label>
-                                <div className="input-wrapper">
-                                    <FiUser />
-                                    <input
-                                        type="text"
-                                        placeholder={currentRole.placeholder}
-                                        value={userId}
-                                        onChange={(e) => setUserId(e.target.value)}
-                                        autoComplete="username"
-                                    />
-                                </div>
+                {/* ── CARD MARKED PART REVERTED ── */}
+                <div className="auth-card animate-slideUp">
+                    <div className="auth-header">
+                        <Link to="/" className="auth-logo">
+                            <div className="logo-box">
+                                <KmitLogo height="60px" />
                             </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Secret Password</label>
-                                <div className="input-wrapper">
-                                    <FiLock />
-                                    <input
-                                        type={showPassword ? 'text' : 'password'}
-                                        placeholder="••••••••"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        autoComplete="current-password"
-                                    />
-                                    <button
-                                        type="button"
-                                        className="password-toggle-btn"
-                                        style={{ background: 'none', border: 'none', color: 'rgba(233,168,37,0.4)', cursor: 'pointer' }}
-                                        onClick={() => setShowPassword(!showPassword)}
-                                    >
-                                        {showPassword ? <FiEyeOff /> : <FiEye />}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div style={{ textAlign: 'right', marginBottom: '1.5rem' }}>
-                                <Link to="/forgot-password" style={{ color: 'rgba(233,168,37,0.5)', fontSize: '11px', textDecoration: 'none' }}>
-                                    Lost your access?
-                                </Link>
-                            </div>
-
-                            <button type="submit" className="signin-premium" disabled={loading}>
-                                {loading ? (
-                                    <span className="spinner-sm" style={{ border: '2px solid rgba(18,0,42,0.2)', borderTop: '2px solid #12002a', borderRadius: '50%', width: '18px', height: '18px', animation: 'spin 1s linear infinite' }}></span>
-                                ) : (
-                                    <>
-                                        ENTER THE ARENA <FiArrowRight />
-                                    </>
-                                )}
-                            </button>
-                        </form>
-
-                        <div style={{ padding: '0 2rem 1.5rem', borderTop: '1px solid rgba(233,168,37,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem' }}>
-                           <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                             KMIT Sec-Protocol v2.0
-                           </span>
-                           <div style={{ display: 'flex', gap: '4px' }}>
-                             {[0, 1, 2].map(i => (
-                               <div key={i} style={{ width: i === ROLES.findIndex(r => r.id === selectedRole) ? '16px' : '6px', height: '6px', borderRadius: '4px', background: i === ROLES.findIndex(r => r.id === selectedRole) ? '#E9A825' : 'rgba(233,168,37,0.2)', transition: 'all 0.3s' }}></div>
-                             ))}
-                           </div>
-                        </div>
+                        </Link>
+                        <h1>Welcome Back</h1>
+                        <p>Sign in to continue your learning journey</p>
                     </div>
+
+                    <div className="role-selector">
+                        {ROLES.map(role => {
+                            const Icon = role.icon;
+                            return (
+                                <button
+                                    key={role.id}
+                                    type="button"
+                                    className={`role-btn ${selectedRole === role.id ? 'active' : ''}`}
+                                    onClick={() => {
+                                        setSelectedRole(role.id);
+                                        setUserId('');
+                                        setPassword('');
+                                    }}
+                                >
+                                    <Icon className="role-icon" />
+                                    <span>{role.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="auth-form">
+                        <div className="form-group">
+                            <label className="form-label">{currentRole.fieldLabel}</label>
+                            <div className="input-wrapper">
+                                <FiUser className="input-icon" />
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder={currentRole.placeholder}
+                                    value={userId}
+                                    onChange={(e) => setUserId(e.target.value)}
+                                    autoComplete="username"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Password</label>
+                            <div className="input-wrapper">
+                                <FiLock className="input-icon" />
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    className="form-input"
+                                    placeholder="Enter your password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete="current-password"
+                                />
+                                <button
+                                    type="button"
+                                    className="password-toggle"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? <FiEyeOff /> : <FiEye />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            className="btn btn-primary btn-lg w-full"
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <span className="spinner spinner-sm"></span>
+                            ) : (
+                                <>
+                                    Sign In
+                                    <FiArrowRight />
+                                </>
+                            )}
+                        </button>
+                    </form>
                 </div>
             </div>
-            
-            <style>{`
-                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-            `}</style>
         </div>
     );
 };
