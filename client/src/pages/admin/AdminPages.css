@@ -143,8 +143,8 @@
 /* ── TABLE & BADGES ── */
 .users-table-container {
     background: var(--bg-secondary);
-    border-radius: 28px;
-    padding: 1rem;
+    border-radius: 24px;
+    padding: 0.5rem;
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-md);
     overflow: hidden;
@@ -157,35 +157,55 @@
 }
 
 .users-table th {
-    padding: 1.25rem 1rem;
+    padding: 1.5rem 1rem;
     text-align: left;
-    background: var(--bg-primary);
-    color: var(--text-secondary);
-    font-weight: 800;
-    font-size: 0.8rem;
+    background: rgba(70, 23, 143, 0.03);
+    color: var(--kahoot-purple);
+    font-weight: 900;
+    font-size: 0.85rem;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
+    border-bottom: 2px solid var(--border-color);
 }
-
-.users-table tr:last-child td:first-child { border-bottom-left-radius: 20px; }
-.users-table tr:last-child td:last-child { border-bottom-right-radius: 20px; }
 
 .users-table td {
-    padding: 1.5rem 1rem;
+    padding: 1.8rem 1rem;
     border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    transition: background 0.2s;
 }
 
-/* Badges with Colors */
+.users-table tr:hover td {
+    background: rgba(70, 23, 143, 0.02);
+}
+
+/* ── BADGES (HARDENED CONTRAST) ── */
 .badge {
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-weight: 800;
-    font-size: 0.75rem;
-    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 50px; /* Pill Shape */
+    font-weight: 900;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.badge-info { background: rgba(19, 104, 206, 0.12); color: #1368CE; border: 1px solid rgba(19, 104, 206, 0.1); }
-.badge-success { background: rgba(57, 217, 0, 0.12); color: #39D900; border: 1px solid rgba(57, 217, 0, 0.1); }
+/* Info Badge (Questions) - Royal Blue */
+.badge-info { 
+    background: rgba(19, 104, 206, 0.15); 
+    color: #0c4a9e; /* DEEPER BLUE FOR VISIBILITY */
+    border: 1.5px solid rgba(19, 104, 206, 0.3); 
+}
+
+/* Success Badge (Participants) - Deep Green */
+.badge-success { 
+    background: rgba(34, 197, 94, 0.15); 
+    color: #166534; /* DEEP EMERALD FOR VISIBILITY */
+    border: 1.5px solid rgba(34, 197, 94, 0.3); 
+}
 
 /* Status Badges */
 .status-badge {
