@@ -160,12 +160,22 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-[data-theme="light"] body,
-body[data-theme="light"] {
-  background: #f0e6ff;
-  background-image:
-    radial-gradient(ellipse at 20% 10%, rgba(123, 47, 190, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 90%, rgba(46, 23, 143, 0.08) 0%, transparent 50%);
+/* Force Light Mode Overrides */
+[data-theme="light"] body {
+  background: #F0F2F9 !important;
+  background-image: none !important;
+  color: #1A0533 !important;
+}
+
+[data-theme="light"] .step-label {
+  color: #1A0533 !important;
+  opacity: 0.8;
+}
+
+[data-theme="light"] .step-number {
+  background: #E2E8F0;
+  border-color: #CBD5E1;
+  color: #1A0533;
 }
 
 #root {
