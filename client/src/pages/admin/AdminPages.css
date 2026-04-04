@@ -36,7 +36,7 @@
     transform: translateY(-2px);
 }
 
-/* ── HIGH-GRID TABLE POLISH (SPACED & BORDERED) ── */
+/* ── HIGH-GRID TABLE POLISH ── */
 .users-table-container {
     background: var(--bg-card);
     border-radius: 20px;
@@ -48,10 +48,9 @@
 
 .users-table {
     width: 100%;
-    border-collapse: collapse; /* ENABLES GRID LINES */
+    border-collapse: collapse;
 }
 
-/* Highlighted Header */
 .users-table th {
     padding: 1.75rem 1.25rem;
     background: var(--indigo-primary);
@@ -60,50 +59,72 @@
     font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    border-right: 1.5px solid rgba(255, 255, 255, 0.1); /* VERTICAL SEPARATORS */
-    border-bottom: 4px solid var(--gold-active); /* GOLD ACCENT LINE */
+    border-right: 1.5px solid rgba(255, 255, 255, 0.1); 
+    border-bottom: 4px solid var(--gold-active); 
 }
 
 .users-table th:last-child { border-right: none; }
 
-/* Spaced Cells & Column Lines */
+/* Spaced Cells & Column Lines - TRIMMED PER USER REQUEST */
 .users-table td {
-    padding: 2.25rem 1.25rem; /* INCREASED PADDING TO AVOID MESSINESS */
-    border-bottom: 1.5px solid var(--border-steel); /* HORIZONTAL GRID LINE */
-    border-right: 1.5px solid var(--border-steel); /* VERTICAL GRID LINE */
+    padding: 1rem 1.25rem; /* COMPACT FOR QUICK ACCESS */
+    border-bottom: 1.5px solid var(--border-steel); 
+    border-right: 1.5px solid var(--border-steel); 
     color: var(--text-primary);
     vertical-align: middle;
 }
 
 .users-table td:last-child { border-right: none; }
 
-/* Grid Hover Effect */
 .users-table tr:hover td {
     background: rgba(49, 46, 129, 0.02);
-    border-bottom-color: var(--indigo-primary);
 }
 
-/* ── ATTRACTIVE BUTTONS & METRICS ── */
-.badge {
-    padding: 10px 18px;
-    border-radius: 10px;
-    font-weight: 950;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+/* ── USER PANEL ENHANCEMENTS (v30) ── */
+.user-cell {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
 }
 
-.badge-success {
-    background: #DCFCE7;
-    color: #166534; /* THICK GREEN */
-    border: 1.5px solid #BBF7D0;
+.avatar-sm {
+    width: 44px; /* CLEAR SIZE */
+    height: 44px;
+    border-radius: 12px; /* MODERN SQUIRCLE */
+    object-fit: cover;
+    border: 2px solid var(--indigo-primary);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+    transition: transform 0.2s;
+    background: white;
 }
 
-.badge-info {
-    background: #E0E7FF;
-    color: #3730A3;
-    border: 1.5px solid #C7D2FE;
+.user-cell:hover .avatar-sm {
+    transform: scale(1.1);
 }
 
-/* Action Button Expansion */
+.email-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.role-badge {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.badge-success { background: #DCFCE7; color: #166534; border: 1.5px solid #BBF7D0; }
+.badge-info { background: #E0E7FF; color: #3730A3; border: 1.5px solid #C7D2FE; }
+
 .btn-primary.btn-sm {
     background: var(--gold-active);
     color: #1A0533 !important;
@@ -112,9 +133,4 @@
     border-radius: 12px;
     box-shadow: 0 4px 0 #EAB308;
     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.btn-primary.btn-sm:hover {
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 8px 15px rgba(234, 179, 8, 0.3);
 }
