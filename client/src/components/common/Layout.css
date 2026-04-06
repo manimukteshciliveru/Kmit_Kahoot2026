@@ -6,7 +6,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #1A0533;
+  background: var(--bg-primary);
   background-image:
     radial-gradient(ellipse at 15% 5%, rgba(123, 47, 190, 0.35) 0%, transparent 50%),
     radial-gradient(ellipse at 85% 95%, rgba(46, 23, 143, 0.3) 0%, transparent 50%);
@@ -15,7 +15,7 @@
 
 .main-content {
   flex: 1;
-  padding: 2rem 1.5rem;
+  padding: var(--space-8) var(--space-6);
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
@@ -25,9 +25,9 @@
 .footer {
   margin-top: auto;
   background: rgba(10, 2, 22, 0.8);
-  border-top: 1px solid rgba(255, 204, 2, 0.12);
+  border-top: 1px solid var(--border);
   backdrop-filter: blur(10px);
-  padding: 1.25rem 1.5rem;
+  padding: var(--space-5) var(--space-6);
 }
 
 .footer-content {
@@ -36,50 +36,43 @@
   justify-content: space-between;
   max-width: 1400px;
   margin: 0 auto;
-  gap: 1rem;
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 
 .footer-content p {
-  color: rgba(255,255,255,0.25);
-  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
   margin: 0;
 }
 
 .footer-links {
   display: flex;
-  gap: 1.25rem;
+  gap: var(--space-5);
 }
 
 .footer-links a {
-  color: rgba(255,255,255,0.25);
-  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: var(--transition-fast);
 }
 
-.footer-links a:hover { color: rgba(255, 204, 2, 0.7); }
+.footer-links a:hover { color: var(--accent); }
 
 /* ===========================
    RESPONSIVE — Layout
    =========================== */
 
-/* Tablet (≤ 768px) */
 @media (max-width: 768px) {
-  .main-content { padding: 1.25rem 1rem; }
-  .footer { padding: 1rem; }
-  .footer-content { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
-  .footer-links { gap: 0.85rem; flex-wrap: wrap; }
+  .main-content { padding: var(--space-5) var(--space-4); }
+  .footer { padding: var(--space-4); }
+  .footer-content { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+  .footer-links { gap: var(--space-4); flex-wrap: wrap; }
 }
 
-/* Phones (≤ 480px) */
 @media (max-width: 480px) {
-  .main-content { padding: 1rem 0.75rem; }
-  .footer-links { gap: 0.65rem; }
-  .footer-content p, .footer-links a { font-size: 0.78rem; }
-}
-
-/* Very small phones (≤ 360px) */
-@media (max-width: 360px) {
-  .main-content { padding: 0.75rem 0.5rem; }
+  .main-content { padding: var(--space-4) var(--space-3); }
+  .footer-links { gap: var(--space-3); }
+  .footer-content p, .footer-links a { font-size: 0.75rem; }
 }
