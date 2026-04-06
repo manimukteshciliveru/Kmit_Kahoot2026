@@ -20,137 +20,119 @@
 .search-box input {
     background: var(--bg-card);
     border: 2px solid var(--border-steel);
-    border-radius: var(--radius-md);
-    padding: var(--space-5) var(--space-6) var(--space-5) 3.5rem;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem 1.25rem 3.5rem;
     font-size: 1.1rem;
-    font-weight: var(--weight-bold);
+    font-weight: 700;
     width: 100%;
-    transition: var(--transition-slow);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── HIGH-GRID TABLE POLISH ── */
 .users-table-container {
     background: var(--bg-card);
-    border-radius: var(--radius-lg);
+    border-radius: 20px;
     border: 2px solid var(--border-steel);
-    overflow-x: auto; /* ENABLE HORIZONTAL SCROLL ON SMALL SCREENS */
-    margin-top: var(--space-8);
-    scrollbar-width: thin;
+    overflow: hidden;
+    margin-top: 2rem;
 }
 
 .users-table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 800px; /* ENSURE TABLE DOES'T SQUISH TOO MUCH */
 }
 
 .users-table th {
-    padding: var(--space-6) var(--space-5);
-    background: var(--kahoot-purple);
+    padding: 1.75rem 1.25rem;
+    background: var(--indigo-primary);
     color: white;
-    font-weight: var(--weight-black);
-    font-size: 0.85rem;
+    font-weight: 900;
+    font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    border-right: 1px solid rgba(255, 255, 255, 0.1); 
-    border-bottom: 4px solid var(--kahoot-yellow); 
-    text-align: left;
+    border-right: 1.5px solid rgba(255, 255, 255, 0.1); 
+    border-bottom: 4px solid var(--gold-active); 
 }
 
+/* Spaced Cells & Column Lines - TRIMMED PER USER REQUEST */
 .users-table td {
-    padding: var(--space-4) var(--space-5);
-    border-bottom: 1px solid var(--border-steel); 
-    border-right: 1px solid var(--border-steel); 
+    padding: 1rem 1.25rem; /* COMPACT FOR QUICK ACCESS */
+    border-bottom: 1.5px solid var(--border-steel); 
+    border-right: 1.5px solid var(--border-steel); 
     color: var(--text-primary);
     vertical-align: middle;
 }
 
 .users-table td:last-child { border-right: none; }
 
-.users-table tr:hover td {
-    background: rgba(255, 204, 2, 0.05);
-}
-
-/* ── USER PANEL ENHANCEMENTS ── */
+/* ── USER PANEL ENHANCEMENTS (v30) ── */
 .user-cell {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
+    gap: 1.2rem;
 }
 
 .avatar-sm {
-    width: 2.75rem;
-    height: 2.75rem;
-    border-radius: var(--radius-sm);
+    width: 44px; /* CLEAR SIZE */
+    height: 44px;
+    border-radius: 12px;
     object-fit: cover;
-    border: 2px solid var(--kahoot-purple);
-    box-shadow: var(--shadow-sm);
+    border: 2px solid var(--indigo-primary);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     flex-shrink: 0;
     background: white;
 }
 
-/* ── ACTION BUTTONS COLOR PALETTE ── */
+/* ── ACTION BUTTONS COLOR PALETTE (v31) ── */
 .action-buttons {
     display: flex;
-    gap: var(--space-2);
+    gap: 10px;
     justify-content: flex-end;
 }
 
 .btn-icon {
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: var(--radius-sm);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: 1.5px solid var(--border-steel);
     background: var(--bg-card);
     cursor: pointer;
-    transition: var(--transition-bounce);
-    font-size: 1.1rem;
-    padding: 0;
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    font-size: 1.05rem;
 }
 
 .btn-icon:hover {
     transform: translateY(-3px) scale(1.1);
-    box-shadow: var(--shadow-md);
-    z-index: var(--z-above);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
-/* Action Button Colors */
-.btn-icon.primary { color: var(--ans-blue); border-color: rgba(19, 104, 206, 0.2); }
-.btn-icon.primary:hover { background: var(--ans-blue); color: white; border-color: var(--ans-blue); }
+/* Edit - Electric Blue */
+.btn-icon.primary { color: #3182CE; border-color: #BEE3F8; }
+.btn-icon.primary:hover { background: #3182CE; color: white; border-color: #3182CE; }
 
-.btn-icon.warning { color: var(--ans-yellow); border-color: rgba(216, 158, 0, 0.2); }
-.btn-icon.warning:hover { background: var(--ans-yellow); color: white; border-color: var(--ans-yellow); }
+/* Deactivate - Amber Gold */
+.btn-icon.warning { color: #DD6B20; border-color: #FEEBC8; }
+.btn-icon.warning:hover { background: #DD6B20; color: white; border-color: #DD6B20; }
 
-.btn-icon.success { color: var(--ans-green); border-color: rgba(38, 137, 12, 0.2); }
-.btn-icon.success:hover { background: var(--ans-green); color: white; border-color: var(--ans-green); }
+/* Activate - Emerald Green */
+.btn-icon.success { color: #38A169; border-color: #C6F6D5; }
+.btn-icon.success:hover { background: #38A169; color: white; border-color: #38A169; }
 
-.btn-icon.danger { color: var(--ans-red); border-color: rgba(226, 27, 60, 0.2); }
-.btn-icon.danger:hover { background: var(--ans-red); color: white; border-color: var(--ans-red); }
+/* Delete - Crimson Red */
+.btn-icon.danger { color: #E53E3E; border-color: #FED7D7; }
+.btn-icon.danger:hover { background: #E53E3E; color: white; border-color: #E53E3E; }
 
 /* ── BADGES & HEROES ── */
-.badge-success { background: rgba(57, 217, 0, 0.1); color: var(--ans-green); border: 1.5px solid rgba(57, 217, 0, 0.2); }
-.badge-info { background: rgba(19, 104, 206, 0.1); color: var(--ans-blue); border: 1.5px solid rgba(19, 104, 206, 0.2); }
+.badge-success { background: #DCFCE7; color: #166534; border: 1.5px solid #BBF7D0; }
+.badge-info { background: #E0E7FF; color: #3730A3; border: 1.5px solid #C7D2FE; }
 
-/* Admin Global Overrides */
 .btn-primary.btn-sm {
-    background: var(--gradient-btn);
-    color: var(--text-dark) !important;
-    font-weight: var(--weight-black);
-    padding: 0.75rem 1.5rem;
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-}
-
-.btn-primary.btn-sm:hover {
-    box-shadow: var(--shadow-md), var(--shadow-glow);
-    transform: translateY(-2px);
-}
-
-@media (max-width: 768px) {
-    .users-table-container { margin-top: var(--space-4); }
-    .users-table th, .users-table td { padding: var(--space-3) var(--space-4); }
-    .avatar-sm { width: 2.25rem; height: 2.25rem; }
+    background: var(--gold-active);
+    color: #1A0533 !important;
+    font-weight: 900;
+    padding: 12px 24px;
+    border-radius: 12px;
 }
