@@ -25,6 +25,11 @@ class AIQuestionGenerator {
         this.gemini = null;
         this.mistral = null;
         this.openai = null;
+        this.groq = null;
+        this.deepseek = null;
+        this.openrouter = null;
+        this.huggingface_key = null;
+        this.ollama_url = "http://localhost:11434"; // Default Ollama port
         this.initialized = false;
         this.workingModelName = null;
     }
@@ -61,6 +66,60 @@ class AIQuestionGenerator {
             } catch (error) {
                 logger.error('❌ AI Service: Failed to initialize OpenAI', error);
             }
+        }
+
+        // Initialize Groq (OpenAI Compatible)
+        if (process.env.GROQ_API_KEY) {
+            try {
+                this.groq = new OpenAI({
+                    apiKey: process.env.GROQ_API_KEY,
+                    baseURL: "https://api.groq.com/openai/v1"
+                });
+                logger.info('✅ AI Service: Groq initialized');
+            } catch (error) {
+                logger.error('❌ AI Service: Failed to initialize Groq', error);
+            }
+        }
+
+        // Initialize DeepSeek (OpenAI Compatible)
+        if (process.env.DEEPSEEK_API_KEY) {
+            try {
+                this.deepseek = new OpenAI({
+                    apiKey: process.env.DEEPSEEK_API_KEY,
+                    baseURL: "https://api.deepseek.com"
+                });
+                logger.info('✅ AI Service: DeepSeek initialized');
+            } catch (error) {
+                logger.error('❌ AI Service: Failed to initialize DeepSeek', error);
+            }
+        }
+
+        // Initialize OpenRouter (OpenAI Compatible - Great for Free Models)
+        if (process.env.OPENROUTER_API_KEY) {
+            try {
+                this.openrouter = new OpenAI({
+                    baseURL: "https://openrouter.ai/api/v1",
+                    apiKey: process.env.OPENROUTER_API_KEY,
+                    defaultHeaders: {
+                        "HTTP-Referer": "http://localhost:5000",
+                        "X-Title": "Kahoot Clone",
+                    }
+                });
+                logger.info('✅ AI Service: OpenRouter initialized');
+            } catch (error) {
+                logger.error('❌ AI Service: Failed to initialize OpenRouter', error);
+            }
+        }
+
+        // HuggingFace Key
+        if (process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY) {
+            this.huggingface_key = process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
+            logger.info('✅ AI Service: HuggingFace initialized');
+        }
+
+        // Ollama doesn't need a key, but we check the URL if provided
+        if (process.env.OLLAMA_URL) {
+            this.ollama_url = process.env.OLLAMA_URL;
         }
 
         this.initialized = true;
@@ -212,6 +271,25 @@ class AIQuestionGenerator {
                 }
             }
 
+            // Attempt 2: Groq (Extreme Speed Fallback)
+            if (!responseText && this.groq) {
+                logger.info('AI Service: Falling back to Groq (Speed Mode)...');
+                const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
+                try {
+                    const response = await this.groq.chat.completions.create({
+                        model: "llama-3.3-70b-versatile",
+                        messages: [{ role: "user", content: promptSystem + '\n' + textContent }],
+                        temperature: 0.7
+                    });
+                    responseText = response.choices[0].message.content;
+                    providerUsed = 'groq';
+                    modelUsed = 'llama-3.3-70b-versatile';
+                    logger.info('✅ AI Service: Success with Groq');
+                } catch (groqError) {
+                    logger.error('❌ AI Service: Groq Failed', groqError);
+                }
+            }
+
             // Attempt 3: OpenAI (High Fidelity Fallback)
             if (!responseText && this.openai) {
                 logger.info('AI Service: Falling back to OpenAI...');
@@ -255,7 +333,77 @@ class AIQuestionGenerator {
                 }
             }
 
-            // Attempt 5: Colab RAG Fallback (Last Resort BEFORE dummy fallback)
+            // Attempt 5: DeepSeek (Technical Accuracy Fallback)
+            if (!responseText && this.deepseek) {
+                logger.info('AI Service: Falling back to DeepSeek...');
+                const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
+                try {
+                    const response = await this.deepseek.chat.completions.create({
+                        model: "deepseek-chat",
+                        messages: [{ role: "user", content: promptSystem + '\n' + textContent }]
+                    });
+                    responseText = response.choices[0].message.content;
+                    providerUsed = 'deepseek';
+                    modelUsed = 'deepseek-chat';
+                    logger.info('✅ AI Service: Success with DeepSeek');
+                } catch (dsError) {
+                    logger.error('❌ AI Service: DeepSeek Failed', dsError);
+                }
+            }
+
+            // Attempt 6: OpenRouter (Unlimited Free Models Fallback)
+            if (!responseText && this.openrouter) {
+                logger.info('AI Service: Falling back to OpenRouter (Free Tier)...');
+                const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
+                try {
+                    const response = await this.openrouter.chat.completions.create({
+                        model: "google/gemma-2-9b-it:free", // One of the best free models
+                        messages: [{ role: "user", content: promptSystem + '\n' + textContent }]
+                    });
+                    responseText = response.choices[0].message.content;
+                    providerUsed = 'openrouter';
+                    modelUsed = 'gemma-2-9b-it:free';
+                    logger.info('✅ AI Service: Success with OpenRouter');
+                } catch (orError) {
+                    logger.error('❌ AI Service: OpenRouter Failed', orError);
+                }
+            }
+
+            // Attempt 7: Ollama (Local AI - 100% Free Forever)
+            if (!responseText) {
+                logger.info('AI Service: Attempting Local Ollama Fallback...');
+                const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
+                try {
+                    const localResult = await this.generateFromOllama(textContent, promptSystem);
+                    if (localResult) {
+                        responseText = localResult;
+                        providerUsed = 'ollama';
+                        modelUsed = 'llama3'; // Assumed default
+                        logger.info('✅ AI Service: Success with Local Ollama');
+                    }
+                } catch (ollamaError) {
+                    logger.debug('Ollama not running locally. Skipping.');
+                }
+            }
+
+            // Attempt 8: HuggingFace (Open-Source Fallback)
+            if (!responseText && this.huggingface_key) {
+                logger.info('AI Service: Falling back to HuggingFace...');
+                const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
+                try {
+                    const hfResult = await this.generateFromHuggingFace(textContent, promptSystem);
+                    if (hfResult) {
+                        responseText = hfResult;
+                        providerUsed = 'huggingface';
+                        modelUsed = 'mistral-7b-v0.3';
+                        logger.info('✅ AI Service: Success with HuggingFace');
+                    }
+                } catch (hfError) {
+                    logger.error('❌ AI Service: HuggingFace Failed', hfError);
+                }
+            }
+
+            // Attempt 9: Colab RAG Fallback (Last Resort BEFORE dummy fallback)
             if (!responseText && process.env.COLAB_RAG_URL) {
                 logger.info('AI Service: Falling back to Google Colab RAG Engine...');
                 const textContent = parts.map(p => typeof p === 'string' ? p : '[Media Content Omitted]').join('\n');
@@ -371,9 +519,12 @@ class AIQuestionGenerator {
             // $0.35 / 1M input tokens, $0.70 / 1M output tokens
             const cost = (estimatedTokens / 1000000) * 0.5;
 
+            const providerEnum = ['google', 'mistral', 'openai', 'colab', 'groq', 'deepseek', 'openrouter', 'ollama', 'huggingface', 'fallback'];
+            const safeProvider = providerEnum.includes(provider) ? provider : 'fallback';
+
             await AILog.create({
                 userId,
-                provider,
+                provider: safeProvider,
                 model,
                 action: 'generate_quiz',
                 promptLength,
@@ -572,6 +723,78 @@ class AIQuestionGenerator {
 
     async generateFromTranscript(transcript, options, userId) {
         return this.generateFromMultimodal([transcript], options, userId);
+    }
+
+    /**
+     * Dedicated LLaMA + RAG Method
+     * Use this when you want to specifically target the self-hosted RAG engine
+     */
+    async generateViaRAG(documentContent, query, options = {}, userId) {
+        this.initialize();
+        const url = process.env.COLAB_RAG_URL;
+        
+        if (!url) {
+            logger.warn('RAG Error: COLAB_RAG_URL not set. Falling back to standard AI.');
+            return this.generateFromText(documentContent, options, userId);
+        }
+
+        try {
+            logger.info('🚀 High-Priority: Using LLaMA + RAG Engine (Colab)...');
+            const response = await axios.post(`${url}/generate_rag`, {
+                content: documentContent,
+                query: query,
+                count: options.count || 10,
+                difficulty: options.difficulty || 'medium'
+            }, { timeout: 180000 }); // Longer timeout for RAG operations
+
+            if (response.data && response.data.success) {
+                this.logUsage(userId, 'colab', 'llama-3-rag', documentContent.length, JSON.stringify(response.data).length, 'success');
+                return response.data.questions;
+            }
+            throw new Error('Colab RAG returned unsuccessful status');
+        } catch (error) {
+            logger.error('❌ LLaMA + RAG Failed:', error.message);
+            // Fallback to standard cross-provider generation logic
+            return this.generateFromText(documentContent, options, userId);
+        }
+    }
+
+    async generateFromOllama(content, systemPrompt) {
+        try {
+            const response = await axios.post(`${this.ollama_url}/api/chat`, {
+                model: "llama3",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: content }
+                ],
+                stream: false,
+                format: "json"
+            }, { timeout: 60000 });
+
+            let output = response.data.message.content;
+            if (typeof output === 'object') output = JSON.stringify(output);
+            return output;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    async generateFromHuggingFace(content, systemPrompt) {
+        try {
+            const model = "mistralai/Mistral-7B-Instruct-v0.3";
+            const response = await axios.post(
+                `https://api-inference.huggingface.co/models/${model}`,
+                { 
+                    inputs: `<s>[INST] ${systemPrompt}\n\nCONTENT:\n${content} [/INST]`,
+                    parameters: { max_new_tokens: 1000, return_full_text: false }
+                },
+                { headers: { Authorization: `Bearer ${this.huggingface_key}` }, timeout: 30000 }
+            );
+
+            return response.data[0].generated_text;
+        } catch (error) {
+            throw error;
+        }
     }
 
     async generateFromColab(content, options) {

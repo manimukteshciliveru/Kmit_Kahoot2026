@@ -9,7 +9,7 @@ const aiLogSchema = new mongoose.Schema({
     },
     provider: {
         type: String,
-        enum: ['google', 'mistral', 'openai', 'colab', 'fallback'],
+        enum: ['google', 'mistral', 'openai', 'colab', 'groq', 'deepseek', 'openrouter', 'ollama', 'huggingface', 'fallback'],
         required: true
     },
     model: {

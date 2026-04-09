@@ -8,7 +8,7 @@ async function testGemini() {
 
     try {
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-pro-latest' });
 
         const prompt = 'Generate 2 simple multiple choice questions about the solar system. Return as a JSON array with properties: text, options (array of 4), correctAnswer. Only return valid JSON, no markdown.';
 
