@@ -395,6 +395,23 @@
 /* ── Professional Top 5 Leaderboard ── */
 .professional-leaderboard-box {
     padding: 1.5rem !important;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Sleek scrollbar for the vertical leaderboard */
+.professional-leaderboard-box::-webkit-scrollbar {
+    width: 6px;
+}
+.professional-leaderboard-box::-webkit-scrollbar-track {
+    background: transparent;
+}
+.professional-leaderboard-box::-webkit-scrollbar-thumb {
+    background: rgba(200, 200, 200, 0.2);
+    border-radius: 10px;
+}
+.professional-leaderboard-box::-webkit-scrollbar-thumb:hover {
+    background: var(--kahoot-yellow, #FFCC02);
 }
 
 .professional-leaderboard-list {
