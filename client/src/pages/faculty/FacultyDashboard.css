@@ -18,7 +18,7 @@
     margin-bottom: 2.5rem;
 }
 
-.dash-welcome h1 {
+.dash-header h1, .dash-welcome h1 {
     font-size: 2.2rem;
     font-weight: 900;
     letter-spacing: -0.5px;
@@ -28,10 +28,24 @@
     -webkit-text-fill-color: transparent;
 }
 
-.dash-welcome p {
+[data-theme="light"] .dash-header h1,
+[data-theme="light"] .dash-welcome h1 {
+    background: linear-gradient(to right, #46178F, #9B4FDE);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.dash-welcome p, .dash-header p {
     color: var(--text-secondary);
-    font-size: 1.1rem;
-    font-weight: 500;
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+[data-theme="light"] .dash-welcome p,
+[data-theme="light"] .dash-header p {
+    color: #1A0533;
+    font-weight: 700;
+    opacity: 0.9;
 }
 
 /* ── STATS GRID (TOP) ── */
@@ -278,6 +292,18 @@
 
 .action-btn.danger { color: #E21B3C; border-color: rgba(226, 27, 60, 0.3); }
 .action-btn.danger:hover { background: #E21B3C; color: white; }
+
+/* Day Mode Action Icons Override */
+[data-theme="light"] .action-btn.view { background: #1368CE; color: white; border-color: #1368CE; }
+[data-theme="light"] .action-btn.view:hover { filter: brightness(1.1); transform: scale(1.05); }
+
+[data-theme="light"] .action-btn.primary,
+[data-theme="light"] .action-btn.edit { background: #26890C; color: white; border-color: #26890C; }
+[data-theme="light"] .action-btn.primary:hover,
+[data-theme="light"] .action-btn.edit:hover { filter: brightness(1.1); transform: scale(1.05); }
+
+[data-theme="light"] .action-btn.danger { background: #E21B3C; color: white; border-color: #E21B3C; }
+[data-theme="light"] .action-btn.danger:hover { filter: brightness(1.1); transform: scale(1.05); }
 
 /* ── BOTTOM ROW CARDS ── */
 .bottom-row {

@@ -12,11 +12,30 @@
 .page-header h1 {
     font-size: 2.5rem;
     margin-bottom: var(--space-sm);
-    background: var(--gradient-primary);
+    background: linear-gradient(to right, var(--text-primary), var(--kahoot-purple, #7B2FBE));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     font-weight: 800;
+}
+
+[data-theme="light"] .page-header h1 {
+    background: linear-gradient(to right, #46178F, #9B4FDE);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.page-header p {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .page-header p {
+    color: #1A0533;
+    font-weight: 700;
+    opacity: 0.9;
 }
 
 /* Stepper (High Contrast Map) */
