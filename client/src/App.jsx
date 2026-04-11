@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext';
 
 // Layouts
 import Layout from './components/common/Layout';
+import DeviceRestriction from './components/common/DeviceRestriction';
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -52,7 +53,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
 const App = () => {
     return (
-        <Routes>
+        <DeviceRestriction>
+            <Routes>
             {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
@@ -119,6 +121,7 @@ const App = () => {
                 {/* Catch All */}
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
+        </DeviceRestriction>
     );
 };
 
