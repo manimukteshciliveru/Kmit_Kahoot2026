@@ -327,37 +327,8 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     </div>
                 </div>
 
-                {/* Question Difficulty */}
-                <div className="modern-graph-card graph-card-full">
-                    <div className="graph-header">
-                        <FiTrendingUp style={{ color: '#8B5CF6', fontSize: '1.4rem' }} /> <h3>Question-wise Performance</h3>
-                    </div>
-                    <div className="graph-container-box" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                        {questionAnalysis && questionAnalysis.length > 0 ? (
-                            <ComposedChart width={gridRef.current?.clientWidth || chartWidth * 2} height={350} data={questionAnalysis} margin={{ top: 20, left: -20, right: 20, bottom: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} isAnimationActive={false} />
-                                <Line type="monotone" dataKey="correctPct" name="Trend" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5, fill: '#0F172A', strokeWidth: 2 }} isAnimationActive={false} />
-                            </ComposedChart>
-                        ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
-                                No question analysis available
-                            </div>
-                        )}
-                    </div>
-                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.5rem', justifyContent: 'center', fontSize: '0.9rem', color: '#94A3B8', fontWeight: 500 }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#10B981', display: 'inline-block', borderRadius: 3 }}></span> Very Easy (&gt;80%)</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#8B5CF6', display: 'inline-block', borderRadius: 3 }}></span> Moderate</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#F43F5E', display: 'inline-block', borderRadius: 3 }}></span> Hard (&lt;30%)</span>
-                    </div>
-                </div>
-
                 {/* Top 5 Leaderboard (Professional List) */}
-                <div className="modern-graph-card graph-card-full">
+                <div className="modern-graph-card">
                     <div className="graph-header">
                         <FiAward style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Top 5 Students</h3>
                     </div>
@@ -395,6 +366,35 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                                 No leaderboard data available
                             </div>
                         )}
+                    </div>
+                </div>
+
+                {/* Question Difficulty */}
+                <div className="modern-graph-card graph-card-full">
+                    <div className="graph-header">
+                        <FiTrendingUp style={{ color: '#8B5CF6', fontSize: '1.4rem' }} /> <h3>Question-wise Performance</h3>
+                    </div>
+                    <div className="graph-container-box" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                        {questionAnalysis && questionAnalysis.length > 0 ? (
+                            <ComposedChart width={gridRef.current?.clientWidth || chartWidth * 2} height={350} data={questionAnalysis} margin={{ top: 20, left: -20, right: 20, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+                                <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                <Bar dataKey="correctPct" name="% Correct" barSize={35} radius={[6, 6, 0, 0]} isAnimationActive={false} />
+                                <Line type="monotone" dataKey="correctPct" name="Trend" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5, fill: '#0F172A', strokeWidth: 2 }} isAnimationActive={false} />
+                            </ComposedChart>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
+                                No question analysis available
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.5rem', justifyContent: 'center', fontSize: '0.9rem', color: '#94A3B8', fontWeight: 500 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#10B981', display: 'inline-block', borderRadius: 3 }}></span> Very Easy (&gt;80%)</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#8B5CF6', display: 'inline-block', borderRadius: 3 }}></span> Moderate</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: 12, height: 12, background: '#F43F5E', display: 'inline-block', borderRadius: 3 }}></span> Hard (&lt;30%)</span>
                     </div>
                 </div>
 
