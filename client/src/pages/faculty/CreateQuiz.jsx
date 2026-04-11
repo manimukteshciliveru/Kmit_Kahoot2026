@@ -355,10 +355,10 @@ const CreateQuiz = () => {
  
         setAiLoading(true);
         try {
-            let response;
+            let apiCall;
  
             if (aiSource === 'text') {
-                response = await aiAPI.generateFromText({
+                apiCall = aiAPI.generateFromText({
                     text: aiText,
                     ...aiSettings,
                     difficulty: quizData.settings.difficultyLevel,
@@ -374,8 +374,15 @@ const CreateQuiz = () => {
                 formData.append('type', aiSettings.type);
                 formData.append('mode', mode); // Pass the mode for extraction
  
-                response = await aiAPI.generateFromFile(formData);
+                apiCall = aiAPI.generateFromFile(formData);
             }
+
+            // --- Intelligent Fallback Trigger (Race Condition) ---
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('AI_TIMEOUT')), 15000) // 15 seconds max
+            );
+
+            const response = await Promise.race([apiCall, timeoutPromise]);
 
             const generatedQuestions = response.data.data.questions;
             setQuestions([...questions, ...generatedQuestions.map((q, i) => ({
@@ -386,7 +393,13 @@ const CreateQuiz = () => {
             toast.success(`${generatedQuestions.length} questions generated!`);
         } catch (error) {
             console.error('AI generation error:', error);
-            toast.error(error.response?.data?.message || 'Failed to generate questions');
+            if (error.message === 'AI_TIMEOUT') {
+                toast.error('AI servers are asleep or overwhelmed. Switching to manual creation!', { icon: '🤖', duration: 5000 });
+                setAiSource(''); // Gracefully fallback the UI manually
+            } else {
+                toast.error(error.response?.data?.message || 'AI generation failed. Switching to manual creation!', { duration: 5000 });
+                setAiSource(''); // Gracefully fallback the UI manually
+            }
         } finally {
             setAiLoading(false);
         }
