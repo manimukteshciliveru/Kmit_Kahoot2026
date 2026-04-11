@@ -23,29 +23,15 @@
     font-weight: 900;
     letter-spacing: -0.5px;
     margin-bottom: 0.5rem;
-    background: linear-gradient(to right, var(--text-primary), var(--kahoot-purple, #7B2FBE));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-[data-theme="light"] .dash-header h1,
-[data-theme="light"] .dash-welcome h1 {
-    background: linear-gradient(to right, #46178F, #9B4FDE);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    background: linear-gradient(to right, #FFFFFF, var(--kahoot-purple, #7B2FBE)) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
 }
 
 .dash-welcome p, .dash-header p {
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.85) !important;
     font-size: 1.15rem;
     font-weight: 600;
-}
-
-[data-theme="light"] .dash-welcome p,
-[data-theme="light"] .dash-header p {
-    color: #1A0533;
-    font-weight: 700;
-    opacity: 0.9;
 }
 
 /* ── STATS GRID (TOP) ── */
