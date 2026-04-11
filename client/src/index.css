@@ -250,6 +250,28 @@ a:hover { color: var(--kahoot-yellow); }
 }
 .btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.98); }
 
+.btn-accent {
+  background: transparent;
+  color: #FFCC02;
+  border: 2px solid #FFCC02;
+  font-weight: 800;
+}
+.btn-accent:hover:not(:disabled) {
+  background: #FFCC02;
+  color: #1A0533;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 204, 2, 0.4);
+}
+[data-theme="light"] .btn-accent {
+  color: #D97706; /* High-contrast golden/amber for Day mode */
+  border-color: #D97706;
+}
+[data-theme="light"] .btn-accent:hover:not(:disabled) {
+  background: #FFCC02;
+  color: #1A0533;
+  border-color: #FFCC02;
+}
+
 .btn-secondary {
   background: rgba(255,255,255,0.12);
   color: var(--text-primary);

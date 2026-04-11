@@ -173,6 +173,18 @@
 .game-tag.solo { background: #1368CE; box-shadow: 0 0 15px rgba(19, 104, 206, 0.3); }
 .game-tag.new  { background: #FFCC02; color: #1A0533; }
 
+.game-card-body {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    width: 100%;
+}
+
+.game-card-footer {
+    margin-top: auto;
+    width: 100%;
+}
+
 .game-card-body p {
     color: var(--text-secondary);
     font-size: 1rem;
@@ -200,14 +212,19 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
-    box-shadow: 0 8px 0 var(--accent-dark);
+    box-shadow: 0 6px 0 #D97706; /* Solid 3D shadow color */
 }
 
 .game-card:hover .btn-launch {
-    background: #FFFFFF;
+    background: #FFD633;
     color: #1A0533;
-    transform: translateY(-2px);
-    box-shadow: 0 10px 0 #E2E8F0;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 0 #D97706, 0 15px 25px rgba(255, 204, 2, 0.4);
+}
+
+.btn-launch:active {
+    transform: translateY(2px) !important;
+    box-shadow: 0 2px 0 #D97706 !important;
 }
 
 .game-card.disabled {
