@@ -22,33 +22,34 @@ const DeviceRestriction = ({ children }) => {
                 flexDirection: 'column',
                 justifyContent: 'center',
                 alignItems: 'center',
-                backgroundColor: '#0F172A',
-                color: '#FFFFFF',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
                 padding: '2rem',
                 textAlign: 'center',
-                fontFamily: "'Outfit', 'Inter', sans-serif"
+                fontFamily: 'var(--font-game)'
             }}>
-                <FiMonitor style={{ fontSize: '4rem', color: '#6366F1', marginBottom: '1.5rem' }} />
-                <h1 style={{ fontSize: '1.8rem', marginBottom: '1rem', fontWeight: 700, letterSpacing: '-0.5px' }}>
+                <FiMonitor style={{ fontSize: '5rem', color: 'var(--kahoot-yellow)', marginBottom: '1.5rem', filter: 'drop-shadow(0 0 20px rgba(255, 204, 2, 0.4))' }} />
+                <h1 style={{ fontSize: '1.8rem', marginBottom: '1rem', fontWeight: 800, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
                     Larger Screen Required
                 </h1>
-                <p style={{ fontSize: '1rem', color: '#94A3B8', lineHeight: 1.6, maxWidth: '400px' }}>
+                <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: '400px' }}>
                     KMIT Kahoot! is designed for an immersive, data-rich experience. 
                     <br/><br/>
-                    Please open this platform on a <strong>Tablet, Laptop, or Desktop Computer</strong> to continue.
+                    Please open this platform on a <strong style={{color: 'var(--accent)'}}>Tablet, Laptop, or Desktop Computer</strong> to continue.
                 </p>
                 <div style={{
-                    marginTop: '2rem',
+                    marginTop: '2.5rem',
                     padding: '0.8rem 1.5rem',
-                    background: 'rgba(99, 102, 241, 0.1)',
-                    border: '1px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '12px',
-                    color: '#818CF8',
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
-                    letterSpacing: '1px'
+                    background: 'var(--bg-card-light)',
+                    border: '1px solid var(--border-focus)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    letterSpacing: '1px',
+                    boxShadow: 'var(--shadow-md)'
                 }}>
-                    SUPPORTED: &ge; 768px
+                    SUPPORTED RESOLUTION: &ge; 768px
                 </div>
             </div>
         );
