@@ -123,7 +123,7 @@ const History = () => {
         <div className="profile-container">
             <header className="profile-header">
                 <div className="profile-info-main" style={{ paddingLeft: 'var(--space-md)' }}>
-                    <h1>Quiz History & Results 📊</h1>
+                    <h1>Quiz History & Results <FiClock /></h1>
                     <p style={{ color: 'var(--text-muted)' }}>Detailed track record of your academic performances.</p>
                 </div>
             </header>
