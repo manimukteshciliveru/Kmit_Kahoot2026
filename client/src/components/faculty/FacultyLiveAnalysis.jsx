@@ -356,23 +356,42 @@ const FacultyLiveAnalysis = ({ leaderboard = [], responses = [], absentStudents 
                     </div>
                 </div>
 
-                {/* Top 5 Leaderboard (Horizontal Bar Chart) */}
+                {/* Top 5 Leaderboard (Professional List) */}
                 <div className="modern-graph-card graph-card-full">
                     <div className="graph-header">
                         <FiAward style={{ color: '#F59E0B', fontSize: '1.4rem' }} /> <h3>Top 5 Students</h3>
                     </div>
-                    <div className="graph-container-box" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                    <div className="graph-container-box professional-leaderboard-box" style={{ width: '100%', padding: '1.5rem' }}>
                         {leaderboardData && leaderboardData.length > 0 ? (
-                            <BarChart width={gridRef.current?.clientWidth || chartWidth * 2} height={400} data={leaderboardData} layout="vertical" margin={{ left: 20, right: 20, top: 20, bottom: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94A3B8' }} tickLine={false} axisLine={false} />
-                                <YAxis dataKey="name" type="category" width={110} tick={{ fill: '#E2E8F0', fontWeight: '500' }} interval={0} tickLine={false} axisLine={false} />
-                                <Tooltip content={CustomTooltip} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                <Legend verticalAlign="top" height={36} />
-                                <Bar dataKey="score" name="Performance Score %" radius={[0, 6, 6, 0]} barSize={20} isAnimationActive={false} />
-                            </BarChart>
+                            <div className="professional-leaderboard-list">
+                                {leaderboardData.map((student, idx) => (
+                                    <div key={student.name} className={`pl-row rank-${idx + 1}`}>
+                                        <div className="pl-rank">
+                                            {idx === 0 ? <span className="pl-medal" title="1st Place">🏆</span> :
+                                             idx === 1 ? <span className="pl-medal" title="2nd Place">🥈</span> :
+                                             idx === 2 ? <span className="pl-medal" title="3rd Place">🥉</span> :
+                                             <span className="pl-rank-num">#{idx + 1}</span>}
+                                        </div>
+                                        <div className="pl-content">
+                                            <div className="pl-info">
+                                                <span className="pl-name">{student.name}</span>
+                                                <span className="pl-score-text">{student.score}%</span>
+                                            </div>
+                                            <div className="pl-bar-container">
+                                                <div 
+                                                    className="pl-bar-fill" 
+                                                    style={{ 
+                                                        width: `${student.score}%`, 
+                                                        background: student.fill || (idx < 3 ? '#F59E0B' : '#3B82F6')
+                                                    }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8', minHeight: '300px' }}>
                                 No leaderboard data available
                             </div>
                         )}

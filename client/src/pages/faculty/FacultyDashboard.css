@@ -391,3 +391,105 @@
     .quick-section { grid-column: span 1; }
     .quick-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Professional Top 5 Leaderboard ── */
+.professional-leaderboard-box {
+    padding: 1.5rem !important;
+}
+
+.professional-leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+}
+
+.pl-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 1.25rem;
+    background: var(--bg-secondary, rgba(255,255,255,0.03));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+}
+
+.pl-row:hover {
+    transform: translateX(10px) scale(1.02);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+    background: var(--bg-card);
+    border-color: rgba(255, 204, 2, 0.4);
+    z-index: 10;
+}
+
+.pl-rank {
+    width: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    font-weight: 900;
+}
+
+.pl-medal {
+    font-size: 2rem;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+    animation: bounce 2s infinite ease-in-out;
+}
+
+.pl-rank-num {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+    font-family: 'Montserrat', sans-serif;
+}
+
+.pl-content {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    gap: 0.4rem;
+}
+
+.pl-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pl-name {
+    font-weight: 800;
+    font-family: 'Montserrat', sans-serif;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+}
+
+.pl-score-text {
+    font-weight: 900;
+    color: var(--text-primary);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.1rem;
+}
+
+.pl-bar-container {
+    height: 10px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.pl-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.3);
+}
+
+/* Rank Specific Enhancements - Gold, Silver, Bronze */
+.pl-row.rank-1 { border-left: 5px solid #FFD700; background: linear-gradient(90deg, rgba(255, 215, 0, 0.08) 0%, transparent 100%); }
+.pl-row.rank-2 { border-left: 5px solid #E2E8F0; background: linear-gradient(90deg, rgba(226, 232, 240, 0.08) 0%, transparent 100%); }
+.pl-row.rank-3 { border-left: 5px solid #CD7F32; background: linear-gradient(90deg, rgba(205, 127, 50, 0.08) 0%, transparent 100%); }
