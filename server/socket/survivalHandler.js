@@ -1,812 +1,130 @@
 /**
  * ============================================================
- *  survivalHandler.js — Socket.IO Handler for Survival Mode
+ *  survivalHandler.js — Redesigned Survival Mode Engine v2.0
  *
  *  GAME FLOW:
- *    1. Host creates a survival room  →  survival:create
- *    2. Players join room             →  survival:join
- *    3. Host starts game              →  survival:start
- *    4. Server generates AI question, decides timer, emits →  newQuestion
- *    5. Players submit answers        →  survival:submit_answer
- *    6. Wrong-answer players get eliminated
- *    7. Repeat until 1 survivor OR all questions exhausted
- *    8. Winner declared, session saved to MongoDB
+ *    1. Host creates room → sets rounds (1-5), questions/round mode
+ *    2. Players join room (lobby shows names only, no ranks yet)
+ *    3. Host starts game → survival:start
  *
- *  AI Integration:
- *    - generateAIQuestion() called before each round
- *    - If AI fails, falls back to random DB question
- *    - Timer set dynamically via decideTimer()
- *    - Next question preloaded while current round plays
+ *    FOR EACH ROUND:
+ *      a. Server emits round_intro (round number, alive count, difficulty)
+ *      b. For each question in round:
+ *           - Server generates AI question at escalated difficulty
+ *           - All alive players answer
+ *           - After timer: answers locked, server ACKs
+ *      c. After ALL questions in round answered:
+ *           - Smart elimination: bottom X% eliminated
+ *           - Round score board emitted to ALL (alive + spectating)
+ *      d. Next round begins (higher difficulty, fewer questions if decremental)
+ *
+ *    END:
+ *      - Full ranked leaderboard emitted to ALL (every participant)
+ *      - session saved to MongoDB
+ *
+ *  DIFFICULTY ESCALATION:
+ *    Round 1: easy  → Round 2: medium → Round 3: hard → Round 4: advanced → Round 5: advanced+
+ *
+ *  ELIMINATION PATTERN (Smart % based):
+ *    - Round 1: eliminate bottom 40% (keeps many players)
+ *    - Round 2: eliminate bottom 35%
+ *    - Round 3: eliminate bottom 30%
+ *    - Round 4: eliminate bottom 25%
+ *    - Round 5+: eliminate all wrong answerers (final showdown)
+ *    - Minimum: always keep at least 1 survivor unless all got it wrong
+ *    - For small rooms (<5): eliminate only wrong answerers
+ *
+ *  SCORING:
+ *    - Base score per correct answer: depends on difficulty
+ *    - Speed bonus: faster answer = more bonus points (up to +50%)
+ *    - Round bonus: extra points for surviving a round
  * ============================================================
  */
 
-const Quiz           = require('../models/Quiz');
+const Quiz            = require('../models/Quiz');
 const SurvivalSession = require('../models/SurvivalSession');
-const User           = require('../models/User');
+const User            = require('../models/User');
 const { generateAIQuestion, decideTimer, difficultyTimer, preloadNextQuestion } = require('../services/aiQuestionService');
-const logger         = require('../utils/logger');
+const logger          = require('../utils/logger');
 
 // ── In-memory survival rooms ──────────────────────────────────
-// roomId → { host, players, questions, config, status, currentQ, sessionId, pin }
 let survivalRooms = new Map();
-// pin → roomId (for quick lookup)
-let pinToRoomId = new Map();
-
-// --- RESET ON START (Fresh Slate Requirement) ---
+let pinToRoomId   = new Map();
 survivalRooms.clear();
 pinToRoomId.clear();
 
-// ── Helper: broadcast to all in room ─────────────────────────
-const roomcast = (io, roomId, event, data) => {
-    io.to(`survival:${roomId}`).emit(event, data);
-};
+// ── Constants ────────────────────────────────────────────────
+const DIFFICULTY_SEQUENCE = ['easy', 'medium', 'hard', 'advanced', 'advanced'];
+const BASE_SCORES = { easy: 10, medium: 20, hard: 30, advanced: 40 };
+const ROUND_SURVIVAL_BONUS = { 1: 5, 2: 10, 3: 20, 4: 30, 5: 50 };
 
-// ── Helper: generate a safe room ID ──────────────────────────
+// Elimination %: what fraction of alive players to remove after each round
+// For large rooms this keeps the game alive longer
+const ELIMINATION_RATES = [0.40, 0.35, 0.30, 0.25, 1.0]; // index = round index (0-based)
+
+// ── Helpers ──────────────────────────────────────────────────
+const roomcast = (io, roomId, event, data) => io.to(`survival:${roomId}`).emit(event, data);
 const mkRoomId = () => `sv_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 const mkPin = () => {
     let pin;
-    do {
-        pin = Math.floor(100000 + Math.random() * 900000).toString();
-    } while (pinToRoomId.has(pin)); // Ensure uniqueness
+    do { pin = Math.floor(100000 + Math.random() * 900000).toString(); }
+    while (pinToRoomId.has(pin));
     return pin;
 };
 
-// ── Helper: calculate ai question stats ──────────────────────
-const calcStats = (players) => {
-    const total = players.length;
-    if (!total) return { avgAccuracy: 0, totalCorrectAnswers: 0 };
-    const totalCorrect   = players.reduce((sum, p) => sum + p.answers.filter(a => a.isCorrect).length, 0);
-    const totalAnswered  = players.reduce((sum, p) => sum + p.answers.length, 0);
-    const avgAccuracy    = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
-    return { avgAccuracy, totalCorrectAnswers: totalCorrect };
+/** Calculate questions per round given mode and round index */
+const getQuestionsForRound = (totalRounds, questionsPerRoundMode, baseQCount, roundIdx) => {
+    if (questionsPerRoundMode === 'equal') {
+        return baseQCount;
+    }
+    // Decremental: Round 1 has most, last round has 1
+    // e.g., 3 rounds → [3, 2, 1]  4 rounds → [4, 3, 2, 1]  5 rounds → [5, 4, 3, 2, 1]
+    return Math.max(1, totalRounds - roundIdx);
 };
 
-// ── Fetch DB fallback question ────────────────────────────────
-const fetchDBQuestion = async (topic, difficulty, usedTexts = []) => {
-    try {
-        const filter = {
-            'questions.difficulty': difficulty,
-            status: { $in: ['done', 'completed', 'waiting', 'live'] }
-        };
-        if (topic && topic !== 'General') {
-            filter.$or = [
-                { subject: { $regex: topic, $options: 'i' } },
-                { title:   { $regex: topic, $options: 'i' } }
-            ];
+/** Smart elimination: eliminate bottom X% by score this round, never eliminate everyone */
+const computeEliminations = (alivePlayers, roundIdx, roomSize) => {
+    const alive = Array.from(alivePlayers.values()).filter(p => p.isAlive);
+    if (alive.length <= 1) return { eliminated: [], survivors: alive };
+
+    // For small rooms (<= 5), just eliminate wrong answerers
+    if (alive.length <= 5) {
+        // currentRoundScores is set on each player during answer processing
+        const wrong = alive.filter(p => !p.correctThisRound);
+        const right = alive.filter(p => p.correctThisRound);
+        // If everyone wrong, save at least one (highest scorer overall)
+        if (right.length === 0) {
+            alive.sort((a, b) => b.score - a.score);
+            return { eliminated: alive.slice(1), survivors: [alive[0]] };
         }
-        const quizzes = await Quiz.find(filter).select('questions subject difficulty').lean().limit(20);
-        const pool = [];
-        quizzes.forEach(qz => {
-            qz.questions.forEach(q => {
-                if (q.difficulty === difficulty && !usedTexts.includes(q.text) && q.options.length >= 2) {
-                    pool.push({ ...q, topic: qz.subject || topic });
-                }
-            });
-        });
-        if (!pool.length) return null;
-        const pick = pool[Math.floor(Math.random() * pool.length)];
-        return {
-            question:      pick.text,
-            options:       pick.options,
-            correctAnswer: pick.correctAnswer,
-            explanation:   pick.explanation || '',
-            difficulty:    pick.difficulty,
-            topic:         pick.topic,
-            timeEstimate:  null,
-            timer:         difficultyTimer(difficulty),
-            source:        'db'
-        };
-    } catch (err) {
-        logger.error('[SurvivalHandler] DB fallback error:', err.message);
-        return null;
+        return { eliminated: wrong, survivors: right };
     }
+
+    // Large rooms: percentage-based elimination
+    // Sort by round performance: correct first, then by speed (lower timeTaken = better)
+    alive.sort((a, b) => {
+        if (b.correctThisRound !== a.correctThisRound) return b.correctThisRound ? 1 : -1;
+        return (a.roundTimeTaken || 9999) - (b.roundTimeTaken || 9999);
+    });
+
+    const rate = ELIMINATION_RATES[Math.min(roundIdx, ELIMINATION_RATES.length - 1)];
+    const eliminateCount = Math.floor(alive.length * rate);
+    // At least 1 survivor always
+    const safeEliminate = Math.min(eliminateCount, alive.length - 1);
+
+    const survivors  = alive.slice(0, alive.length - safeEliminate);
+    const eliminated = alive.slice(alive.length - safeEliminate);
+
+    return { eliminated, survivors };
 };
 
-// ── Main handler export ───────────────────────────────────────
-module.exports = (io, socket) => {
-    if (!socket.user) return;
-
-    const userId   = socket.user._id.toString();
-    const userName  = socket.user.name;
-
-    // ── 1. CREATE ROOM ────────────────────────────────────────
-    socket.on('survival:create', async (data) => {
-        const {
-            topic        = 'General',
-            difficulty   = 'medium',
-            title        = 'Survival Arena',
-            description  = 'Survival Match',
-            maxPlayers   = 50,
-            quizId       = null
-        } = data || {};
-
-        const roomId = mkRoomId();
-        const pin    = mkPin();
-        const room = {
-            roomId,
-            pin,
-            title,
-            description,
-            host:          userId,
-            hostName:      userName,
-            topic,
-            content:       data.content || null, // Store pasted text or PDF content
-            difficulty,
-            maxQuestions:  5,
-            maxPlayers:    parseInt(maxPlayers) || 50,
-            quizId,
-            status:        'waiting',
-            currentQIndex: -1,
-            alivePlayers:  new Map(),    // userId → playerObj
-            eliminatedPlayers: [],
-            usedQuestions: [],          // question texts for de-dupe
-            currentQuestion: null,      // live question object
-            roundTimer: null,           // setTimeout handle
-            sessionDoc: null            // SurvivalSession mongoose doc
-        };
-
-        survivalRooms.set(roomId, room);
-        pinToRoomId.set(pin, roomId);
-        socket.join(`survival:${roomId}`);
-
-        // Add host as first player
-        room.alivePlayers.set(userId, {
-            userId,
-            name:           userName,
-            avatar:         socket.user.avatar,
-            rollNumber:     socket.user.rollNumber || '',
-            department:     socket.user.department || '',
-            section:        socket.user.section    || '',
-            socketId:       socket.id,
-            score:          0,
-            answers:        [],
-            isAlive:        true,
-            eliminatedAt:   null
-        });
-
-        try {
-            const sessionDoc = new SurvivalSession({
-                roomId,
-                pin,
-                title,
-                description,
-                host:       userId,
-                hostName:   userName,
-                topic,
-                difficulty,
-                maxPlayers: room.maxPlayers,
-                status:     'waiting',
-                players:    [{
-                    userId, name: userName, score: 0, isAlive: true
-                }]
-            });
-            await sessionDoc.save();
-            room.sessionDoc = sessionDoc;
-
-            socket.emit('survival:created', { 
-                roomId, pin, topic, title, description,
-                difficulty, maxQuestions: 5, 
-                maxPlayers: room.maxPlayers,
-                host: userId // CRITICAL: Host must know they ARE the host!
-            });
-            broadcastRoomsList(io); 
-            logger.info(`[SURVIVAL] Match Saved & Created: ${roomId} | PIN: ${pin}`);
-        } catch (err) {
-            logger.error('[SURVIVAL] DB Save/Create failed:', err.message);
-            socket.emit('error', { message: 'Database failure. Please try again.' });
-        }
-    });
-
-    // ── 1.1 JOIN BY PIN (Direct Support) ───────────────────────
-    socket.on('survival:join_by_pin', async (data) => {
-        const { pin } = data || {};
-        if (!pin) return socket.emit('error', { message: 'PIN is required.' });
-        
-        const pinStr = pin.toString();
-        const roomId = pinToRoomId.get(pinStr);
-        if (!roomId) return socket.emit('error', { message: 'Invalid PIN. Room not found.' });
-
-        const room = survivalRooms.get(roomId);
-        if (!room) return socket.emit('error', { message: 'Room data lost or expired.' });
-        if (room.status !== 'waiting') return socket.emit('error', { message: 'Match already in progress.' });
-
-        // Forward to the standard join logic
-        socket.emit('survival:pin_resolved', { roomId });
-        logger.info(`[SURVIVAL] PIN ${pinStr} resolved to ${roomId} for ${userName}`);
-    });
-
-    // ── 2. JOIN ROOM ──────────────────────────────────────────
-    socket.on('survival:join', async (data) => {
-        const { roomId } = data || {};
-        const room = survivalRooms.get(roomId);
-
-        if (!room) return socket.emit('error', { message: 'Survival room not found.' });
-        
-        // Reconnection logic: allow entry if user is already registered in the room (e.g., refresh recovery)
-        const isReconnecting = room.alivePlayers.has(userId) || room.host === userId;
-        
-        if (!isReconnecting && room.status !== 'waiting') {
-            return socket.emit('error', { message: 'Game already in progress.' });
-        }
-        
-        // CHECK PLAYER LIMIT
-        if (room.alivePlayers.size >= room.maxPlayers) {
-            return socket.emit('error', { message: `Room is full. Max capacity is ${room.maxPlayers} players.` });
-        }
-
-        socket.join(`survival:${roomId}`);
-
-        // Upsert player (host may rejoin)
-        if (!room.alivePlayers.has(userId)) {
-            room.alivePlayers.set(userId, {
-                userId,
-                name:         userName,
-                avatar:       socket.user.avatar,
-                rollNumber:   socket.user.rollNumber || '',
-                department:   socket.user.department || '',
-                section:      socket.user.section    || '',
-                socketId:     socket.id, // -- Store initial socketId --
-                score:        0,
-                answers:      [],
-                isAlive:      true,
-                eliminatedAt: null
-            });
-        } else {
-            // Update socketId for reconnections
-            const p = room.alivePlayers.get(userId);
-            p.socketId = socket.id;
-        }
-
-        const playersArr = Array.from(room.alivePlayers.values()).map(p => ({
-            userId: p.userId,
-            name:   p.name,
-            avatar: p.avatar
-        }));
-
-        roomcast(io, roomId, 'survival:player_joined', {
-            player:  { userId, name: userName, avatar: socket.user.avatar },
-            players: playersArr
-        });
-
-        // Bug 5: Push new player to sessionDoc on join
-        if (room.sessionDoc) {
-            const alreadyInSession = room.sessionDoc.players.some(
-                p => p.userId?.toString() === userId
-            );
-            if (!alreadyInSession) {
-                room.sessionDoc.players.push({ 
-                    userId, 
-                    name: userName, 
-                    score: 0, 
-                    isAlive: true 
-                });
-                room.sessionDoc.save().catch(err => logger.error('[SURVIVAL] Session join save error:', err.message));
-            }
-        }
-
-        socket.emit('survival:room_state', {
-            roomId,
-            title:      room.title,
-            description: room.description,
-            topic:      room.topic,
-            difficulty: room.difficulty,
-            players:    playersArr,
-            status:     room.status,
-            host:       room.host, // Send host!
-            maxPlayers: room.maxPlayers
-        });
-
-        // Reconnection synchronization payload: Catch up the player if a round is active
-        if (room.status === 'active' && room.currentQuestion) {
-            const alivePlayers = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
-            const qData = room.currentQuestion;
-            const timerObj = qData.timer || 20; 
-            const elapsed = Math.floor((Date.now() - qData.startedAt) / 1000);
-            const remaining = Math.max(0, timerObj - elapsed);
-
-            socket.emit('survival:new_question', {
-                questionIndex:  room.currentQIndex,
-                questionNumber: room.currentQIndex + 1,
-                totalQuestions: room.maxQuestions,
-                question:       qData.question,
-                options:        qData.options,
-                difficulty:     qData.difficulty,
-                topic:          qData.topic,
-                timer:          remaining,
-                source:         qData.source,
-                aliveCount:     alivePlayers.length,
-                statusMessage:  "Mid-round re-sync..."
-            });
-        }
-
-        logger.info(`[SURVIVAL] ${userName} joined room ${roomId}`);
-    });
-
-    // ── 3. START GAME (host only) ─────────────────────────────
-    socket.on('survival:start', async (data) => {
-        const { roomId } = data || {};
-        const room = survivalRooms.get(roomId);
-        if (!room) return socket.emit('error', { message: 'Room not found.' });
-        if (room.host !== userId) return socket.emit('error', { message: 'Only the host can start.' });
-
-        // Bug 1 & 2: Set status to active and startedAt
-        room.status = 'active';
-        room.startedAt = new Date();
-
-        roomcast(io, roomId, 'survival:game_starting', {
-            roomId,
-            players: Array.from(room.alivePlayers.values()).map(p => ({
-                userId: p.userId, name: p.name
-            })),
-            maxQuestions: room.maxQuestions
-        });
-
-        // Small delay for client UI transition, then fire first question
-        setTimeout(() => sendNextQuestion(io, room), 3000);
-
-        logger.info(`[SURVIVAL] Game started: ${roomId} | Players: ${room.alivePlayers.size}`);
-    });
-
-    // ── 4. SUBMIT ANSWER ──────────────────────────────────────
-    socket.on('survival:submit_answer', async (data) => {
-        const { roomId, answer, questionIndex } = data || {};
-        const room = survivalRooms.get(roomId);
-        if (!room || room.status !== 'active') return;
-
-        const player = room.alivePlayers.get(userId);
-        if (!player || !player.isAlive) return;
-
-        // Prevent duplicate submission for the same round
-        if (player.answers.some(a => a.questionIndex === questionIndex)) return;
-
-        const q         = room.currentQuestion;
-        if (!q || q.index !== questionIndex) return;
-
-        const isCorrect = answer && answer.trim() === q.correctAnswer.trim();
-        const timeTaken = Date.now() - q.startedAt;
-
-        const answerRecord = {
-            questionIndex,
-            questionText:   q.question,
-            selectedAnswer: answer || '',
-            correctAnswer:  q.correctAnswer,
-            isCorrect,
-            timeTaken,
-            scoreAwarded:  isCorrect ? getPointsByRound(questionIndex + 1) : 0
-        };
-
-        player.answers.push(answerRecord);
-        if (isCorrect) player.score += answerRecord.scoreAwarded;
-
-        // Acknowledge to player
-        socket.emit('survival:answer_ack', {
-            isCorrect,
-            correctAnswer:  q.correctAnswer,
-            explanation:    q.explanation || '',
-            scoreAwarded:   answerRecord.scoreAwarded,
-            totalScore:     player.score
-        });
-
-        // Update pending answers
-        if (room.pendingAnswers) {
-            room.pendingAnswers.delete(userId);
-            // If all alive players have answered, advance immediately
-            if (room.pendingAnswers.size === 0) {
-                clearTimeout(room.roundTimer);
-                processRoundEnd(io, room);
-            }
-        }
-
-        logger.info(`[SURVIVAL] ${userName} answered Q${questionIndex} | Correct: ${isCorrect}`);
-    });
-
-    // ── 5. LEAVE ──────────────────────────────────────────────
-    socket.on('survival:leave', async (data) => {
-        const { roomId } = data || {};
-        const room = survivalRooms.get(roomId);
-        if (!room) return;
-
-        // Bug 4: Actually eliminate on leave
-        const player = room.alivePlayers.get(userId);
-        if (player && player.isAlive) {
-            player.isAlive = false;
-            player.eliminatedAt = room.currentQIndex >= 0 ? room.currentQIndex : 0;
-        }
-
-        socket.leave(`survival:${roomId}`);
-        logger.info(`[SURVIVAL] ${userName} left room ${roomId}`);
-    });
-
-    // ── 6. GET ROOM LIST (for lobby) ──────────────────────────
-    socket.on('survival:get_rooms', () => {
-        const openRooms = [];
-        for (const [roomId, room] of survivalRooms.entries()) {
-            if (room.status === 'waiting') {
-                openRooms.push({
-                    roomId,
-                    title:       room.title,
-                    description: room.description,
-                    hostName:    room.hostName,
-                    topic:       room.topic,
-                    difficulty:  room.difficulty,
-                    playerCount: room.alivePlayers.size,
-                    maxPlayers:  room.maxPlayers
-                });
-            }
-        }
-        socket.emit('survival:rooms_list', openRooms);
-    });
-};
-
-// ═══════════════════════════════════════════════════════════════
-//  INTERNAL GAME LOGIC (module-level helpers)
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Emits the next AI-generated question to the room.
- * Falls back to DB if Gemini fails.
- */
-const sendNextQuestion = async (io, room, retryCount = 0) => {
-    const { roomId, topic, difficulty, currentQIndex } = room;
-    const MAX_RETRIES = 3;
-    const ROUND_LIMIT = 5;
-
-    // Check termination conditions
-    const alivePlayers = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
-
-    if (alivePlayers.length === 0) {
-        return endGame(io, room, 'no_survivors');
-    }
-
-    if (alivePlayers.length === 1 && room.currentQIndex >= 0) {
-        return endGame(io, room, 'last_survivor');
-    }
-
-    // STRICT 5 ROUND LIMIT
-    if (room.currentQIndex >= ROUND_LIMIT - 1) {
-        return endGame(io, room, 'max_rounds_reached');
-    }
-
-    room.currentQIndex++;
-
-    // ── Inform room: preparing next question ───────────────────
-    roomcast(io, roomId, 'survival:preparing_question', {
-        questionIndex: room.currentQIndex,
-        aliveCount:    alivePlayers.length
-    });
-
-    // Track who needs to answer this round
-    room.pendingAnswers = new Set(alivePlayers.map(p => p.userId));
-
-    let qData = null;
-    // ── Try AI first, fallback to DB ───────────────────────────
-    try {
-        logger.info(`[SURVIVAL] Generating AI Q (Attempt ${retryCount + 1}/3) for room ${roomId} | Q${room.currentQIndex + 1}`);
-        qData = await generateAIQuestion(topic, difficulty, room.content);
-        if (qData) {
-            qData.source = 'ai';
-        } else {
-            throw new Error('AI returned null payload');
-        }
-    } catch (err) {
-        logger.warn(`[SURVIVAL] AI generation failure (Attempt ${retryCount + 1}): ${err.message}`);
-        
-        if (retryCount < MAX_RETRIES) {
-            // Wait 2s and retry
-            return setTimeout(() => sendNextQuestion(io, room, retryCount + 1), 2000);
-        } else {
-            // Give up on AI, try ONE DB fallback
-            logger.warn(`[SURVIVAL] AI failed 3 times. Falling back to DB...`);
-            qData = await fetchDBQuestion(topic, difficulty, room.usedQuestions);
-        }
-    }
-
-    if (!qData) {
-        // --- ABSOLUTE FINAL RESORT: Panic Fallback (Never Fail) ---
-        logger.warn(`[SURVIVAL] 🚨 Panic Fallback triggered for room ${roomId}`);
-        const fallbacks = [
-            {
-                question: `In a high-stakes survival simulation on "${topic}", which factor is generally considered THE most critical for long-term endurance?`,
-                options:  ['Strategic Planning', 'Resource Management', 'Emotional Intelligence', 'Technical Skill'],
-                correctAnswer: 'Resource Management',
-                explanation: 'While all are important, managing your limited resources is the foundation of survival in any competitive arena.',
-                timer: 25
-            },
-            {
-                question: `A sudden shift in ${topic} protocol occurs. What is the most adaptive response for a synchronized participant?`,
-                options:  ['Immediate Pivot', 'Consult Manual', 'Wait for Command', 'Ignore Change'],
-                correctAnswer: 'Immediate Pivot',
-                explanation: 'Adaptability and rapid pivoting are the hallmarks of survival in dynamic environments.',
-                timer: 20
-            }
-        ];
-        const pick = fallbacks[Math.floor(Math.random() * fallbacks.length)];
-        qData = {
-            ...pick,
-            difficulty,
-            topic,
-            timeEstimate: { averageStudent: 15, belowAverageStudent: 25 },
-            source: 'panic_fallback'
-        };
-    }
-
-    // Mark question as used
-    room.usedQuestions.push(qData.question);
-
-    // Attach session context
-    qData.index    = room.currentQIndex;
-    qData.startedAt = Date.now();
-
-    room.currentQuestion = qData;
-    room.currentAnswers  = new Set(); // track who has answered
-
-    const timer = qData.timer || difficultyTimer(difficulty);
-
-    // Store question in session document
-    if (room.sessionDoc) {
-        room.sessionDoc.questions.push({
-            questionIndex: room.currentQIndex,
-            questionText:  qData.question,
-            options:       qData.options,
-            correctAnswer: qData.correctAnswer,
-            explanation:   qData.explanation || '',
-            topic:         qData.topic,
-            difficulty:    qData.difficulty,
-            source:        qData.source,
-            timerGiven:    timer,
-            timeEstimate:  qData.timeEstimate || { averageStudent: 15, belowAverageStudent: 25 }
-        });
-        // Avoid blocking — update async
-        room.sessionDoc.save().catch(err => logger.error('[SURVIVAL] Session save error:', err.message));
-    }
-
-    // ── Emit question to all alive players ─────────────────────
-    roomcast(io, roomId, 'survival:new_question', {
-        questionIndex:  room.currentQIndex,
-        questionNumber: room.currentQIndex + 1,
-        totalQuestions: room.maxQuestions,
-        question:       qData.question,
-        options:        qData.options,
-        difficulty:     qData.difficulty,
-        topic:          qData.topic,
-        timer,                                // ← Dynamic timer from AI
-        source:         qData.source,
-        aliveCount:     alivePlayers.length,
-        // Psychological triggers
-        statusMessage:  buildStatusMessage(alivePlayers.length, room.currentQIndex)
-    });
-
-    logger.info(`[SURVIVAL] Q${room.currentQIndex + 1} emitted | Timer: ${timer}s | Source: ${qData.source} | Room: ${roomId}`);
-
-    // ── Start preloading next question in background ───────────
-    preloadNextQuestion(topic, difficulty);
-
-    // ── Auto-advance: mark non-responders after timer ──────────
-    room.roundTimer = setTimeout(async () => {
-        await processRoundEnd(io, room);
-    }, (timer + 2) * 1000); // +2s grace
-};
-
-/**
- * Called after timer expires or all alive players answered.
- * Eliminates players who answered wrong.
- */
-const processRoundEnd = async (io, room) => {
-    if (room.status !== 'active') return;
-
-    const { roomId } = room;
-    const q = room.currentQuestion;
-    if (!q) return;
-
-    clearTimeout(room.roundTimer);
-
-    const eliminated = [];
-    const survivors  = [];
-
-    for (const [pid, player] of room.alivePlayers.entries()) {
-        if (!player.isAlive) continue;
-
-        const lastAnswer = player.answers.find(a => a.questionIndex === q.index);
-
-        if (!lastAnswer || !lastAnswer.isCorrect) {
-            // Eliminate player
-            player.isAlive       = false;
-            player.eliminatedAt  = q.index;
-            eliminated.push({ userId: player.userId, name: player.name });
-            
-            // Notify player immediately with correct payload shape
-            if (player.socketId) {
-                io.to(player.socketId).emit('survival:eliminated', {
-                    survivalRounds: q.index, 
-                    finalScore: player.score,
-                    message: lastAnswer ? "Wrong Answer! You have been eliminated." : "Time's up! You have been eliminated."
-                });
-            }
-
-            logger.info(`[SURVIVAL] 💥 ${player.name} eliminated at Q${q.index + 1}`);
-        } else {
-            survivors.push({ userId: player.userId, name: player.name, score: player.score });
-        }
-    }
-
-    // Assign rank to eliminated players (based on round survived)
-    const currentAlive = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
-
-    // Emit elimination event
-    roomcast(io, roomId, 'survival:round_result', {
-        questionIndex:  q.index,
-        correctAnswer:  q.correctAnswer,
-        explanation:    q.explanation,
-        eliminated,
-        survivors:       currentAlive.map(p => ({ userId: p.userId, name: p.name, score: p.score })),
-        leaderboard:     getScoreboard(room)
-    });
-
-    /* Individual notifications moved to the loop above for immediate feedback */
-
-    // Bug 9: Broadcast live scores
-    broadcastScores(io, room);
-
-    // Survive/end check
-    const stillAlive = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
-
-    if (stillAlive.length <= 1) {
-        // Give a moment before ending
-        setTimeout(() => endGame(io, room, stillAlive.length === 0 ? 'all_eliminated' : 'last_survivor'), 2000);
-    } else {
-        // Continue to next round after brief pause
-        setTimeout(() => sendNextQuestion(io, room), 4000);
-    }
-};
-
-/**
- * Ends the game, assigns final ranks, saves to MongoDB.
- */
-const endGame = async (io, room, reason = 'completed') => {
-    if (room.status === 'completed') return; // Prevent double-trigger
-    room.status = 'completed';
-    clearTimeout(room.roundTimer);
-
-    const { roomId } = room;
-    const allPlayers = Array.from(room.alivePlayers.values());
-    const endedAt    = new Date();
-    const duration   = room.startedAt ? Math.round((endedAt - room.startedAt) / 1000) : 0;
-
-    // Sort: alive first (by score), then by rounds survived
-    allPlayers.sort((a, b) => {
-        if (a.isAlive !== b.isAlive) return a.isAlive ? -1 : 1;
-        if (b.score !== a.score) return b.score - a.score;
-        const aRound = a.eliminatedAt ?? room.currentQIndex + 1;
-        const bRound = b.eliminatedAt ?? room.currentQIndex + 1;
-        return bRound - aRound;
-    });
-
-    // Assign final ranks
-    allPlayers.forEach((p, i) => { p.rank = i + 1; });
-    
-    // Rule: Stalemate? (Everyone eliminated in same round)
-    // Or did someone actually survive?
-    const actualSurvivors = allPlayers.filter(p => p.isAlive);
-    const winner = actualSurvivors.length === 1 ? actualSurvivors[0] : allPlayers[0];
-
-    // Build leaderboard payload
-    const leaderboard = allPlayers.map(p => ({
-        userId:         p.userId,
-        name:           p.name,
-        rank:           p.rank,
-        score:          p.score,
-        isWinner:       p.rank === 1,
-        eliminatedAt:   p.eliminatedAt,
-        survivalRounds: p.eliminatedAt !== null ? p.eliminatedAt + 1 : room.currentQIndex + 1,
-        accuracy:       calcPlayerAccuracy(p)
-    }));
-
-    // ── Emit game result to all ────────────────────────────────
-    roomcast(io, roomId, 'survival:game_ended', {
-        reason,
-        winner:    winner ? { userId: winner.userId, name: winner.name } : null,
-        leaderboard,
-        totalRounds:  room.currentQIndex + 1,
-        duration
-    });
-
-    // ── Save final session to MongoDB ──────────────────────────
-    try {
-        if (room.sessionDoc) {
-            const stats = calcStats(allPlayers);
-
-            room.sessionDoc.status         = 'completed';
-            room.sessionDoc.endedAt        = endedAt;
-            room.sessionDoc.duration       = duration;
-            room.sessionDoc.totalQuestions = room.currentQIndex + 1;
-            room.sessionDoc.winner         = winner
-                ? { userId: winner.userId, name: winner.name }
-                : { userId: null, name: 'No winner' };
-            room.sessionDoc.avgAccuracy          = stats.avgAccuracy;
-            room.sessionDoc.totalCorrectAnswers  = stats.totalCorrectAnswers;
-
-            // Save full player results
-            room.sessionDoc.players = allPlayers.map(p => {
-                const correctCount = p.answers.filter(a => a.isCorrect).length;
-                const totalAnswers = p.answers.length;
-                return {
-                    userId:         p.userId,
-                    name:           p.name,
-                    rollNumber:     p.rollNumber,
-                    department:     p.department,
-                    section:        p.section,
-                    score:          p.score,
-                    rank:           p.rank,
-                    isWinner:       p.rank === 1,
-                    eliminatedAt:   p.eliminatedAt,
-                    answers:        p.answers,
-                    accuracy:       totalAnswers > 0 ? Math.round((correctCount / totalAnswers) * 100) : 0,
-                    avgTimeTaken:   totalAnswers > 0
-                        ? Math.round(p.answers.reduce((sum, a) => sum + (a.timeTaken || 0), 0) / totalAnswers)
-                        : 0,
-                    survivalRounds: p.eliminatedAt !== null ? p.eliminatedAt + 1 : room.currentQIndex + 1,
-                    weakTopics:    findWeakTopics(p.answers, room.sessionDoc.questions || [])
-                };
-            });
-
-            await room.sessionDoc.save();
-            logger.info(`[SURVIVAL] 📦 Session saved to MongoDB: ${room.sessionDoc._id} | Room: ${roomId}`);
-        }
-    } catch (err) {
-        logger.error(`[SURVIVAL] MongoDB save error: ${err.message}`);
-    }
-
-    // Cleanup room after 5 minutes
-    setTimeout(() => {
-        if (room.pin) pinToRoomId.delete(room.pin);
-        survivalRooms.delete(roomId);
-    }, 5 * 60 * 1000);
-    broadcastRoomsList(io); // Update lobby
-    logger.info(`[SURVIVAL] 🏆 Game ended: ${roomId} | Reason: ${reason} | Winner: ${winner?.name || 'None'}`);
-};
-
-const broadcastRoomsList = (io) => {
-    const openRooms = [];
-    for (const [roomId, room] of survivalRooms.entries()) {
-        if (room.status === 'waiting') {
-            openRooms.push({
-                roomId,
-                title:       room.title,
-                description: room.description,
-                hostName:    room.hostName,
-                pin:         room.pin, // Send PIN too
-                topic:       room.topic,
-                difficulty:  room.difficulty,
-                playerCount: room.alivePlayers.size,
-                maxPlayers:  room.maxPlayers
-            });
-        }
-    }
-    // io.emit ensures ALL clients get the update
-    io.emit('survival:rooms_list', openRooms);
-};
-
-// -- Round-based Scoring (Requirement: 5, 10, 15, 20, 25) --
-const getPointsByRound = (round) => {
-    const table = { 1: 5, 2: 10, 3: 15, 4: 20, 5: 25 };
-    return table[round] || 0;
-};
-
-const getPoints = (difficulty) => {
-    const pts = { easy: 5, medium: 10, hard: 15, advanced: 20 };
-    return pts[difficulty] || 10;
-};
-
-const getScoreboard = (room) => {
-    return Array.from(room.alivePlayers.values())
-        .sort((a, b) => b.score - a.score)
-        .map((p, i) => ({
-            rank:    i + 1,
-            userId:  p.userId,
-            name:    p.name,
-            score:   p.score,
-            isAlive: p.isAlive
-        }));
+const calcScore = (isCorrect, difficulty, timeTaken, timerGiven) => {
+    if (!isCorrect) return 0;
+    const base = BASE_SCORES[difficulty] || 20;
+    // Speed bonus: 0% to 50% extra based on how fast they answered
+    const speedRatio = Math.max(0, 1 - (timeTaken / (timerGiven * 1000)));
+    const speedBonus = Math.round(base * 0.5 * speedRatio);
+    return base + speedBonus;
 };
 
 const calcPlayerAccuracy = (player) => {
@@ -815,36 +133,588 @@ const calcPlayerAccuracy = (player) => {
     return Math.round((correct / player.answers.length) * 100);
 };
 
-const findWeakTopics = (answers, questions) => {
-    const weak = new Set();
-    answers.forEach(a => {
-        if (!a.isCorrect) {
-            const q = questions.find(q => q.questionText === a.questionText);
-            if (q?.topic) weak.add(q.topic);
+const getScoreboard = (room) =>
+    Array.from(room.alivePlayers.values())
+        .concat(room.eliminatedPlayers || [])
+        .sort((a, b) => b.score - a.score)
+        .map((p, i) => ({ rank: i + 1, userId: p.userId, name: p.name, score: p.score, isAlive: p.isAlive }));
+
+const broadcastRoomsList = (io) => {
+    const openRooms = [];
+    for (const [roomId, room] of survivalRooms.entries()) {
+        if (room.status === 'waiting') {
+            openRooms.push({
+                roomId, title: room.title, description: room.description,
+                hostName: room.hostName, pin: room.pin,
+                topic: room.topic, difficulty: room.startDifficulty,
+                playerCount: room.alivePlayers.size, maxPlayers: room.maxPlayers,
+                rounds: room.totalRounds, questionsMode: room.questionsPerRoundMode
+            });
+        }
+    }
+    io.emit('survival:rooms_list', openRooms);
+};
+
+const fetchDBQuestion = async (topic, difficulty, usedTexts = []) => {
+    try {
+        const filter = { 'questions.difficulty': difficulty, status: { $in: ['done', 'completed', 'waiting', 'live'] } };
+        if (topic && topic !== 'General') {
+            filter.$or = [{ subject: { $regex: topic, $options: 'i' } }, { title: { $regex: topic, $options: 'i' } }];
+        }
+        const quizzes = await Quiz.find(filter).select('questions subject difficulty').lean().limit(20);
+        const pool = [];
+        quizzes.forEach(qz => qz.questions.forEach(q => {
+            if (q.difficulty === difficulty && !usedTexts.includes(q.text) && q.options.length >= 2)
+                pool.push({ ...q, topic: qz.subject || topic });
+        }));
+        if (!pool.length) return null;
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        return { question: pick.text, options: pick.options, correctAnswer: pick.correctAnswer, explanation: pick.explanation || '', difficulty, topic: pick.topic, timer: difficultyTimer(difficulty), source: 'db' };
+    } catch (err) { logger.error('[SURVIVAL] DB fallback error:', err.message); return null; }
+};
+
+// ── Main Handler ──────────────────────────────────────────────
+module.exports = (io, socket) => {
+    if (!socket.user) return;
+    const userId   = socket.user._id.toString();
+    const userName = socket.user.name;
+
+    // ── CREATE ROOM ───────────────────────────────────────────
+    socket.on('survival:create', async (data) => {
+        const {
+            topic           = 'General',
+            startDifficulty = 'easy',
+            title           = 'Survival Arena',
+            description     = 'Survival Match',
+            maxPlayers      = 50,
+            totalRounds     = 3,
+            baseQPerRound   = 3,
+            questionsPerRoundMode = 'decremental', // 'decremental' | 'equal'
+            quizId          = null
+        } = data || {};
+
+        const clampedRounds = Math.min(5, Math.max(1, parseInt(totalRounds) || 3));
+        const clampedBase   = Math.min(5, Math.max(1, parseInt(baseQPerRound) || 3));
+
+        const roomId = mkRoomId();
+        const pin    = mkPin();
+
+        const room = {
+            roomId, pin, title, description,
+            host: userId, hostName: userName,
+            topic,
+            content: data.content || null,
+            startDifficulty,
+            totalRounds: clampedRounds,
+            baseQPerRound: clampedBase,
+            questionsPerRoundMode,
+            maxPlayers: Math.min(75, Math.max(2, parseInt(maxPlayers) || 50)),
+            quizId,
+            status: 'waiting',
+            currentRound: 0,          // 0-based round index during game
+            currentQInRound: 0,       // 0-based question index within current round
+            totalQAsked: 0,           // total questions asked across all rounds
+            alivePlayers: new Map(),  // userId → playerObj
+            eliminatedPlayers: [],    // eliminated playerObjs (for final board)
+            usedQuestions: [],
+            currentQuestion: null,
+            roundTimer: null,
+            sessionDoc: null
+        };
+
+        survivalRooms.set(roomId, room);
+        pinToRoomId.set(pin, roomId);
+        socket.join(`survival:${roomId}`);
+
+        room.alivePlayers.set(userId, {
+            userId, name: userName, avatar: socket.user.avatar,
+            rollNumber: socket.user.rollNumber || '',
+            department: socket.user.department || '',
+            section: socket.user.section || '',
+            socketId: socket.id,
+            score: 0, answers: [], isAlive: true, eliminatedAt: null,
+            correctThisRound: false, roundTimeTaken: 9999
+        });
+
+        try {
+            const sessionDoc = new SurvivalSession({
+                roomId, pin, title, description,
+                host: userId, hostName: userName,
+                topic, difficulty: startDifficulty,
+                maxPlayers: room.maxPlayers,
+                status: 'waiting',
+                players: [{ userId, name: userName, score: 0, isAlive: true }]
+            });
+            await sessionDoc.save();
+            room.sessionDoc = sessionDoc;
+
+            socket.emit('survival:created', {
+                roomId, pin, topic, title, description,
+                startDifficulty, totalRounds: clampedRounds,
+                baseQPerRound: clampedBase, questionsPerRoundMode,
+                maxPlayers: room.maxPlayers, host: userId
+            });
+            broadcastRoomsList(io);
+            logger.info(`[SURVIVAL] Created: ${roomId} | PIN: ${pin} | Rounds: ${clampedRounds} | QMode: ${questionsPerRoundMode}`);
+        } catch (err) {
+            logger.error('[SURVIVAL] DB Create failed:', err.message);
+            socket.emit('error', { message: 'Database failure. Please try again.' });
         }
     });
-    return Array.from(weak);
+
+    // ── JOIN BY PIN ───────────────────────────────────────────
+    socket.on('survival:join_by_pin', (data) => {
+        const { pin } = data || {};
+        if (!pin) return socket.emit('error', { message: 'PIN is required.' });
+        const pinStr = pin.toString();
+        const roomId = pinToRoomId.get(pinStr);
+        if (!roomId) return socket.emit('error', { message: 'Invalid PIN. Room not found.' });
+        const room = survivalRooms.get(roomId);
+        if (!room) return socket.emit('error', { message: 'Room data lost or expired.' });
+        if (room.status !== 'waiting') return socket.emit('error', { message: 'Match already in progress.' });
+        socket.emit('survival:pin_resolved', { roomId });
+        logger.info(`[SURVIVAL] PIN ${pinStr} → ${roomId}`);
+    });
+
+    // ── JOIN ROOM ─────────────────────────────────────────────
+    socket.on('survival:join', (data) => {
+        const { roomId } = data || {};
+        const room = survivalRooms.get(roomId);
+        if (!room) return socket.emit('error', { message: 'Survival room not found.' });
+
+        const isReconnecting = room.alivePlayers.has(userId) || room.host === userId ||
+            room.eliminatedPlayers.some(p => p.userId === userId);
+
+        if (!isReconnecting && room.status !== 'waiting') {
+            return socket.emit('error', { message: 'Game already in progress.' });
+        }
+        if (!isReconnecting && room.alivePlayers.size >= room.maxPlayers) {
+            return socket.emit('error', { message: `Room is full (${room.maxPlayers} max).` });
+        }
+
+        socket.join(`survival:${roomId}`);
+
+        if (!room.alivePlayers.has(userId) && !room.eliminatedPlayers.some(p => p.userId === userId)) {
+            room.alivePlayers.set(userId, {
+                userId, name: userName, avatar: socket.user.avatar,
+                rollNumber: socket.user.rollNumber || '', department: socket.user.department || '', section: socket.user.section || '',
+                socketId: socket.id, score: 0, answers: [], isAlive: true, eliminatedAt: null,
+                correctThisRound: false, roundTimeTaken: 9999
+            });
+        } else if (room.alivePlayers.has(userId)) {
+            room.alivePlayers.get(userId).socketId = socket.id;
+        }
+
+        const playersArr = Array.from(room.alivePlayers.values()).map(p => ({ userId: p.userId, name: p.name, avatar: p.avatar }));
+        roomcast(io, roomId, 'survival:player_joined', { player: { userId, name: userName, avatar: socket.user.avatar }, players: playersArr });
+
+        // Push to sessionDoc if new
+        if (room.sessionDoc) {
+            const inSession = room.sessionDoc.players.some(p => p.userId?.toString() === userId);
+            if (!inSession) {
+                room.sessionDoc.players.push({ userId, name: userName, score: 0, isAlive: true });
+                room.sessionDoc.save().catch(e => logger.error('[SURVIVAL] Session join save:', e.message));
+            }
+        }
+
+        socket.emit('survival:room_state', {
+            roomId, title: room.title, description: room.description, topic: room.topic,
+            startDifficulty: room.startDifficulty, totalRounds: room.totalRounds,
+            baseQPerRound: room.baseQPerRound, questionsPerRoundMode: room.questionsPerRoundMode,
+            players: playersArr, status: room.status, host: room.host, maxPlayers: room.maxPlayers
+        });
+
+        // Reconnect sync: push live question if in progress
+        if (room.status === 'active' && room.currentQuestion) {
+            const alivePlayers = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
+            const qData = room.currentQuestion;
+            const elapsed = Math.floor((Date.now() - qData.startedAt) / 1000);
+            const remaining = Math.max(0, (qData.timer || 20) - elapsed);
+            socket.emit('survival:new_question', {
+                questionIndex: room.totalQAsked, questionNumber: room.currentQInRound + 1,
+                totalQInRound: getQuestionsForRound(room.totalRounds, room.questionsPerRoundMode, room.baseQPerRound, room.currentRound),
+                roundIndex: room.currentRound, roundNumber: room.currentRound + 1, totalRounds: room.totalRounds,
+                question: qData.question, options: qData.options, difficulty: qData.difficulty,
+                topic: qData.topic, timer: remaining, source: qData.source,
+                aliveCount: alivePlayers.length, statusMessage: 'Mid-round re-sync...'
+            });
+        }
+
+        logger.info(`[SURVIVAL] ${userName} joined room ${roomId}`);
+    });
+
+    // ── START GAME ────────────────────────────────────────────
+    socket.on('survival:start', (data) => {
+        const { roomId } = data || {};
+        const room = survivalRooms.get(roomId);
+        if (!room) return socket.emit('error', { message: 'Room not found.' });
+        if (room.host !== userId) return socket.emit('error', { message: 'Only host can start.' });
+        if (room.status !== 'waiting') return socket.emit('error', { message: 'Game already started.' });
+
+        room.status    = 'active';
+        room.startedAt = new Date();
+
+        roomcast(io, roomId, 'survival:game_starting', {
+            roomId,
+            players: Array.from(room.alivePlayers.values()).map(p => ({ userId: p.userId, name: p.name })),
+            totalRounds: room.totalRounds, baseQPerRound: room.baseQPerRound,
+            questionsPerRoundMode: room.questionsPerRoundMode
+        });
+
+        // Start Round 0 after a 3s countdown
+        setTimeout(() => beginRound(io, room), 3000);
+        logger.info(`[SURVIVAL] Game started: ${roomId} | Players: ${room.alivePlayers.size}`);
+    });
+
+    // ── SUBMIT ANSWER ─────────────────────────────────────────
+    socket.on('survival:submit_answer', (data) => {
+        const { roomId, answer, questionIndex } = data || {};
+        const room = survivalRooms.get(roomId);
+        if (!room || room.status !== 'active') return;
+
+        const player = room.alivePlayers.get(userId);
+        if (!player) return; // eliminated players can't answer
+
+        // Prevent double-submission
+        if (player.answers.some(a => a.questionIndex === questionIndex)) return;
+
+        const q = room.currentQuestion;
+        if (!q || q.globalIndex !== questionIndex) return;
+
+        const isCorrect  = answer && answer.trim() === q.correctAnswer.trim();
+        const timeTaken  = Date.now() - q.startedAt;
+        const scoreGiven = calcScore(isCorrect, q.difficulty, timeTaken, q.timer);
+
+        const answerRecord = {
+            questionIndex, questionText: q.question,
+            selectedAnswer: answer || '', correctAnswer: q.correctAnswer,
+            isCorrect, timeTaken, scoreAwarded: scoreGiven,
+            roundIndex: room.currentRound
+        };
+
+        player.answers.push(answerRecord);
+        player.score += scoreGiven;
+
+        // Track round-level stats for elimination decision
+        if (isCorrect) {
+            player.correctThisRound = true;
+            player.roundTimeTaken = Math.min(player.roundTimeTaken || 9999, timeTaken);
+        }
+
+        socket.emit('survival:answer_ack', {
+            isCorrect, correctAnswer: q.correctAnswer, explanation: q.explanation || '',
+            scoreAwarded: scoreGiven, totalScore: player.score
+        });
+
+        // Remove from pending
+        if (room.pendingAnswers) {
+            room.pendingAnswers.delete(userId);
+            if (room.pendingAnswers.size === 0) {
+                clearTimeout(room.roundTimer);
+                advanceQuestion(io, room);
+            }
+        }
+
+        logger.info(`[SURVIVAL] ${userName} answered Q${questionIndex} | Correct: ${isCorrect} | +${scoreGiven}pts`);
+    });
+
+    // ── LEAVE ─────────────────────────────────────────────────
+    socket.on('survival:leave', (data) => {
+        const { roomId } = data || {};
+        const room = survivalRooms.get(roomId);
+        if (!room) return;
+        const player = room.alivePlayers.get(userId);
+        if (player && player.isAlive) { player.isAlive = false; player.eliminatedAt = room.currentRound; }
+        socket.leave(`survival:${roomId}`);
+        logger.info(`[SURVIVAL] ${userName} left room ${roomId}`);
+    });
+
+    // ── GET ROOM LIST ─────────────────────────────────────────
+    socket.on('survival:get_rooms', () => {
+        const openRooms = [];
+        for (const [roomId, room] of survivalRooms.entries()) {
+            if (room.status === 'waiting') {
+                openRooms.push({
+                    roomId, title: room.title, description: room.description,
+                    hostName: room.hostName, pin: room.pin, topic: room.topic,
+                    difficulty: room.startDifficulty,
+                    playerCount: room.alivePlayers.size, maxPlayers: room.maxPlayers,
+                    rounds: room.totalRounds, questionsMode: room.questionsPerRoundMode
+                });
+            }
+        }
+        socket.emit('survival:rooms_list', openRooms);
+    });
 };
 
-const buildStatusMessage = (aliveCount, roundIndex) => {
-    if (aliveCount <= 2) return `⚡ FINAL DUEL! Only ${aliveCount} players remain!`;
-    if (aliveCount <= 5) return `🔥 Only ${aliveCount} survive! Stay sharp!`;
-    if (roundIndex === 0) return '🚀 First elimination round! 1 wrong = OUT!';
-    return `⚠️ Round ${roundIndex + 1}: ${aliveCount} players alive. One mistake = elimination!`;
+// ═══════════════════════════════════════════════════════════════
+//  INTERNAL GAME ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+/** Begins a new round: broadcasts round_intro, resets per-round tracking, starts Q1 */
+const beginRound = (io, room) => {
+    const { roomId, currentRound, totalRounds } = room;
+    const difficulty = DIFFICULTY_SEQUENCE[Math.min(currentRound, DIFFICULTY_SEQUENCE.length - 1)];
+    const questionsThisRound = getQuestionsForRound(totalRounds, room.questionsPerRoundMode, room.baseQPerRound, currentRound);
+    const alivePlayers = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
+
+    if (alivePlayers.length <= 1) {
+        return endGame(io, room, alivePlayers.length === 0 ? 'no_survivors' : 'last_survivor');
+    }
+
+    // Reset per-round tracking on all alive players
+    alivePlayers.forEach(p => { p.correctThisRound = false; p.roundTimeTaken = 9999; });
+
+    room.currentQInRound = 0;
+    room.currentRoundDifficulty = difficulty;
+    room.questionsThisRound = questionsThisRound;
+
+    roomcast(io, roomId, 'survival:round_intro', {
+        roundNumber: currentRound + 1, totalRounds,
+        difficulty, questionsThisRound,
+        aliveCount: alivePlayers.length,
+        message: `Round ${currentRound + 1} of ${totalRounds} — Difficulty: ${difficulty.toUpperCase()}`
+    });
+
+    logger.info(`[SURVIVAL] Round ${currentRound + 1}/${totalRounds} | Difficulty: ${difficulty} | Qs: ${questionsThisRound} | Room: ${roomId}`);
+
+    // Small delay for client to render the round intro, then fire first question
+    setTimeout(() => sendNextQuestion(io, room), 2500);
 };
 
-// Bug 9 Helper: Broadcast live scores
-const broadcastScores = (io, room) => {
-    const scores = Array.from(room.alivePlayers.values())
-        .sort((a, b) => b.score - a.score)
-        .map((p, i) => ({
-            rank: i + 1,
-            userId: p.userId,
-            name: p.name,
-            score: p.score,
-            isAlive: p.isAlive
-        }));
-    roomcast(io, room.roomId, 'survival:score_update', { scores });
+/** Sends the next question within the current round */
+const sendNextQuestion = async (io, room, retryCount = 0) => {
+    const { roomId } = room;
+    const MAX_RETRIES = 3;
+    const difficulty  = room.currentRoundDifficulty || 'easy';
+
+    const alivePlayers = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
+    if (alivePlayers.length <= 1) {
+        return endGame(io, room, alivePlayers.length === 0 ? 'no_survivors' : 'last_survivor');
+    }
+
+    room.pendingAnswers = new Set(alivePlayers.map(p => p.userId));
+
+    let qData = null;
+    try {
+        qData = await generateAIQuestion(room.topic, difficulty, room.content);
+        if (qData) qData.source = 'ai';
+        else throw new Error('AI null');
+    } catch (err) {
+        logger.warn(`[SURVIVAL] AI Q failed (attempt ${retryCount + 1}): ${err.message}`);
+        if (retryCount < MAX_RETRIES) {
+            return setTimeout(() => sendNextQuestion(io, room, retryCount + 1), 2000);
+        }
+        qData = await fetchDBQuestion(room.topic, difficulty, room.usedQuestions);
+    }
+
+    if (!qData) {
+        const panics = [
+            { question: `In ${room.topic}, which concept is considered foundational for ${difficulty}-level mastery?`, options: ['Core Principles', 'Advanced Patterns', 'Edge Cases', 'Meta-analysis'], correctAnswer: 'Core Principles', explanation: 'Core principles underpin all advanced understanding.', timer: 20 },
+            { question: `A ${difficulty} challenge arises in ${room.topic}. What is the primary response?`, options: ['Analyze First', 'Act Immediately', 'Delegate', 'Document'], correctAnswer: 'Analyze First', explanation: 'Analysis before action prevents compounded errors.', timer: 25 }
+        ];
+        qData = { ...panics[Math.floor(Math.random() * panics.length)], difficulty, topic: room.topic, source: 'panic_fallback' };
+    }
+
+    room.usedQuestions.push(qData.question);
+    room.totalQAsked++;
+    qData.globalIndex = room.totalQAsked;
+    qData.index       = room.currentQInRound;
+    qData.startedAt   = Date.now();
+    room.currentQuestion = qData;
+
+    const timer = qData.timer || difficultyTimer(difficulty);
+    qData.timer = timer;
+
+    if (room.sessionDoc) {
+        room.sessionDoc.questions.push({
+            questionIndex: room.totalQAsked, questionText: qData.question,
+            options: qData.options, correctAnswer: qData.correctAnswer,
+            explanation: qData.explanation || '', topic: qData.topic, difficulty,
+            source: qData.source, timerGiven: timer,
+            timeEstimate: qData.timeEstimate || { averageStudent: 15, belowAverageStudent: 25 }
+        });
+        room.sessionDoc.save().catch(e => logger.error('[SURVIVAL] Session Q save:', e.message));
+    }
+
+    roomcast(io, roomId, 'survival:new_question', {
+        questionIndex: room.totalQAsked,
+        questionNumber: room.currentQInRound + 1,
+        totalQInRound: room.questionsThisRound,
+        roundIndex: room.currentRound,
+        roundNumber: room.currentRound + 1,
+        totalRounds: room.totalRounds,
+        question: qData.question, options: qData.options,
+        difficulty, topic: qData.topic, timer, source: qData.source,
+        aliveCount: alivePlayers.length
+    });
+
+    logger.info(`[SURVIVAL] Q${room.currentQInRound + 1}/${room.questionsThisRound} in Round ${room.currentRound + 1} | Diff:${difficulty} | Timer:${timer}s`);
+
+    preloadNextQuestion(room.topic, difficulty);
+
+    room.roundTimer = setTimeout(() => advanceQuestion(io, room), (timer + 2) * 1000);
 };
 
+/** Called after each individual question's timer. Moves to next Q or round end. */
+const advanceQuestion = async (io, room) => {
+    if (room.status !== 'active') return;
+    clearTimeout(room.roundTimer);
 
+    room.currentQInRound++;
+
+    // Still more questions in this round?
+    if (room.currentQInRound < room.questionsThisRound) {
+        // 2s pause before next question within the round
+        setTimeout(() => sendNextQuestion(io, room), 2000);
+    } else {
+        // All questions in round done → process round end
+        await processRoundEnd(io, room);
+    }
+};
+
+/** Called at end of a full round: score board + smart elimination + next round or game end */
+const processRoundEnd = async (io, room) => {
+    if (room.status !== 'active') return;
+    clearTimeout(room.roundTimer);
+
+    const { roomId, currentRound, totalRounds } = room;
+    const { eliminated, survivors } = computeEliminations(room.alivePlayers, currentRound, room.alivePlayers.size);
+
+    // Award round survival bonus to surviving players
+    const roundBonus = ROUND_SURVIVAL_BONUS[currentRound + 1] || 10;
+    survivors.forEach(p => { p.score += roundBonus; });
+
+    // Eliminate players
+    eliminated.forEach(p => {
+        p.isAlive       = false;
+        p.eliminatedAt  = currentRound;
+        room.eliminatedPlayers.push(p);
+        room.alivePlayers.delete(p.userId);
+
+        // Notify eliminated player directly
+        if (p.socketId) {
+            io.to(p.socketId).emit('survival:eliminated', {
+                survivalRounds: currentRound + 1,
+                finalScore: p.score,
+                message: p.correctThisRound
+                    ? `Eliminated by performance score this round.`
+                    : `Wrong answer — eliminated in Round ${currentRound + 1}.`
+            });
+        }
+        logger.info(`[SURVIVAL] 💥 ${p.name} eliminated in Round ${currentRound + 1}`);
+    });
+
+    // Build current scoreboard (alive + eliminated)
+    const allPlayers = [...Array.from(room.alivePlayers.values()), ...room.eliminatedPlayers]
+        .sort((a, b) => b.score - a.score);
+    allPlayers.forEach((p, i) => { p.rank = i + 1; });
+
+    const leaderboard = allPlayers.map(p => ({
+        rank: p.rank, userId: p.userId, name: p.name, score: p.score,
+        isAlive: p.isAlive, eliminatedRound: p.eliminatedAt !== null ? p.eliminatedAt + 1 : null
+    }));
+
+    // Emit round result to ALL (survivors + spectators + eliminated watching)
+    roomcast(io, roomId, 'survival:round_result', {
+        roundNumber: currentRound + 1,
+        totalRounds,
+        eliminated: eliminated.map(p => ({ userId: p.userId, name: p.name, score: p.score })),
+        survivors:  survivors.map(p => ({ userId: p.userId, name: p.name, score: p.score })),
+        leaderboard,
+        roundBonus,
+        nextRound: currentRound + 1 < totalRounds ? currentRound + 2 : null
+    });
+
+    const stillAlive = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
+
+    if (stillAlive.length <= 1 || currentRound >= totalRounds - 1) {
+        // Game over
+        setTimeout(() => endGame(io, room,
+            stillAlive.length === 0 ? 'all_eliminated' :
+            stillAlive.length === 1 ? 'last_survivor' : 'max_rounds_reached'
+        ), 4000);
+    } else {
+        // Advance to next round
+        room.currentRound++;
+        setTimeout(() => beginRound(io, room), 5000); // 5s leaderboard display time
+    }
+};
+
+/** Ends the game: assigns final ranks, emits to ALL, saves to MongoDB. */
+const endGame = async (io, room, reason = 'completed') => {
+    if (room.status === 'completed') return;
+    room.status = 'completed';
+    clearTimeout(room.roundTimer);
+
+    const { roomId } = room;
+    const endedAt    = new Date();
+    const duration   = room.startedAt ? Math.round((endedAt - new Date(room.startedAt)) / 1000) : 0;
+
+    const allPlayers = [...Array.from(room.alivePlayers.values()), ...room.eliminatedPlayers];
+
+    allPlayers.sort((a, b) => {
+        if (a.isAlive !== b.isAlive) return a.isAlive ? -1 : 1;
+        if (b.score !== a.score) return b.score - a.score;
+        const aRound = a.eliminatedAt ?? room.currentRound + 1;
+        const bRound = b.eliminatedAt ?? room.currentRound + 1;
+        return bRound - aRound;
+    });
+
+    allPlayers.forEach((p, i) => { p.rank = i + 1; });
+
+    const winner = allPlayers[0] || null;
+
+    const leaderboard = allPlayers.map(p => ({
+        rank: p.rank, userId: p.userId, name: p.name, score: p.score,
+        isAlive: p.isAlive, isWinner: p.rank === 1,
+        eliminatedRound: p.eliminatedAt !== null ? p.eliminatedAt + 1 : null,
+        survivalRounds:  p.eliminatedAt !== null ? p.eliminatedAt + 1 : room.currentRound + 1,
+        accuracy: calcPlayerAccuracy(p), answers: p.answers.length
+    }));
+
+    // Emit final result to EVERYONE in the room (alive or spectating)
+    roomcast(io, roomId, 'survival:game_ended', {
+        reason,
+        winner: winner ? { userId: winner.userId, name: winner.name, score: winner.score } : null,
+        leaderboard,
+        totalRounds: room.currentRound + 1,
+        totalQuestions: room.totalQAsked,
+        duration
+    });
+
+    try {
+        if (room.sessionDoc) {
+            const allAnswers = allPlayers.reduce((sum, p) => sum + p.answers.filter(a => a.isCorrect).length, 0);
+            const allTotal   = allPlayers.reduce((sum, p) => sum + p.answers.length, 0);
+
+            room.sessionDoc.status         = 'completed';
+            room.sessionDoc.endedAt        = endedAt;
+            room.sessionDoc.duration       = duration;
+            room.sessionDoc.totalQuestions = room.totalQAsked;
+            room.sessionDoc.winner         = winner ? { userId: winner.userId, name: winner.name } : { userId: null, name: 'No winner' };
+            room.sessionDoc.avgAccuracy    = allTotal > 0 ? Math.round((allAnswers / allTotal) * 100) : 0;
+            room.sessionDoc.players        = allPlayers.map(p => {
+                const correct = p.answers.filter(a => a.isCorrect).length;
+                return {
+                    userId: p.userId, name: p.name, rollNumber: p.rollNumber,
+                    department: p.department, section: p.section,
+                    score: p.score, rank: p.rank, isWinner: p.rank === 1,
+                    eliminatedAt: p.eliminatedAt, answers: p.answers,
+                    accuracy: p.answers.length > 0 ? Math.round((correct / p.answers.length) * 100) : 0,
+                    survivalRounds: p.eliminatedAt !== null ? p.eliminatedAt + 1 : room.currentRound + 1
+                };
+            });
+            await room.sessionDoc.save();
+            logger.info(`[SURVIVAL] 📦 Session saved: ${room.sessionDoc._id}`);
+        }
+    } catch (err) { logger.error('[SURVIVAL] MongoDB save error:', err.message); }
+
+    setTimeout(() => {
+        if (room.pin) pinToRoomId.delete(room.pin);
+        survivalRooms.delete(roomId);
+        broadcastRoomsList(io);
+    }, 5 * 60 * 1000);
+
+    logger.info(`[SURVIVAL] 🏆 Game ended | Room: ${roomId} | Reason: ${reason} | Winner: ${winner?.name || 'None'}`);
+};
