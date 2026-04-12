@@ -42,7 +42,14 @@ const Profile = () => {
     return (
         <div className="profile-container">
             <header className="profile-header">
-                <div className="profile-avatar">
+                <div 
+                    className="profile-avatar premium-profile-avatar"
+                    style={{ background: 
+                        user?.role === 'student' ? 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' :
+                        user?.role === 'faculty' ? 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)' :
+                        'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)'
+                    }}
+                >
                     {user?.role === 'student' && <FaUserGraduate />}
                     {user?.role === 'faculty' && <FaChalkboardTeacher />}
                     {user?.role === 'admin' && <FaUserShield />}
@@ -50,7 +57,17 @@ const Profile = () => {
                 <div className="profile-info-main">
                     <h1>{user?.name}</h1>
                     <div className="profile-badges">
-                        <span className="profile-badge">
+                        <span 
+                            className="profile-badge premium-profile-badge"
+                            style={{ 
+                                background: 
+                                    user?.role === 'student' ? 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' :
+                                    user?.role === 'faculty' ? 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)' :
+                                    'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+                                color: 'white',
+                                border: 'none'
+                            }}
+                        >
                             {user?.role === 'student' && <FaUserGraduate />}
                             {user?.role === 'faculty' && <FaChalkboardTeacher />}
                             {user?.role === 'admin' && <FaUserShield />}

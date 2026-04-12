@@ -57,9 +57,31 @@
 }
 
 
+/* Premium Profile Styles */
+.premium-profile-avatar {
+    border: 3px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 
+        0 15px 35px rgba(0, 0, 0, 0.3),
+        inset 0 0 20px rgba(255, 255, 255, 0.25) !important;
+    overflow: visible;
+}
+
+.premium-profile-avatar svg {
+    filter: drop-shadow(0 8px 16px rgba(0,0,0,0.4)) !important;
+    font-size: 3.8rem !important;
+}
+
+.premium-profile-badge {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-weight: 800 !important;
+    letter-spacing: 0.5px;
+    padding: 0.5rem 1.25rem !important;
+}
+
 .profile-info-main {
     z-index: 1;
 }
+
 
 .profile-info-main h1 {
     font-size: 2rem;

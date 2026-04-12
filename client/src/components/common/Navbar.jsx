@@ -5,9 +5,9 @@ import { useSocket } from '../../context/SocketContext';
 import {
     FiHome, FiLogOut, FiUser, FiSettings, FiGrid, FiUsers,
     FiFileText, FiPlusCircle, FiActivity, FiSun, FiMoon,
-    FiMenu, FiX, FiLayers, FiZap, FiTarget,
-    FiAward, FiBookOpen, FiShield
+    FiMenu, FiX, FiLayers, FiZap, FiTarget
 } from 'react-icons/fi';
+import { FaUserGraduate, FaChalkboardTeacher, FaUserShield } from 'react-icons/fa';
 import { useTheme } from '../../context/ThemeContext';
 import KmitLogo from './KmitLogo';
 import './Navbar.css';
@@ -16,9 +16,9 @@ import './Navbar.css';
 // Shows the user's photo if they have one, otherwise a
 // distinct icon + colour per role: student / faculty / admin
 const ROLE_META = {
-    student: { icon: <FiAward />,    bg: '#7B2FBE', label: 'Student' },
-    faculty: { icon: <FiBookOpen />, bg: '#1E40AF', label: 'Faculty' },
-    admin:   { icon: <FiShield />,   bg: '#065F46', label: 'Admin'   },
+    student: { icon: <FaUserGraduate />,       grad: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', bg: '#6366f1', label: 'Student' },
+    faculty: { icon: <FaChalkboardTeacher />, grad: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)', bg: '#10b981', label: 'Faculty' },
+    admin:   { icon: <FaUserShield />,         grad: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)', bg: '#f59e0b', label: 'Admin'   },
 };
 
 const RoleAvatar = ({ user, size = 38 }) => {
@@ -48,19 +48,19 @@ const RoleAvatar = ({ user, size = 38 }) => {
     // No photo — show emoji avatar with role colour
     return (
         <div
-            className="role-avatar-fallback"
+            className="role-avatar-fallback premium-avatar"
             title={`${meta.label}: ${user?.name}`}
             style={{
                 width: size, height: size,
-                background: meta.bg,
-                fontSize: size * 0.45
+                background: meta.grad,
+                fontSize: size * 0.42
             }}
         >
             {meta.icon}
             <span
-                className="role-dot-badge"
+                className="role-dot-badge premium-badge"
                 title={meta.label}
-                style={{ background: meta.bg }}
+                style={{ background: meta.grad }}
             >
                 {meta.icon}
             </span>
