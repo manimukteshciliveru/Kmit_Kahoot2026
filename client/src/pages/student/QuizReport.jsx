@@ -24,8 +24,7 @@ const QuizReport = () => {
     const [analytics, setAnalytics] = useState(null);
     const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
     const [participationStats, setParticipationStats] = useState(null);
-    const [aiReview, setAIReview] = useState(null);
-    const [reviewLoading, setReviewLoading] = useState(false);
+
     const [explainingQId, setExplainingQId] = useState(null);
     const [explanations, setExplanations] = useState({});
     const [branchFilter, setBranchFilter] = useState('ALL');
@@ -52,10 +51,6 @@ const QuizReport = () => {
             setReport(reportData);
             setParticipationStats(stats);
 
-            // Fetch AI review first so it's not affected by leaderboard failures
-            if (reportData.quizId?._id) {
-                fetchAIReview(reportData.quizId._id);
-            }
 
             // Decoupled Leaderboard Fetch (Privacy Safe)
             try {
@@ -87,19 +82,7 @@ const QuizReport = () => {
         }
     };
 
-    const fetchAIReview = async (quizId) => {
-        setReviewLoading(true);
-        try {
-            const res = await aiAPI.getReview(quizId);
-            if (res.data.success) {
-                setAIReview(res.data.data.feedback);
-            }
-        } catch (error) {
-            console.error('AI Review error:', error);
-        } finally {
-            setReviewLoading(false);
-        }
-    };
+
 
     const handleAIExplain = async (ans, q) => {
         const qId = q._id;
@@ -354,48 +337,7 @@ const QuizReport = () => {
             />
 
 
-            {/* AI Review Section */}
-            <section className="ai-review-section">
-                <div className="ai-review-card">
-                    <div className="ai-header">
-                        <div className="ai-title">
-                            <FiZap className="zap-icon" />
-                            <h3>AI Performance Review</h3>
-                        </div>
-                        {reviewLoading && <div className="shimmer-line"></div>}
-                    </div>
 
-                    {!reviewLoading && aiReview ? (
-                        <div className="ai-content animate-fadeIn">
-                            <div className="ai-grid">
-                                <div className="ai-box strengths">
-                                    <h4><FiCheckCircle /> Key Strengths</h4>
-                                    <ul>
-                                        {aiReview.strengths?.map((s, i) => <li key={i}>{s}</li>)}
-                                    </ul>
-                                </div>
-                                <div className="ai-box weaknesses">
-                                    <h4><FiTarget /> Areas for Improvement</h4>
-                                    <ul>
-                                        {aiReview.weaknesses?.map((w, i) => <li key={i}>{w}</li>)}
-                                    </ul>
-                                </div>
-                            </div>
-                            <div className="ai-tip-box">
-                                <div className="tip-icon"><FiInfo /></div>
-                                <div className="tip-text">
-                                    <h5>Mentor's Tip</h5>
-                                    <p>{aiReview.tip}</p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : !reviewLoading ? (
-                        <div className="ai-empty">
-                            <p>AI Review is being prepared or unavailable for this session.</p>
-                        </div>
-                    ) : null}
-                </div>
-            </section>
 
             <section className="detailed-analysis">
                 <div className="section-head"><h3><FiLayers /> Question-wise Analysis</h3></div>
@@ -537,24 +479,7 @@ const QuizReport = () => {
                 .performance-badge.warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
                 .performance-badge.danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
 
-                /* AI Review Section */
-                .ai-review-section { margin-bottom: 2rem; }
-                .ai-review-card { background: var(--bg-secondary); border-radius: 16px; padding: 2rem; box-shadow: var(--shadow-lg); border: 1px solid var(--border); position: relative; overflow: hidden; }
-                .ai-review-card::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(to bottom, var(--primary), var(--accent)); }
-                .ai-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-                .ai-title { display: flex; align-items: center; gap: 0.75rem; color: var(--primary); }
-                .zap-icon { font-size: 1.5rem; filter: drop-shadow(0 0 5px var(--primary-light)); }
-                .ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 1.5rem; }
-                .ai-box { background: var(--bg-tertiary); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); }
-                .ai-box h4 { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; font-size: 1rem; color: var(--text-primary); }
-                .ai-box ul { padding-left: 1.25rem; }
-                .ai-box li { margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.95rem; }
-                .ai-box.strengths h4 svg { color: var(--success); }
-                .ai-box.weaknesses h4 svg { color: var(--danger); }
-                .ai-tip-box { display: flex; gap: 1rem; background: rgba(var(--primary-rgb), 0.05); background-color: var(--bg-tertiary); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--primary-light); }
-                .tip-icon { font-size: 1.5rem; color: var(--primary); margin-top: 2px; }
-                .tip-text h5 { margin: 0 0 0.25rem 0; font-size: 0.95rem; color: var(--text-primary); }
-                .tip-text p { margin: 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; font-style: italic; }
+
 
                 .detailed-analysis { background: var(--bg-secondary); border-radius: 12px; padding: 2rem; box-shadow: var(--shadow-sm); margin-bottom: 2rem; }
                 .section-head h3 { color: var(--text-primary); margin-top: 0; margin-bottom: 1.5rem; }
