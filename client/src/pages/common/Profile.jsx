@@ -5,6 +5,7 @@ import {
     FiUser, FiMail, FiBook, FiLayout, FiLock,
     FiShield
 } from 'react-icons/fi';
+import { FaUserGraduate, FaChalkboardTeacher, FaUserShield } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import './Profile.css';
 
@@ -42,13 +43,18 @@ const Profile = () => {
         <div className="profile-container">
             <header className="profile-header">
                 <div className="profile-avatar">
-                    {user?.name?.charAt(0)}
+                    {user?.role === 'student' && <FaUserGraduate />}
+                    {user?.role === 'faculty' && <FaChalkboardTeacher />}
+                    {user?.role === 'admin' && <FaUserShield />}
                 </div>
                 <div className="profile-info-main">
                     <h1>{user?.name}</h1>
                     <div className="profile-badges">
                         <span className="profile-badge">
-                            <FiShield /> {user?.role?.toUpperCase()}
+                            {user?.role === 'student' && <FaUserGraduate />}
+                            {user?.role === 'faculty' && <FaChalkboardTeacher />}
+                            {user?.role === 'admin' && <FaUserShield />}
+                            {user?.role?.toUpperCase()}
                         </span>
                         {user?.role === 'student' && (
                             <>

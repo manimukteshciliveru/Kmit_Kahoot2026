@@ -41,7 +41,14 @@
     color: white;
     z-index: 1;
     box-shadow: 0 8px 16px rgba(255, 127, 17, 0.2);
+    border: 3px solid rgba(255, 255, 255, 0.1);
 }
+
+.profile-avatar svg {
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+    font-size: 3.5rem;
+}
+
 
 .profile-info-main {
     z-index: 1;
