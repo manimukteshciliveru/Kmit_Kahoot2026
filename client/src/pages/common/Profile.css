@@ -32,17 +32,24 @@
 .profile-avatar {
     width: 100px;
     height: 100px;
-    background: var(--gradient-primary);
+    background: var(--primary);
     border-radius: var(--radius-xl);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 3rem;
     color: white;
-    z-index: 1;
-    box-shadow: 0 8px 16px rgba(255, 127, 17, 0.2);
-    border: 3px solid rgba(255, 255, 255, 0.1);
+    z-index: 2;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+    border: 4px solid rgba(255, 255, 255, 0.15);
 }
+
+/* Ensure visibility in Light Mode */
+[data-theme="light"] .profile-avatar {
+    box-shadow: 0 10px 25px rgba(123, 47, 190, 0.2);
+    border: 4px solid white;
+}
+
 
 .profile-avatar svg {
     filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
