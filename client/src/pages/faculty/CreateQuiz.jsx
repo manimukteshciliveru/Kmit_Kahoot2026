@@ -379,7 +379,7 @@ const CreateQuiz = () => {
 
             // --- Intelligent Fallback Trigger (Race Condition) ---
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('AI_TIMEOUT')), 15000) // 15 seconds max
+                setTimeout(() => reject(new Error('AI_TIMEOUT')), 120000) // 120 seconds max
             );
 
             const response = await Promise.race([apiCall, timeoutPromise]);
