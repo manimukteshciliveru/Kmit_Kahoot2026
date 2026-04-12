@@ -5,7 +5,8 @@ import { useSocket } from '../../context/SocketContext';
 import {
     FiHome, FiLogOut, FiUser, FiSettings, FiGrid, FiUsers,
     FiFileText, FiPlusCircle, FiActivity, FiSun, FiMoon,
-    FiMenu, FiX, FiLayers, FiZap, FiTarget
+    FiMenu, FiX, FiLayers, FiZap, FiTarget,
+    FiAward, FiBookOpen, FiShield
 } from 'react-icons/fi';
 import { useTheme } from '../../context/ThemeContext';
 import KmitLogo from './KmitLogo';
@@ -15,9 +16,9 @@ import './Navbar.css';
 // Shows the user's photo if they have one, otherwise a
 // distinct icon + colour per role: student / faculty / admin
 const ROLE_META = {
-    student: { emoji: '🎓', bg: '#7B2FBE', label: 'Student' },
-    faculty: { emoji: '📚', bg: '#1E40AF', label: 'Faculty' },
-    admin:   { emoji: '🛡️', bg: '#065F46', label: 'Admin'   },
+    student: { icon: <FiAward />,    bg: '#7B2FBE', label: 'Student' },
+    faculty: { icon: <FiBookOpen />, bg: '#1E40AF', label: 'Faculty' },
+    admin:   { icon: <FiShield />,   bg: '#065F46', label: 'Admin'   },
 };
 
 const RoleAvatar = ({ user, size = 38 }) => {
@@ -38,7 +39,7 @@ const RoleAvatar = ({ user, size = 38 }) => {
                     title={meta.label}
                     style={{ background: meta.bg }}
                 >
-                    {meta.emoji}
+                    {meta.icon}
                 </span>
             </div>
         );
@@ -55,13 +56,13 @@ const RoleAvatar = ({ user, size = 38 }) => {
                 fontSize: size * 0.45
             }}
         >
-            {meta.emoji}
+            {meta.icon}
             <span
                 className="role-dot-badge"
                 title={meta.label}
                 style={{ background: meta.bg }}
             >
-                {meta.emoji}
+                {meta.icon}
             </span>
         </div>
     );
