@@ -524,27 +524,7 @@ const CreateQuiz = () => {
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Quiz Mode</label>
-                            <div className="mode-selector">
-                                {[
-                                    { value: 'mcq', icon: <FiList />, label: 'Multiple Choice' },
-                                    { value: 'fill-blank', icon: <FiType />, label: 'Fill in Blanks' },
-                                    { value: 'qa', icon: <FiHelpCircle />, label: 'Q & A' },
-                                    { value: 'mixed', icon: <FiSettings />, label: 'Mixed Mode' }
-                                ].map((mode) => (
-                                    <button
-                                        key={mode.value}
-                                        type="button"
-                                        className={`mode-btn ${quizData.mode === mode.value ? 'active' : ''}`}
-                                        onClick={() => handleQuizDataChange('mode', mode.value)}
-                                    >
-                                        {mode.icon}
-                                        <span>{mode.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+
 
                         <div className="form-group">
                             <label className="form-label">Difficulty Level</label>
