@@ -131,6 +131,7 @@ const SurvivalArena = () => {
     };
 
     const handleJoinRoom = (roomId) => {
+        sessionStorage.setItem('currentSurvivalRoomId', roomId);
         socket.emit('survival:join', { roomId });
         setView('preparing');
     };
@@ -176,9 +177,18 @@ const SurvivalArena = () => {
     useEffect(() => {
         if (!socket || !connected) return;
 
+        // --- Reconnect Logic ---
+        const lastRoomId = sessionStorage.getItem('currentSurvivalRoomId');
+        if (lastRoomId && view === 'lobby') {
+            socket.emit('survival:join', { roomId: lastRoomId });
+        }
+
+        socket.emit('survival:get_rooms'); // always ask for latest rooms on mount
+
         socket.on('survival:rooms_list', setAvailableRooms);
         socket.on('survival:created', (data) => {
             console.log("📡 [SURVIVAL] Match Successfully Created:", data);
+            sessionStorage.setItem('currentSurvivalRoomId', data.roomId);
             if (creationTimeoutRef.current) clearTimeout(creationTimeoutRef.current); // Bug 8
             setRoomState(data);
             setView('preparing');
@@ -200,6 +210,7 @@ const SurvivalArena = () => {
 
         // Bug 6 (Merged): Keep one room_state listener
         socket.on('survival:room_state', (data) => {
+            sessionStorage.setItem('currentSurvivalRoomId', data.roomId);
             setRoomState(data);
             if (data.status === 'active') setView('preparing');
         });
@@ -477,7 +488,12 @@ const SurvivalArena = () => {
                                 availableRooms
                                     .filter(r => r.topic.toLowerCase().includes(searchQuery.toLowerCase()) || r.hostName.toLowerCase().includes(searchQuery.toLowerCase()))
                                     .map(room => (
-                                        <div key={room.roomId} className="room-card glass animate-slideDown">
+                                        <div 
+                                            key={room.roomId} 
+                                            className="room-card glass animate-slideDown search-room-clickable"
+                                            onClick={() => handleJoinRoom(room.roomId)}
+                                            style={{ cursor: 'pointer' }}
+                                        >
                                             <div className="room-info">
                                                 <h3 className="room-title">{room.title || room.topic}</h3>
                                                 <span className="room-topic-mini">{room.topic}</span>
@@ -487,8 +503,8 @@ const SurvivalArena = () => {
                                                     <span className="players"><FiUsers /> {room.playerCount} / {room.maxPlayers}</span>
                                                 </div>
                                             </div>
-                                            <div className="pin-required-badge">
-                                                <FiShield /> PIN Required
+                                            <div className="pin-required-badge" style={{ background: 'var(--kahoot-purple)', color: 'white' }}>
+                                                <FiArrowRight /> Join Now
                                             </div>
                                         </div>
                                     ))

@@ -221,7 +221,13 @@ module.exports = (io, socket) => {
         const room = survivalRooms.get(roomId);
 
         if (!room) return socket.emit('error', { message: 'Survival room not found.' });
-        if (room.status !== 'waiting') return socket.emit('error', { message: 'Game already in progress.' });
+        
+        // Reconnection logic: allow entry if user is already registered in the room (e.g., refresh recovery)
+        const isReconnecting = room.alivePlayers.has(userId) || room.host === userId;
+        
+        if (!isReconnecting && room.status !== 'waiting') {
+            return socket.emit('error', { message: 'Game already in progress.' });
+        }
         
         // CHECK PLAYER LIMIT
         if (room.alivePlayers.size >= room.maxPlayers) {
