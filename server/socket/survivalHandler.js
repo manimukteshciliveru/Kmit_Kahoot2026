@@ -296,6 +296,29 @@ module.exports = (io, socket) => {
             maxPlayers: room.maxPlayers
         });
 
+        // Reconnection synchronization payload: Catch up the player if a round is active
+        if (room.status === 'active' && room.currentQuestion) {
+            const alivePlayers = Array.from(room.alivePlayers.values()).filter(p => p.isAlive);
+            const qData = room.currentQuestion;
+            const timerObj = qData.timer || 20; 
+            const elapsed = Math.floor((Date.now() - qData.startedAt) / 1000);
+            const remaining = Math.max(0, timerObj - elapsed);
+
+            socket.emit('survival:new_question', {
+                questionIndex:  room.currentQIndex,
+                questionNumber: room.currentQIndex + 1,
+                totalQuestions: room.maxQuestions,
+                question:       qData.question,
+                options:        qData.options,
+                difficulty:     qData.difficulty,
+                topic:          qData.topic,
+                timer:          remaining,
+                source:         qData.source,
+                aliveCount:     alivePlayers.length,
+                statusMessage:  "Mid-round re-sync..."
+            });
+        }
+
         logger.info(`[SURVIVAL] ${userName} joined room ${roomId}`);
     });
 
