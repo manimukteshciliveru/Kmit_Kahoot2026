@@ -196,13 +196,56 @@
 }
 
 .user-avatar {
-  width: 30px;
-  height: 30px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid rgba(255, 204, 2, 0.5);
   flex-shrink: 0;
 }
+
+/* Role-aware avatar fallback circle */
+.role-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.role-avatar-fallback {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  position: relative;
+  /* emoji centering */
+  line-height: 1;
+  cursor: default;
+  user-select: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.role-avatar-fallback:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 14px rgba(255,255,255,0.2);
+}
+
+/* Small role badge pinned bottom-right of avatar */
+.role-dot-badge {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(26, 5, 51, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+}
+
 
 .user-details {
   display: flex;

@@ -11,6 +11,62 @@ import { useTheme } from '../../context/ThemeContext';
 import KmitLogo from './KmitLogo';
 import './Navbar.css';
 
+// ── Role-aware Avatar ─────────────────────────────────────────
+// Shows the user's photo if they have one, otherwise a
+// distinct icon + colour per role: student / faculty / admin
+const ROLE_META = {
+    student: { emoji: '🎓', bg: '#7B2FBE', label: 'Student' },
+    faculty: { emoji: '📚', bg: '#1E40AF', label: 'Faculty' },
+    admin:   { emoji: '🛡️', bg: '#065F46', label: 'Admin'   },
+};
+
+const RoleAvatar = ({ user, size = 38 }) => {
+    const role = user?.role || 'student';
+    const meta = ROLE_META[role] || ROLE_META.student;
+
+    if (user?.avatar) {
+        return (
+            <div className="role-avatar-wrapper" style={{ position: 'relative', width: size, height: size }}>
+                <img
+                    src={user.avatar}
+                    alt={user.name}
+                    className="user-avatar"
+                    style={{ width: size, height: size }}
+                />
+                <span
+                    className="role-dot-badge"
+                    title={meta.label}
+                    style={{ background: meta.bg }}
+                >
+                    {meta.emoji}
+                </span>
+            </div>
+        );
+    }
+
+    // No photo — show emoji avatar with role colour
+    return (
+        <div
+            className="role-avatar-fallback"
+            title={`${meta.label}: ${user?.name}`}
+            style={{
+                width: size, height: size,
+                background: meta.bg,
+                fontSize: size * 0.45
+            }}
+        >
+            {meta.emoji}
+            <span
+                className="role-dot-badge"
+                title={meta.label}
+                style={{ background: meta.bg }}
+            >
+                {meta.emoji}
+            </span>
+        </div>
+    );
+};
+
 const Navbar = () => {
     const { user, logout, isAuthenticated } = useAuth();
     const { connected } = useSocket();
@@ -115,11 +171,7 @@ const Navbar = () => {
                             {/* User Menu — desktop */}
                             <div className="user-menu desktop-only">
                                 <div className="user-info">
-                                    <img
-                                        src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=7B2FBE&color=fff`}
-                                        alt={user?.name}
-                                        className="user-avatar"
-                                    />
+                                    <RoleAvatar user={user} size={38} />
                                     <div className="user-details">
                                         <span className="user-name">{user?.name}</span>
                                         <span className="user-role">{user?.role}</span>
@@ -157,11 +209,7 @@ const Navbar = () => {
                 <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
                     {/* User info bar */}
                     <div className="mobile-user-bar">
-                        <img
-                            src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=7B2FBE&color=fff`}
-                            alt={user?.name}
-                            className="user-avatar"
-                        />
+                        <RoleAvatar user={user} size={40} />
                         <div>
                             <div className="user-name">{user?.name}</div>
                             <div className="user-role">{user?.role}</div>
