@@ -216,34 +216,58 @@
   z-index: 0;
 }
 
-/* Floating Branded Kahoot! Shapes */
-.login-background-fx::before {
-  content: '? ✓ ★ ◆ ▲ ● ? ★ ●';
+/* Base Styles for Scattered Shapes */
+.floating-shape {
   position: absolute;
-  inset: -20%;
-  font-size: 5rem;
   font-weight: 900;
-  color: rgba(255, 204, 2, 0.05);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15rem;
-  justify-content: space-around;
-  align-items: center;
-  animation: shapesFloat 40s linear infinite;
+  color: rgba(255, 204, 2, 0.1); 
   pointer-events: none;
-  overflow: hidden;
-  filter: blur(1px);
+  filter: blur(0px);
+  z-index: 1;
+  user-select: none;
+  transition: color 0.5s ease;
 }
 
-@keyframes shapesFloat {
-  0% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-50px) rotate(5deg); }
-  100% { transform: translateY(0) rotate(0deg); }
+[data-theme='dark'] .floating-shape {
+  text-shadow: 0 0 15px rgba(255, 204, 2, 0.3);
 }
 
-[data-theme='light'] .login-background-fx::before {
-  color: rgba(123, 47, 190, 0.06);
+[data-theme='light'] .floating-shape {
+  color: rgba(123, 47, 190, 0.1);
+  text-shadow: 0 0 10px rgba(123, 47, 190, 0.1);
 }
+
+/* Individual Random Positions & Unique Animations */
+.s-1  { top: 12%;  left: 15%;  font-size: 5rem;   animation: float-1 18s infinite alternate ease-in-out; }
+.s-2  { top: 22%;  left: 28%;  font-size: 3rem;   animation: float-2 22s infinite alternate ease-in-out; opacity: 0.06; }
+.s-3  { top: 78%;  left: 12%;  font-size: 6rem;   animation: float-3 20s infinite alternate ease-in-out; }
+.s-4  { top: 85%;  left: 25%;  font-size: 4rem;   animation: float-1 25s infinite alternate ease-in-out; opacity: 0.05; }
+
+.s-5  { top: 10%;  left: 82%;  font-size: 5.50rem; animation: float-2 19s infinite alternate ease-in-out; }
+.s-6  { top: 25%;  left: 92%;  font-size: 3.5rem; animation: float-3 24s infinite alternate ease-in-out; opacity: 0.04; }
+.s-7  { top: 82%;  left: 88%;  font-size: 4.8rem; animation: float-1 21s infinite alternate ease-in-out; }
+.s-8  { top: 70%;  left: 78%;  font-size: 3.2rem; animation: float-2 23s infinite alternate ease-in-out; opacity: 0.07; }
+
+.s-9  { top: 45%;  left: 10%;  font-size: 2.5rem; animation: float-3 26s infinite alternate ease-in-out; }
+.s-10 { top: 5%;   left: 55%;  font-size: 3.8rem; animation: float-1 27s infinite alternate ease-in-out; }
+.s-11 { top: 55%;  left: 90%;  font-size: 3rem;   animation: float-2 21s infinite alternate ease-in-out; }
+.s-12 { top: 90%;  left: 50%;  font-size: 4.5rem; animation: float-3 22s infinite alternate ease-in-out; }
+
+@keyframes float-1 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  100% { transform: translate(30px, -40px) rotate(20deg) scale(1.1); }
+}
+
+@keyframes float-2 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  100% { transform: translate(-25px, -30px) rotate(-15deg) scale(0.95); }
+}
+
+@keyframes float-3 {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  100% { transform: translate(20px, 20px) rotate(45deg); }
+}
+
 
 .blob {
   position: absolute;
@@ -251,8 +275,9 @@
   filter: blur(120px);
   opacity: 0.5;
   animation: blobMove 25s infinite alternate;
-  z-index: 1;
+  z-index: 0;
 }
+
 
 
 [data-theme='light'] .login-background-fx::before {
