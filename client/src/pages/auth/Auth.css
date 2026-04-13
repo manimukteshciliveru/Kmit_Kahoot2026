@@ -321,9 +321,24 @@
 }
 
 
+.form-card-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.form-card-logo :first-child {
+  background: white;
+  padding: 12px 24px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
 .form-header {
   margin-bottom: 2.5rem;
+  text-align: center;
 }
+
 
 .role-badge {
   display: inline-flex;
