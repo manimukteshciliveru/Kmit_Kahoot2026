@@ -46,11 +46,15 @@ const ParticlesBG = () => {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
                 ctx.globalAlpha = this.opacity;
                 ctx.fill();
+                ctx.shadowBlur = 0; // Reset for next particle
                 ctx.globalAlpha = 1;
             }
         }
+
 
 
         const createParticles = () => {

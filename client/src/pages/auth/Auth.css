@@ -214,32 +214,57 @@
   inset: 0;
   overflow: hidden;
   z-index: 0;
+  background-image: 
+    linear-gradient(rgba(255, 204, 2, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 204, 2, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: gridFloat 30s linear infinite;
+}
+
+@keyframes gridFloat {
+  0% { background-position: 0 0; }
+  100% { background-position: 50px 50px; }
 }
 
 .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.4;
-  animation: blobMove 20s infinite alternate;
+  filter: blur(100px);
+  opacity: 0.5;
+  animation: blobMove 25s infinite alternate;
 }
 
 .blob-1 {
-  width: 600px;
-  height: 600px;
-  top: -10%;
+  width: 700px;
+  height: 700px;
+  top: -15%;
   right: -10%;
   background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
 }
 
 .blob-2 {
-  width: 500px;
-  height: 500px;
-  bottom: -5%;
-  left: 10%;
-  background: radial-gradient(circle, #2a0d47 0%, transparent 70%);
+  width: 600px;
+  height: 600px;
+  bottom: -10%;
+  left: 5%;
+  background: radial-gradient(circle, #46178f 0%, transparent 70%);
   animation-delay: -5s;
 }
+
+[data-theme='light'] .blob-1 {
+  background: radial-gradient(circle, rgba(123, 47, 190, 0.2) 0%, transparent 70%);
+}
+
+[data-theme='light'] .blob-2 {
+  background: radial-gradient(circle, rgba(0, 210, 255, 0.15) 0%, transparent 70%);
+}
+
+[data-theme='light'] .login-background-fx {
+  background-image: 
+    linear-gradient(rgba(123, 47, 190, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(123, 47, 190, 0.04) 1px, transparent 1px);
+}
+
 
 @keyframes blobMove {
   0% { transform: translate(0, 0) scale(1); }
