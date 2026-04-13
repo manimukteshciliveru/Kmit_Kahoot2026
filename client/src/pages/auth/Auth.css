@@ -98,13 +98,22 @@
 }
 
 .role-item-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
   color: white;
+  transform: translateX(8px);
 }
 
 .role-item-btn.active {
   background: rgba(123, 47, 190, 0.15);
   color: white;
+  box-shadow: inset 0 0 20px rgba(123, 47, 190, 0.1);
+}
+
+.role-item-btn:hover .role-item-icon {
+  background: rgba(123, 47, 190, 0.2);
+  color: var(--primary);
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 0 15px rgba(123, 47, 190, 0.2);
 }
 
 .role-item-icon {
@@ -117,14 +126,16 @@
   background: rgba(255,255,255,0.05);
   font-size: 1.25rem;
   color: var(--text-muted);
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .role-item-btn.active .role-item-icon {
   background: var(--primary);
   color: white;
-  box-shadow: 0 4px 12px rgba(123, 47, 190, 0.4);
+  box-shadow: 0 8px 16px rgba(123, 47, 190, 0.4);
+  transform: scale(1.1);
 }
+
 
 .role-item-text {
   display: flex;
@@ -241,12 +252,24 @@
   position: relative;
   z-index: 5;
   background: var(--bg-glass);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--border);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
   padding: 3rem;
-  border-radius: 32px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border-radius: 36px;
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.6),
+    inset 0 1px 1px rgba(255,255,255,0.1);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
 }
+
+.login-form-container:hover {
+  transform: translateY(-5px);
+  box-shadow: 
+    0 35px 70px -15px rgba(0, 0, 0, 0.7),
+    inset 0 1px 1px rgba(255,255,255,0.15);
+}
+
 
 .form-header {
   margin-bottom: 2.5rem;
@@ -367,29 +390,53 @@
   cursor: pointer;
 }
 
-/* Submit Button */
+/* Submit Button - Shimmer Effect */
 .v2-submit-btn {
   width: 100%;
-  height: 56px;
+  height: 58px;
   background: var(--primary);
   color: white;
   border: none;
-  border-radius: 16px;
+  border-radius: 18px;
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 1.05rem;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
   cursor: pointer;
-  transition: var(--transition-bounce);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 10px 20px rgba(123, 47, 190, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.v2-submit-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: 0.5s;
+}
+
+.v2-submit-btn:hover::before {
+  left: 100%;
+  transition: 0.6s;
 }
 
 .v2-submit-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
   background: var(--primary-light);
-  box-shadow: 0 15px 30px rgba(123, 47, 190, 0.4);
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 15px 35px rgba(123, 47, 190, 0.5);
+  letter-spacing: 0.5px;
 }
 
 .v2-submit-btn:disabled {

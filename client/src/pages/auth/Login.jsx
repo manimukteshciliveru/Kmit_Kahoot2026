@@ -9,7 +9,9 @@ import {
 import { FaUserGraduate, FaChalkboardTeacher, FaUserShield } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import KmitLogo from '../../components/common/KmitLogo';
+import ParticlesBG from '../../components/common/ParticlesBG';
 import './Auth.css';
+
 
 const ROLES = [
     { 
@@ -127,7 +129,9 @@ const Login = () => {
 
             {/* Main Login Area */}
             <main className="login-main-content">
+                <ParticlesBG />
                 <div className="login-background-fx">
+
                     <div className="blob blob-1"></div>
                     <div className="blob blob-2"></div>
                 </div>
