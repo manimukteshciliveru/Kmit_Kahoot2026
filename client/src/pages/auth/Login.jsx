@@ -188,7 +188,6 @@ const Login = () => {
                                 <span className="checkmark"></span>
                                 Remember me
                             </label>
-                            <span className="forgot-link">Forgot Password?</span>
                         </div>
 
                         <button 
@@ -206,10 +205,6 @@ const Login = () => {
                             )}
                         </button>
                     </form>
-
-                    <footer className="form-footer">
-                        <p>Need support? <span className="contact-support">Contact IT Desk</span></p>
-                    </footer>
                 </div>
             </main>
         </div>
