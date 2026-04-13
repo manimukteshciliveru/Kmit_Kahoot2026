@@ -24,10 +24,14 @@ const ParticlesBG = () => {
             init() {
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 2 + 1;
-                this.speedX = (Math.random() - 0.5) * 0.5;
-                this.speedY = (Math.random() - 0.5) * 0.5;
-                this.opacity = Math.random() * 0.5 + 0.1;
+                this.size = Math.random() * 3 + 1;
+                this.speedX = (Math.random() - 0.5) * 0.4;
+                this.speedY = (Math.random() - 0.5) * 0.4;
+                
+                // Color selection: Gold, Purple, or soft White
+                const colors = ['#FFCC02', '#7B2FBE', '#FFFFFF', '#FF9900'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.opacity = Math.random() * 0.4 + 0.1;
             }
 
             update() {
@@ -41,10 +45,13 @@ const ParticlesBG = () => {
             draw() {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 204, 2, ${this.opacity})`;
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.opacity;
                 ctx.fill();
+                ctx.globalAlpha = 1;
             }
         }
+
 
         const createParticles = () => {
             particles = [];
