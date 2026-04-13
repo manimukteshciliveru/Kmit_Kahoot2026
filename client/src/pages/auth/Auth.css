@@ -214,25 +214,48 @@
   inset: 0;
   overflow: hidden;
   z-index: 0;
-  background-image: 
-    linear-gradient(rgba(255, 204, 2, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 204, 2, 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-  animation: gridFloat 30s linear infinite;
+  perspective: 1000px;
 }
 
-@keyframes gridFloat {
-  0% { background-position: 0 0; }
-  100% { background-position: 50px 50px; }
+/* 3D Perspective Grid Floor */
+.login-background-fx::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background-image: 
+    linear-gradient(rgba(255, 204, 2, 0.08) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(255, 204, 2, 0.08) 1.5px, transparent 1.5px);
+  background-size: 60px 60px;
+  transform: rotateX(60deg);
+  animation: gridScroll 20s linear infinite;
+  mask-image: linear-gradient(to top, rgba(0,0,0,1) 20%, transparent 80%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 20%, transparent 80%);
+}
+
+@keyframes gridScroll {
+  0% { transform: rotateX(60deg) translateY(0); }
+  100% { transform: rotateX(60deg) translateY(60px); }
 }
 
 .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(100px);
+  filter: blur(120px);
   opacity: 0.5;
   animation: blobMove 25s infinite alternate;
+  z-index: 1;
 }
+
+[data-theme='light'] .login-background-fx::before {
+  background-image: 
+    linear-gradient(rgba(123, 47, 190, 0.08) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(123, 47, 190, 0.08) 1.5px, transparent 1.5px);
+  mask-image: linear-gradient(to top, rgba(0,0,0,0.5) 20%, transparent 80%);
+}
+
 
 .blob-1 {
   width: 700px;
