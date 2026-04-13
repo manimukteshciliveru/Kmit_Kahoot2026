@@ -214,30 +214,35 @@
   inset: 0;
   overflow: hidden;
   z-index: 0;
-  perspective: 1000px;
 }
 
-/* 3D Perspective Grid Floor */
+/* Floating Branded Kahoot! Shapes */
 .login-background-fx::before {
-  content: '';
+  content: '? ✓ ★ ◆ ▲ ● ? ★ ●';
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background-image: 
-    linear-gradient(rgba(255, 204, 2, 0.08) 1.5px, transparent 1.5px),
-    linear-gradient(90deg, rgba(255, 204, 2, 0.08) 1.5px, transparent 1.5px);
-  background-size: 60px 60px;
-  transform: rotateX(60deg);
-  animation: gridScroll 20s linear infinite;
-  mask-image: linear-gradient(to top, rgba(0,0,0,1) 20%, transparent 80%);
-  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 20%, transparent 80%);
+  inset: -20%;
+  font-size: 5rem;
+  font-weight: 900;
+  color: rgba(255, 204, 2, 0.05);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15rem;
+  justify-content: space-around;
+  align-items: center;
+  animation: shapesFloat 40s linear infinite;
+  pointer-events: none;
+  overflow: hidden;
+  filter: blur(1px);
 }
 
-@keyframes gridScroll {
-  0% { transform: rotateX(60deg) translateY(0); }
-  100% { transform: rotateX(60deg) translateY(60px); }
+@keyframes shapesFloat {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-50px) rotate(5deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+[data-theme='light'] .login-background-fx::before {
+  color: rgba(123, 47, 190, 0.06);
 }
 
 .blob {
@@ -249,13 +254,11 @@
   z-index: 1;
 }
 
+
 [data-theme='light'] .login-background-fx::before {
-  background-image: 
-    linear-gradient(rgba(123, 47, 190, 0.15) 2px, transparent 2px),
-    linear-gradient(90deg, rgba(123, 47, 190, 0.15) 2px, transparent 2px);
-  mask-image: linear-gradient(to top, rgba(0,0,0,0.7) 10%, transparent 90%);
-  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 10%, transparent 90%);
+  color: rgba(123, 47, 190, 0.08);
 }
+
 
 
 

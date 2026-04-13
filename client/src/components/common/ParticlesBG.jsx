@@ -48,17 +48,35 @@ const ParticlesBG = ({ theme = 'dark' }) => {
             }
 
             draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.speedX * 10); // Subtle rotation based on movement
+                
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                // Randomly choose shape: 0-Circle, 1-Square, 2-Diamond
+                const shapeType = Math.floor(this.x % 3);
+                
+                if (shapeType === 0) {
+                    ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                } else if (shapeType === 1) {
+                    ctx.rect(-this.size, -this.size, this.size * 2, this.size * 2);
+                } else {
+                    ctx.moveTo(0, -this.size * 1.5);
+                    ctx.lineTo(this.size * 1.5, 0);
+                    ctx.lineTo(0, this.size * 1.5);
+                    ctx.lineTo(-this.size * 1.5, 0);
+                    ctx.closePath();
+                }
+
                 ctx.fillStyle = this.color;
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = theme === 'dark' ? 10 : 0;
                 ctx.shadowColor = this.color;
                 ctx.globalAlpha = this.opacity;
                 ctx.fill();
-                ctx.shadowBlur = 0; // Reset for next particle
-                ctx.globalAlpha = 1;
+                ctx.restore();
             }
         }
+
 
 
 
