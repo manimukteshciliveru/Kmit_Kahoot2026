@@ -214,6 +214,38 @@
   inset: 0;
   overflow: hidden;
   z-index: 0;
+  perspective: 1200px;
+}
+
+/* 3D Perspective Grid - High Fidelity */
+.login-background-fx::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background-image: 
+    linear-gradient(rgba(255, 204, 2, 0.08) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(255, 204, 2, 0.08) 1.5px, transparent 1.5px);
+  background-size: 80px 80px;
+  transform: rotateX(65deg) rotateZ(0deg);
+  animation: gridShift 30s linear infinite;
+  mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 0%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 0%, transparent 85%);
+  z-index: -1;
+}
+
+@keyframes gridShift {
+  0% { transform: rotateX(65deg) translateY(0); }
+  100% { transform: rotateX(65deg) translateY(80px); }
+}
+
+[data-theme='light'] .login-background-fx::before {
+  background-image: 
+    linear-gradient(rgba(123, 47, 190, 0.12) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(123, 47, 190, 0.12) 2px, transparent 2px);
+  mask-image: radial-gradient(ellipse at center, rgba(0,0,0,0.8) 0%, transparent 85%);
 }
 
 /* Base Styles for Scattered Shapes */
@@ -275,7 +307,7 @@
   filter: blur(120px);
   opacity: 0.5;
   animation: blobMove 25s infinite alternate;
-  z-index: 0;
+  z-index: -1;
 }
 
 
