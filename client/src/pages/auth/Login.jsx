@@ -1,18 +1,41 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { FiUser, FiLock, FiEye, FiEyeOff, FiArrowRight, FiSun, FiMoon } from 'react-icons/fi';
-import { HiAcademicCap, HiUserGroup, HiShieldCheck } from 'react-icons/hi2';
+import { 
+    FiLock, FiEye, FiEyeOff, FiArrowRight, 
+    FiSun, FiMoon, FiMail, FiHash 
+} from 'react-icons/fi';
+import { FaUserGraduate, FaChalkboardTeacher, FaUserShield } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import KmitLogo from '../../components/common/KmitLogo';
 import './Auth.css';
 
-// Role definitions for login form
 const ROLES = [
-    { id: 'student', label: 'Student', icon: HiAcademicCap, placeholder: 'Enter Roll Number (e.g., 24BD1A058J)', fieldLabel: 'Roll Number' },
-    { id: 'faculty', label: 'Faculty', icon: HiUserGroup, placeholder: 'Enter Faculty ID', fieldLabel: 'Faculty ID' },
-    { id: 'admin', label: 'Admin', icon: HiShieldCheck, placeholder: 'Enter Admin ID', fieldLabel: 'Admin ID' },
+    { 
+        id: 'student', 
+        label: 'Student', 
+        icon: <FaUserGraduate />, 
+        placeholder: 'Roll Number or Email', 
+        fieldLabel: 'Identity',
+        desc: 'Access your quizzes and track performance'
+    },
+    { 
+        id: 'faculty', 
+        label: 'Faculty', 
+        icon: <FaChalkboardTeacher />, 
+        placeholder: 'Faculty ID or Email', 
+        fieldLabel: 'Workplace ID',
+        desc: 'Create, manage and analyze student quizzes'
+    },
+    { 
+        id: 'admin', 
+        label: 'Admin', 
+        icon: <FaUserShield />, 
+        placeholder: 'Admin ID or Email', 
+        fieldLabel: 'System Key',
+        desc: 'Overwatch system logs and user authority'
+    },
 ];
 
 const Login = () => {
@@ -21,12 +44,12 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
+    
+    const { login, isAuthenticated, user: authUser } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
-    const { isAuthenticated, user: authUser } = useAuth();
 
-    // 🚀 Auto-redirect if already logged in
+    // Auto-redirect if already logged in
     useEffect(() => {
         if (isAuthenticated && authUser) {
             navigate(`/${authUser.role}/dashboard`);
@@ -37,108 +60,95 @@ const Login = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
         if (!userId || !password) {
             toast.error('Please fill in all fields');
             return;
         }
-
-        if (loading) return; // Prevent double submission
-
         setLoading(true);
         try {
             const result = await login(userId, password, selectedRole);
             if (result.success) {
-                toast.success(`Welcome back!`);
+                toast.success(`Welcome back, ${result.user.name.split(' ')[0]}!`);
                 navigate(`/${selectedRole}/dashboard`);
             } else {
                 toast.error(result.message);
             }
         } catch (err) {
-            toast.error('Login failed, please try again.');
+            toast.error('Connection failed, try again later.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="auth-page">
-            <div className="auth-background">
-                <div className="bg-gradient"></div>
-                <div className="bg-grid"></div>
-                <div className="bg-glow glow-1"></div>
-                <div className="bg-glow glow-2"></div>
-            </div>
+        <div className="login-v2-page">
+            {/* Left Sidebar */}
+            <aside className="login-sidebar">
+                <div className="sidebar-brand">
+                    <div className="logo-box">
+                        <KmitLogo height="44px" />
+                    </div>
+                    <div className="brand-text">
+                        <span>Kahoot!</span>
+                        <small>Learning Engine</small>
+                    </div>
+                </div>
 
-            {/* Theme Toggle in top right corner */}
-            <div className="theme-toggle-corner">
-                <button
-                    onClick={toggleTheme}
-                    className={`theme-selector-btn ${theme}`}
-                    title={theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}
-                >
-                    <span className="theme-icon">
-                        {theme === 'dark' ? <FiMoon /> : <FiSun />}
-                    </span>
-                    <span className="theme-label">
-                        {theme === 'dark' ? 'Night Mode' : 'Day Mode'}
-                    </span>
-                </button>
-            </div>
-
-            <div className="auth-container">
-                <div className="auth-card animate-slideUp">
-                    <div className="auth-header">
-                        <Link to="/" className="auth-logo">
-                            <div style={{
-                                display: 'inline-flex',
-                                padding: '12px 24px',
-                                background: 'white',
-                                borderRadius: '12px',
-                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                                marginBottom: '1rem',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}>
-                                <KmitLogo height="60px" />
+                <nav className="role-vertical-menu">
+                    <div className="menu-label">SELECT AUTHORITY</div>
+                    {ROLES.map(role => (
+                        <button
+                            key={role.id}
+                            className={`role-item-btn ${selectedRole === role.id ? 'active' : ''}`}
+                            onClick={() => {
+                                setSelectedRole(role.id);
+                                setUserId('');
+                                setPassword('');
+                            }}
+                        >
+                            <span className="role-item-icon">{role.icon}</span>
+                            <div className="role-item-text">
+                                <span className="label">{role.label}</span>
+                                <span className="desc">{role.id === selectedRole ? 'Active Authority' : 'Switch Mode'}</span>
                             </div>
-                        </Link>
-                        <h1>Welcome Back</h1>
-                        <p>Sign in to continue your learning journey</p>
-                    </div>
+                            {selectedRole === role.id && <div className="active-indicator" />}
+                        </button>
+                    ))}
+                </nav>
 
-                    {/* Role Selector */}
-                    <div className="role-selector">
-                        {ROLES.map(role => {
-                            const Icon = role.icon;
-                            return (
-                                <button
-                                    key={role.id}
-                                    type="button"
-                                    className={`role-btn ${selectedRole === role.id ? 'active' : ''}`}
-                                    onClick={() => {
-                                        setSelectedRole(role.id);
-                                        setUserId('');
-                                        setPassword('');
-                                    }}
-                                >
-                                    <Icon className="role-icon" />
-                                    <span>{role.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
+                <div className="sidebar-footer">
+                    <button onClick={toggleTheme} className="theme-toggle-inline">
+                        {theme === 'dark' ? <FiSun /> : <FiMoon />}
+                        <span>{theme === 'dark' ? 'Day Mode' : 'Night Mode'}</span>
+                    </button>
+                    <div className="copyright">© 2026 KMIT-KAHOOT</div>
+                </div>
+            </aside>
 
-                    <form onSubmit={handleSubmit} className="auth-form">
-                        <div className="form-group">
-                            <label className="form-label">
-                                {currentRole.fieldLabel}
-                            </label>
-                            <div className="input-wrapper">
-                                <FiUser className="input-icon" />
+            {/* Main Login Area */}
+            <main className="login-main-content">
+                <div className="login-background-fx">
+                    <div className="blob blob-1"></div>
+                    <div className="blob blob-2"></div>
+                </div>
+
+                <div className="login-form-container animate-slideRight">
+                    <header className="form-header">
+                        <div className="role-badge">
+                            {currentRole.icon}
+                            <span>{currentRole.label} PORTAL</span>
+                        </div>
+                        <h1>Login to your account</h1>
+                        <p>{currentRole.desc}</p>
+                    </header>
+
+                    <form onSubmit={handleSubmit} className="login-form-body">
+                        <div className="v2-form-group">
+                            <label>{currentRole.fieldLabel}</label>
+                            <div className="v2-input-wrapper">
+                                <FiHash className="v2-icon" />
                                 <input
                                     type="text"
-                                    className="form-input"
                                     placeholder={currentRole.placeholder}
                                     value={userId}
                                     onChange={(e) => setUserId(e.target.value)}
@@ -147,21 +157,20 @@ const Login = () => {
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Password</label>
-                            <div className="input-wrapper">
-                                <FiLock className="input-icon" />
+                        <div className="v2-form-group">
+                            <label>Password</label>
+                            <div className="v2-input-wrapper">
+                                <FiLock className="v2-icon" />
                                 <input
                                     type={showPassword ? 'text' : 'password'}
-                                    className="form-input"
-                                    placeholder="Enter your password"
+                                    placeholder="Enter secure password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     autoComplete="current-password"
                                 />
                                 <button
                                     type="button"
-                                    className="password-toggle"
+                                    className="v2-toggle"
                                     onClick={() => setShowPassword(!showPassword)}
                                 >
                                     {showPassword ? <FiEyeOff /> : <FiEye />}
@@ -169,23 +178,36 @@ const Login = () => {
                             </div>
                         </div>
 
-                        <button
-                            type="submit"
-                            className="btn btn-primary btn-lg w-full"
+                        <div className="form-utils">
+                            <label className="checkbox-container">
+                                <input type="checkbox" />
+                                <span className="checkmark"></span>
+                                Remember me
+                            </label>
+                            <span className="forgot-link">Forgot Password?</span>
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            className="v2-submit-btn" 
                             disabled={loading}
                         >
                             {loading ? (
-                                <span className="spinner spinner-sm"></span>
+                                <div className="v2-loader"></div>
                             ) : (
                                 <>
-                                    Sign In
+                                    <span>Sign in to Dashboard</span>
                                     <FiArrowRight />
                                 </>
                             )}
                         </button>
                     </form>
+
+                    <footer className="form-footer">
+                        <p>Need support? <span className="contact-support">Contact IT Desk</span></p>
+                    </footer>
                 </div>
-            </div>
+            </main>
         </div>
     );
 };
