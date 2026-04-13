@@ -129,8 +129,9 @@ const Login = () => {
 
             {/* Main Login Area */}
             <main className="login-main-content">
-                <ParticlesBG />
+                <ParticlesBG key={theme} theme={theme} />
                 <div className="login-background-fx">
+
 
                     <div className="blob blob-1"></div>
                     <div className="blob blob-2"></div>

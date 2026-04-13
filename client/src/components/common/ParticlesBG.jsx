@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 
-const ParticlesBG = () => {
+const ParticlesBG = ({ theme = 'dark' }) => {
     const canvasRef = useRef(null);
+
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -28,11 +29,15 @@ const ParticlesBG = () => {
                 this.speedX = (Math.random() - 0.5) * 0.4;
                 this.speedY = (Math.random() - 0.5) * 0.4;
                 
-                // Color selection: Gold, Purple, or soft White
-                const colors = ['#FFCC02', '#7B2FBE', '#FFFFFF', '#FF9900'];
+                // Bold colors for light mode, glowing for dark mode
+                const colors = theme === 'light' 
+                    ? ['#7B2FBE', '#FF9900', '#4F46E5', '#D97706'] // Deeper colors for visibility
+                    : ['#FFCC02', '#7B2FBE', '#FFFFFF', '#FF9900'];
+                
                 this.color = colors[Math.floor(Math.random() * colors.length)];
-                this.opacity = Math.random() * 0.4 + 0.1;
+                this.opacity = theme === 'light' ? Math.random() * 0.6 + 0.3 : Math.random() * 0.4 + 0.1;
             }
+
 
             update() {
                 this.x += this.speedX;

@@ -251,10 +251,12 @@
 
 [data-theme='light'] .login-background-fx::before {
   background-image: 
-    linear-gradient(rgba(123, 47, 190, 0.08) 1.5px, transparent 1.5px),
-    linear-gradient(90deg, rgba(123, 47, 190, 0.08) 1.5px, transparent 1.5px);
-  mask-image: linear-gradient(to top, rgba(0,0,0,0.5) 20%, transparent 80%);
+    linear-gradient(rgba(123, 47, 190, 0.15) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(123, 47, 190, 0.15) 2px, transparent 2px);
+  mask-image: linear-gradient(to top, rgba(0,0,0,0.7) 10%, transparent 90%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 10%, transparent 90%);
 }
+
 
 
 .blob-1 {
