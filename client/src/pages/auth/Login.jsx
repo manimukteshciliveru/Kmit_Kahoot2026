@@ -138,10 +138,8 @@ const Login = () => {
                 </div>
 
                 <div className="login-form-container animate-slideRight">
-                    <div className="form-card-logo">
-                        <KmitLogo height="65px" />
-                    </div>
                     <header className="form-header">
+
 
                         <div className="role-badge">
                             {currentRole.icon}
